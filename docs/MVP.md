@@ -92,3 +92,19 @@ When demoing this project to engineering leads at places like **Google Search AI
 1. **Syntax-Safe Mutations via ESTree Nodes:** Show how `uipipe paint` doesn't use fragile string regex replaces or fragile template string substitutions to apply design styles. By parsing the file through `oxc-parser`, you traverse legitimate `JSXOpeningElement` nodes and safely inject properties directly onto real AST indices. This guarantees a **0.00% compilation syntax corruption rate**.
 2. **Mathematical Visual Gates:** Emphasize that your system runs color luma contrast formulas *at compile time*. The design system is structurally incapable of compiling code that violates accessibility benchmarks. 
 3. **The State Invariant Reconciliation Protocol (SIRP):** Before any modification command runs, the tool computes a SHA-256 byte hash of the developer's file. If the local hash drifts from the historical ledger in `session.json` (meaning the human dev did manual IDE edits), the system instantly alerts them and forces a choice: track it cleanly via an incremental log commit or revert to a stable checkpoint. This elegantly resolves the multi-agent co-builder friction pattern.
+
+## 5. Architectural Scalability & Future PRD Expansion Paths
+
+The MVP is explicitly architected using strict separation-of-concern boundaries to ensure the toolchain can gracefully scale up to the full 14-tool Product Requirement Document (PRD) specification without necessitating structural rewrites of the core logical layers.
+
+### 5.1 Decoupled Browser Telemetry (Scaling `break` to Frameworks)
+* **MVP Boundary:** `uipipe break` evaluates static HTML snapshots using raw `getBoundingClientRect()` bounds to sidestep real-time component bundling overhead.
+* **PRD Inflection Strategy:** The headless fuzzer engine inside `src/core/adversary.ts` interacts with browsers via a strict `IHeadlessBrowserDriver` interface. Scaling back up to live React/JSX component testing requires zero changes to the fuzzer loop or the self-healing layout engine; it merely requires instantiating an alternative `ReactCanvasAdapter` that orchestrates an in-memory Vite bundling pipeline.
+
+### 5.2 Immutable Tree Graph Extensibility (Scaling `paint` to `trace`)
+* **MVP Boundary:** `src/core/compiler.ts` utilizes `oxc-parser` exclusively to traverse `JSXOpeningElement` nodes and perform mutation style-token injections.
+* **PRD Inflection Strategy:** Because the AST parser translates text streams into industry-standard ESTree object graphs in Node memory, adding tools like `uipipe trace` (the console ASCII visualizer) or `uipipe layout` (the pure structural framework boilerplate engine) is completely additive. These tools can tap directly into the existing token map and node depth extraction indices without mutating the underlying compiler core.
+
+### 5.3 Command-Routing Decoupling (Scaling to the 14-Tool Matrix)
+* **MVP Boundary:** The CLI layer maps flags directly to five high-signal orchestration commands while relying on core foundational domains (`matrix.ts`, `session.ts`, `adversary.ts`).
+* **PRD Inflection Strategy:** The files within `src/core/` handle pure domain math (relative color luminance, SHA-256 byte-hashes, bounding box collisions). Expanding from 6 tools to the full 14-tool suite is achieved by building light, isolated process routing wrappers inside `src/commands/` (such as `bleed.ts` or `flex.ts`). These wrappers simply pass alternative command parameters down to the stabilized, mathematical utility primitives already locked within the core infrastructure.
