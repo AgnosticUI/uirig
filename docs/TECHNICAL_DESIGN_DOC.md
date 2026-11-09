@@ -559,6 +559,60 @@ export interface ITextPackerCore {
   compressLayoutAsset(sourceMarkup: string, options: IPackOptions): Promise<IPackOutput>;
 }
 ```
+
+### 4.14 Unified Headless Browser Driver Adapter Contract
+* **Path:** `src/interfaces/browser.ts`
+
+This contract abstracts browser automation frameworks (Playwright, Puppeteer, Selenium) into an interchangeable structural telemetry suite, protecting core fuzz routines from runtime tool lock-in.
+
+```typescript
+export interface IBrowserDriverLaunchOptions {
+  headless: boolean;
+  viewportWidth: number;
+  viewportHeight: number;
+}
+
+export interface IElementBoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  selectorPath: string;
+}
+
+export interface IHeadlessBrowserDriver {
+  /**
+   * Initializes the underlying serverless browser runner instance.
+   */
+  init(options: IBrowserDriverLaunchOptions): Promise<void>;
+
+  /**
+   * Mounts and loads the target compiled layout markup file safely into a local DOM window context.
+   */
+  loadTargetMarkup(filePath: string): Promise<void>;
+
+  /**
+   * Inject targeted tracking mutations (e.g., text length expansion string fuzzing) onto specific selectors.
+   */
+  mutateTextContent(selector: string, appendedText: string): Promise<void>;
+
+  /**
+   * Injects dynamic inline styles to push container box margins or padding.
+   */
+  injectStyles(selector: string, styles: Record<string, string>): Promise<void>;
+
+  /**
+   * Polls exact runtime coordinates and geometric metrics utilizing native browser telemetry loops.
+   */
+  getElementBoundingBox(selector: string): Promise<IElementBoundingBox | null>;
+
+  /**
+   * Explicitly teardown and close headless browser threads to preserve runner performance buckets.
+   */
+  terminate(): Promise<void>;
+}
+```
+
 ## 5. Component-by-Component Breakdown
 
 ### 5.1 Root Architecture & Configuration Paths
@@ -620,3 +674,22 @@ export interface ITextPackerCore {
   The automated structural repair synthesizer. Receives specific coordinate or box leakage pointers from Playwright evaluations, maps matching target element signatures back into the source syntax nodes, maps appropriate patch elements, and formats inline structural repairs.
 * **`orchestrator.ts`**
   The hot-reload session lifecycle processor. Coordinates atomic filesystem updates, controls localized web server threads, and opens real-time pipeline notifications across rendering engines.
+
+### 5.4 Swappable Automation Driver Core Mapping
+* **Path:** `src/core/adversary.ts`
+
+The `AdversaryCore` logic modules ingest an instance fulfilling the `IHeadlessBrowserDriver` interface via standard Dependency Injection. This layout allows enterprise operators to build alternative driver adapters without altering core structural fuzz engines.
+
+```text
+[Decoupled Fuzz Loop Orchestration Map]
+ src/commands/break.ts (CLI Process Router)
+        │
+        ▼
+ src/core/adversary.ts (Ingests IHeadlessBrowserDriver via Constructor)
+        │
+        └───► PlaywrightAdapter (MVP Core Delivery Node)
+              ├─── [PuppeteerAdapter] (Future Extensible Strategy Slot)
+              └─── [CypressAdapter]   (Future Extensible Strategy Slot)
+```
+
+> **MVP Delivery Mandate:** To streamline the initial open-source release footprint and minimize dependency overhead, **only the `PlaywrightAdapter` is delivered as part of the MVP implementation**. The underlying architecture remains rigorously decoupled via structural type interfaces, ensuring that subsequent driver strategies can be appended as minor feature iterations without mutating the core adversary execution loops.
