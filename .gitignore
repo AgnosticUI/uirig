@@ -1,0 +1,15 @@
+# System & Dependency Overhead
+node_modules/
+dist/
+build/
+.env
+
+# Local Workspace State Logs & Artifacts
+.uipipe/snapshots/
+.uipipe/copy_paste_pack.md
+
+# OS/IDE Artifacts
+.DS_Store
+.vscode/
+.idea/
+*.log
