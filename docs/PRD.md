@@ -1,4 +1,4 @@
-# Product Requirement Document (PRD)
+# Product Requirement Document (PRD) - Part 1
 
 ## Project: `uipipe`
 ### Subtitle: The Composable Unix Pipeline for Token-Aware AI Design Engineering
@@ -57,28 +57,41 @@ To project a professional toolchain aesthetic, `uipipe` explicitly and completel
 
 ## 4. Component Interface Specifications
 
-### 4.1 `uipipe layout` (The Structural Blueprint)
-* **Description:** Pure-responsibility layout generator. Accepts structural content parameters and synthesizes a zero-color, unstyled HTML/JSX skeleton baseline.
-* **Input:** Natural language structural description or wireframe constraint.
-* **Output:** An immutable, semantic `01_layout.html` or framework template chunk utilizing only primitive layout bounds (Flexbox/Grid layout constructs, gray wireframe placeholders). It is completely stripped of all aesthetic embellishments.
+### 4.1 `uipipe layout` (Structural Blueprint Engine)
+* **Description:** Generates zero-color, invariant layout skeletons focusing exclusively on document outlines, containment flows, and responsive layouts.
+* **Input Parameters:**
+  * `intent`: Natural language structural directive string.
+  * `--platform`: Target rendering engine definition (`html-tailwind` | `react-tailwindcss`).
+* **In-Memory Transformation:** Instantiates the base framework structural skeleton layout template, mapping user description keywords directly into pure CSS grid grids and flex layouts.
+* **Output Artifact:** Emits `01_layout.html` or framework component file containing grayscale semantic markup stripped of any color, typography families, shadows, or motion styles.
+* **Failure Matrix:** Throws exit code `1` if layout directives lack valid document containment boundaries or if write access to the workspace path is denied.
 
-### 4.2 `uipipe paint` & The Framework Adapter Matrix
-* **Description:** Ingests unstyled structure markup strings and forks parsing logic based on platform choice. For raw static HTML layouts, it parses elements via PostHTML nodes. For React/JSX environments, it leverages a high-performance native Rust compiler bridge via `oxc-parser` to process target structures directly into standard ESTree compliance. This completely safeguards complex hybrid tag expressions, dynamic brace variables, and self-closing tags from element corruption. Strategy adapters parse values securely into final framework token bindings (standard markup `class` formatting tags versus React/JSX camelCase `className` properties).
-* **The Variation Machine:** Instead of outputting a single design outcome, `uipipe paint` reads the token spectrum and generates 3-5 distinct visual applications onto the identical structural base (e.g., shifting structural token density from compact to roomy, swapping accent priorities, alternating light/dark surface maps).
-* **The Shuffle Engine:** Supports an interactive command variant (`uipipe paint --shuffle`). This operates as a design "I'm Feeling Lucky" engine. It dynamically randomizes token mappings (color bindings from the design token system, border-radius themes, shadow depths) across the structural blocks. The user cycles through applications with simple keystrokes until a layout variant satisfies aesthetic targets.
+### 4.2 `uipipe paint` & The Relational Token Matrix Core
+* **Description:** Fuses the unstyled structure markup file with a design system token configuration using a secure virtual tree engine to prevent regex string substitution collisions.
+* **Input Parameters:**
+  * `--tokens`: Path pointer string to target design tokens JSON catalog dictionary.
+  * `--shuffle`: Flag configuration activating the "I'm Feeling Lucky" alternative style mixer.
+* **In-Memory Transformation:** Validates token properties against the Relational Matrix schema. If a color pairing falls below a 4.5:1 relative luminance WCAG contrast threshold, the engine discards the variation and dynamically calculates a compliant harmony pair out of the allowed spectrum tokens before converting the PostHTML DOM tree or Oxc ESTree nodes into final painted output code blocks.
+* **Output Artifact:** Emits `02_painted.html` or a framework-specific painted style snapshot file.
+* **Failure Matrix:** Throws exit code `1` if design token catalogs violate schema bounds or fail the mathematical contrast threshold rules during manual token overrides.
 
-### 4.3 `uipipe break` (The Adversarial Stress Fuzzer)
-* **Description:** A strict adversarial layout robustness inspector (accessible via `uipipe break`, `breakit`, or `uibreakit`). It completely abandons brittle, error-prone string length estimations inside Node.js. Instead, it launches an un-networked serverless browser context via a local headless Playwright execution process (v1.64+ stable line).
-* **Functional Injections:** For components that rely on state hydration (React/Vue components), the engine constructs a clean sandboxed local mount frame (`config/templates/react_canvas.html`) paired with framework execution scripts. It executes an internal blocking evaluate hook to guarantee client-side hydration is fully active before running text growth stress injections via modern web-first `page.locator()` parameters. It tests layout boundaries using native browser bounding rectangles (`getBoundingClientRect` measurements):
-  1. *String Expansion Fuzzing:** Injects long textual strings with zero break spaces (e.g., 75-character long string IDs, German locale length amplification (+30% tracking characters)) to verify text-wrapping layouts.
-  2. *Scale Fuzzing:* Forces document containers into simulating a 200% text layout scaling rule to test responsiveness.
-  3. *Interrupted Phase Simulation:* Validates element mechanics when actions fire out of order or animation states are dropped mid-execution.
-* **Output:** If text overflows break layout boundary containment grids, the tool throws a structural violation error, logs element leaks, and exits with a strict POSIX status code `2`, preventing broken builds from hitting production code paths.
+### 4.3 `uipipe break` (The Adversarial Self-Healing Rig)
+* **Description:** A local layout linter that launches a local, un-networked serverless browser thread to test component robustness under extreme real-world interface configurations.
+* **Input Parameters:**
+  * `--target`: Local path pointer targeting the styled visual layout file asset.
+  * `--fix`: Operational configuration flag activating automated layout self-healing.
+* **In-Memory Transformation:** Spawns a headless Playwright runner, injects custom locale tracking parameters (+30% tracking characters), and simulates 200% document scale reflows. If an element's bounding rect leaks outside parent box containment properties, it triggers an overflow violation. If `--fix` is passed, `src/core/healer.ts` intercepts the selector node and injects defensive class overrides (e.g., adding `flex-wrap` or `break-all`) onto the DOM/AST structures.
+* **Output Artifact:** Emits a hardened `03_hardened.html` code file or throws layout leakage parameters directly to standard outputs.
+* **Failure Matrix:** Exits with strict POSIX status code `2` if a layout boundary collapse is verified and the `--fix` parameter is absent or fails to achieve structural encapsulation.
 
-### 4.4 `uipipe handoff` & `uipipe manifest` (The Filesystem Proxies)
-* **Description:** The ultimate enabler for the **Free-Tier Alchemist** and **Metered Pragmatist**. It abstracts the local environment into portable text bundles.
-* **The Manifest Engine (`uipipe manifest`):** Safely computes a clean local directory tree snapshot while completely blocking dependency blackholes (`node_modules/`, `.git/`, build distributions).
-* **The Context Capsule:** Compiles all steps, current workspace tree maps, token definitions, and structural snapshots into a hyper-dense, single markdown layout pack saved at `.uipipe/copy_paste_pack.md`. The user copies this individual asset directly into the prompt frame of any free web-browser LLM, successfully executing complex, context-aware coding tasks without setting up live API environments.
+### 4.4 `uipipe handoff` & `uipipe manifest` (Context Portability Capsule)
+* **Description:** Compiles local repository blueprints and execution steps into a single portable context text asset designed for zero environment context degradation.
+* **Input Parameters:**
+  * `--session`: Target execution session identification tracking uuid string.
+* **In-Memory Transformation:** Executes a rapid local directory spider crawl to compile a file list tree map while completely blocking dependency blackholes (`node_modules/`, `.git/`, `dist/`). It stringifies local token definitions, crawls past snapshots, and minifies prompt frames.
+* **Output Artifact:** Emits an ultra-dense, standalone markdown proxy file block saved directly at `.uipipe/copy_paste_pack.md` for seamless clipboard integration into external tools.
+* **Failure Matrix:** Throws exit code `1` if tracking check validation checksums fail across the historical snapshot files.
+
 
 ## 5. Technical Session Lifecycle & State Engine
 
@@ -87,7 +100,7 @@ To project a professional toolchain aesthetic, `uipipe` explicitly and completel
 ### 5.1 The Local Session Blueprint Example
 ```json
 {
-  "\$schema": "http://json-schema.org",
+  "$schema": "http://json-schema.org",
   "sessionId": "medical-dashboard-029",
   "meta": {
     "platform": "html-tailwind",

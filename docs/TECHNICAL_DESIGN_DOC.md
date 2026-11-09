@@ -19,7 +19,7 @@ uipipe/
 ├── bin/
 │   └── uipipe                       # Global CLI executable entrypoint script
 ├── config/
-│   ├── default_tokens.json          # Fallback system tokens
+│   ├── default_tokens.json          # Enforces relational matrix and WCAG contrast rules
 │   └── templates/
 │       ├── layout_base.html         # HTML structural skeleton baseline
 │       ├── react_canvas.html        # Headless React client hydration mount point
@@ -29,6 +29,7 @@ uipipe/
 │   ├── index.ts                     # Core routing and entry orchestration
 │   ├── commands/                    # CLI user interaction handlers
 │   │   ├── break.ts                 # Handles uipipe break | breakit | uibreakit aliases
+│   │   ├── dev.ts                   # Inits local hot-reloaded watcher orchestration
 │   │   ├── handoff.ts
 │   │   ├── init.ts
 │   │   ├── layout.ts
@@ -41,6 +42,9 @@ uipipe/
 │   │   ├── adversary.ts             # Playwright-driven headless stress rig with hydration flags
 │   │   ├── compiler.ts              # Dual-Engine (PostHTML / Oxc ESTree) design token compiler
 │   │   ├── crawler.ts               # Local workspace filesystem analysis
+│   │   ├── healer.ts                # Structural DOM layout patch synthesizer
+│   │   ├── matrix.ts                # Enforces relational constraints & contrast filters
+│   │   ├── orchestrator.ts          # File watcher, web sockets, & dev state engine
 │   │   └── session.ts               # Local state lifecycle & reconciliation manager
 │   ├── interfaces/                  # Shared data shapes and type declarations
 │   │   ├── config.ts
@@ -67,34 +71,44 @@ uipipe/
 
 ## 2. System Architecture & Runtime Data Flows
 
-The system operates as a **unidirectional processing pipeline** anchored by an immutable file history journal. High-level interactions are driven by the user through the CLI layer, which routes payload targets down through isolated domain cores. These cores communicate exclusively through primitive data transfer objects and stream matrices to enforce strict Single Responsibility properties.
+The system operates as a **unidirectional processing pipeline** anchored by an immutable file history journal, with an active hot-reloaded feedback loop managed via a continuous orchestration layer. High-level interactions are driven explicitly by the developer through the CLI wrapper layer, which securely routes payload arrays down into isolated domain cores. These subsystems communicate entirely through primitive, immutable data transfer objects and state streams to enforce strict Single Responsibility properties across the codebase.
 
 ```mermaid
 graph TD
-    User([User CLI Call]) --> Entry[src/index.ts Entry Router]
-    Entry --> Cmd[src/commands Engine]
+    User([User command: uipipe dev]) --> Entry[src/index.ts Entry Router]
+    Entry --> DevCmd[src/commands/dev.ts Continuous Watcher]
     
-    subgraph Core Domain Logic [Pure Subsystems]
-        Cmd -->|Scans project files| Crawler[src/core/crawler.ts]
-        Cmd -->|Mutates state ledger| Session[src/core/session.ts]
-        Cmd -->|Parses PostHTML / Oxc ESTree| Compiler[src/core/compiler.ts]
-        Cmd -->|Executes Hydrated Playwright Rig| Adversary[src/core/adversary.ts]
+    subgraph Dev Orchestration Loop [Hot-Reloaded Workspace Runtime]
+        DevCmd -->|Spawns Local Server| Orch[src/core/orchestrator.ts]
+        Orch -->|Watches modifications| FSWatch[Filesystem Event Monitor]
+        FSWatch -->|Triggers re-compile| Compiler[src/core/compiler.ts]
+        Compiler -->|Filters through contrast checks| Matrix[src/core/matrix.ts]
+        Matrix -->|Emits painted output| Snapshots[(.uipipe/snapshots/)]
+        Snapshots -->|Loads canvas to test bounds| Adversary[src/core/adversary.ts]
+        Adversary -->|On failure: runs patches| Healer[src/core/healer.ts]
+        Healer -->|Pushes safe layout updates| Snapshots
+        Snapshots -->|Hot-reloads local screen over WebSockets| CanvasApp[Local Development Canvas UI]
     end
 
-    Session <-->|Reads/Writes Ledger| DiskJson[(.uipipe/session.json)]
-    Crawler -->|Excludes dependencies| Tree[Filesystem Analysis Snapshot]
-    Compiler -->|Fuses Design Intent| Snapshots[(.uipipe/snapshots/)]
-    Adversary -->|Hardens DOM wrappers| Snapshots
-    
-    Cmd -->|Compiles Portability Bundle| Handoff[uipipe handoff]
-    Handoff -->|Emits Clipboard Proxy Pack| DiskMd[(.uipipe/copy_paste_pack.md)]
+    Session[src/core/session.ts] <-->|Reads/Writes Ledger| DiskJson[(.uipipe/session.json)]
 ```
 
 ### 2.1 In-Memory Architecture Flow Mapping
-When a data transaction runs through the engine, execution transforms through three distinct states:
-1. **The Structural Token Stream:** `uipipe layout` generates an unstyled string data array containing pure DOM structures tagged with fallback layout IDs.
-2. **The Dual-Engine DOM/AST Tree Mapping:** `uipipe paint` evaluates the active platform definition before parsing. If the platform target is `html-tailwind`, it passes strings to a native PostHTML memory node registry tree. If the target is `react-tailwindcss`, it instantiates an ultra-fast Rust-backed ESTree Syntax Tree via direct `oxc-parser` Node API bindings. This completely avoids tag truncation or variable syntax drops on custom elements (`<CardHeader />`). The appropriate framework strategy adapter maps attributes securely into final token bindings.
-3. **The Hydrated Headless Playwright Pipeline:** `uipipe break` launches a local, un-networked serverless browser layer using Playwright (v1.64+ stable line). For framework-bound code targets, it dynamically mounts files inside a client template canvas (`config/templates/react_canvas.html`) paired with localized bundle injectors. The engine intercepts lifecycle steps using native layout evaluate hooks, forcing a pause until client-side hydration completes before testing layout boundaries via element bounding client rectangles (`getBoundingClientRect`).
+
+When a transaction or filesystem mutation event runs through the toolchain, execution transforms through three distinct in-memory data states managed inside transient byte buffers and pointer graphs:
+
+1. **The Structural Token Stream (Layout Phase):**
+   The prompt string is handled by the entry router and passed down to `src/core/compiler.ts`. The blueprint engine assembles a pure, unstyled layout array. This array represents raw semantic DOM nodes containing layout constraints but absolutely zero visual embellishments. In-memory, this is held as a flat UTF-8 encoded string buffer containing structural primitive layouts (e.g., standard CSS Grid and Flexbox container utility frames). Fallback layout anchor indices are injected into elements to serve as targets for the downstream compiler steps.
+
+2. **The Dual-Engine Tree Graph Synthesis (Paint Phase):**
+   Upon entry, `src/core/session.ts` runs a SHA-256 byte-hash computation against the targeted layout file to verify it hasn't drifted from the state log tracking ledger. If validated, the compiler core branches execution based on the active ecosystem profile:
+   * **PostHTML Core (`html-tailwind`):** The raw HTML string buffer is compiled into a virtual tree node graph using a strict PostHTML plugin array interface. The algorithm traverses the tree, matches the injected layout anchor indices, maps the target node attributes, and fuses style variables directly out of `config/default_tokens.json`.
+   * **Oxc ESTree Core (`react-tailwindcss`):** The JSX/TSX string buffer is processed by `oxc-parser` using low-overhead native bindings. It bypasses heavy JavaScript runtimes and instantly generates a standard ESTree-compliant Abstract Syntax Tree object graph in Node memory. The `src/core/adapters/jsx.ts` module traverses this syntax graph, identifies hybrid tag expressions, and directly mutates `JSXAttribute` node objects to swap raw design properties without risk of string interpolation corruption.
+   Before the tree is stringified back to storage, the `src/core/matrix.ts` layer runs relative luminance computations on the proposed color tokens, ensuring a mathematical minimum 4.5:1 text-to-background contrast ratio is held.
+
+3. **The Hydrated Headless Playwright Pipeline (Break & Heal Phase):**
+   The styled layout component string is loaded into a local headless Playwright browser thread. For framework targets, it is injected directly into a sandboxed mounting canvas (`config/templates/react_canvas.html`) loaded with zero-dependency framework bundles. The adversarial engine triggers a custom, blocking `page.waitForFunction()` hook that loops until client-side state hydration markers are active. Once hydrated, `ui-break-it` executes text expansions and element bounding evaluations via native layout evaluate channels, testing node bounding boxes using precise `getBoundingClientRect` metrics. On boundary collapse, the selector tree path is passed back to `src/core/healer.ts` to execute automated AST structural repair overrides before final compilation strings hit the snapshot cache.
+
 
 ---
 
@@ -127,7 +141,7 @@ The fundamental architectural state log ledger tracking execution chronology.
         "type": "object",
         "properties": {
           "step": { "type": "integer", "minimum": 1 },
-          "command": { "type": "string", "enum": ["layout", "paint", "break"] },
+          "command": { "type": "string", "enum": ["layout", "paint", "break", "dev"] },
           "variantName": { "type": "string" },
           "filePointer": { "type": "string" },
           "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}\$" },
@@ -141,15 +155,31 @@ The fundamental architectural state log ledger tracking execution chronology.
 }
 ```
 
-### 3.2 Design Token System Dictionary Schema (`tokens.json`)
-The architectural dictionary mapping raw styling values to tokens passed directly to the style compiler core.
+### 3.2 Design Token System Dictionary Schema (`config/default_tokens.json`)
+The system schema expanded to map strict structural contrast dependencies, light/dark mathematical color locks, and relational scale combinations.
 
 ```json
 {
   "\$schema": "http://json-schema.org",
-  "title": "DesignTokenDictionary",
+  "title": "RelationalTokenMatrixDefinition",
   "type": "object",
   "properties": {
+    "matrixConstraints": {
+      "type": "object",
+      "properties": {
+        "minWcagContrastRatio": { "type": "number", "minimum": 4.5 },
+        "enforceScaleLock": { "type": "boolean" },
+        "harmonyMappings": {
+          "type": "object",
+          "properties": {
+            "lightModeLock": { "type": "array", "items": { "type": "string" } },
+            "darkModeLock": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["lightModeLock", "darkModeLock"]
+        }
+      },
+      "required": ["minWcagContrastRatio", "enforceScaleLock", "harmonyMappings"]
+    },
     "density": { "type": "string", "enum": ["compact", "normal", "roomy"] },
     "colors": {
       "type": "object",
@@ -181,9 +211,11 @@ The architectural dictionary mapping raw styling values to tokens passed directl
       "required": ["radiusBase", "borderWidthBase", "shadowBase"]
     }
   },
-  "required": ["density", "colors", "typography", "geometry"]
+  "required": ["matrixConstraints", "density", "colors", "typography", "geometry"]
 }
 ```
+
+---
 
 ---
 
@@ -199,90 +231,155 @@ All CLI command routers pass exact exit diagnostics to the host operating system
 
 ### 4.2 Framework Token Adapter Transformers Contract Matrix
 * **Path:** `src/core/adapters/`
-  ```typescript
-  export interface ITokenAdapterInput {
-    elementAttributes: Record<string, string>;
-    resolvedStyleClasses: string[];
-  }
+```typescript
+export interface ITokenAdapterInput {
+  elementAttributes: Record<string, string>;
+  resolvedStyleClasses: string[];
+}
 
-  export interface ITokenAdapterOutput {
-    transformedAttributes: Record<string, string>;
-  }
+export interface ITokenAdapterOutput {
+  transformedAttributes: Record<string, string>;
+}
 
-  export interface IFrameworkAdapter {
-    transformNodeAttributes(input: ITokenAdapterInput): ITokenAdapterOutput;
-  }
-  ```
+export interface IFrameworkAdapter {
+  transformNodeAttributes(input: ITokenAdapterInput): ITokenAdapterOutput;
+}
+```
 
 ### 4.3 Local Directory Crawler Subsystem
 * **Path:** `src/core/crawler.ts`
-  ```typescript
-  export interface ICrawlerOptions {
-    targetDir: string;
-    maxDepth: number;
-    excludePatterns: string[]; // maps node_modules, .git, build directories
-  }
+```typescript
+export interface ICrawlerOptions {
+  targetDir: string;
+  maxDepth: number;
+  excludePatterns: string[]; // maps node_modules, .git, build directories
+}
 
-  export interface IFSNode {
-    name: string;
-    path: string;
-    type: 'file' | 'directory';
-    children?: IFSNode[];
-  }
+export interface IFSNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: IFSNode[];
+}
 
-  export interface ICrawlerCore {
-    generateTreeSnapshot(options: ICrawlerOptions): Promise<IFSNode>;
-    serializeToAscii(tree: IFSNode): string;
-  }
-  ```
+export interface ICrawlerCore {
+  generateTreeSnapshot(options: ICrawlerOptions): Promise<IFSNode>;
+  serializeToAscii(tree: IFSNode): string;
+}
+```
 
 ### 4.4 Token Mixer & Style Compiler Subsystem (Dual HTML/Oxc Engine)
 * **Path:** `src/core/compiler.ts`
-  ```typescript
-  export interface ICompilerInput {
-    sourceMarkup: string;        // unstyled HTML or JSX baseline code
-    tokens: object;              // validated design token structure dictionary
-    platformAdapter: 'html-tailwind' | 'react-tailwindcss' | 'vue-prime';
-    shuffleSeed?: number;        // seed payload triggering shuffle operations
-  }
+```typescript
+export interface ICompilerInput {
+  sourceMarkup: string;        // unstyled HTML or JSX baseline code
+  tokens: object;              // validated design token structure dictionary
+  platformAdapter: 'html-tailwind' | 'react-tailwindcss' | 'vue-prime';
+  shuffleSeed?: number;        // seed payload triggering shuffle operations
+}
 
-  export interface ICompilerOutput {
-    compiledMarkup: string;      // styling token-applied layout output string
-    appliedMappings: Record<string, string>; 
-  }
+export interface ICompilerOutput {
+  compiledMarkup: string;      // styling token-applied layout output string
+  appliedMappings: Record<string, string>; 
+}
 
-  export interface IStyleCompilerCore {
-    compileStyleTensor(input: ICompilerInput): Promise<ICompilerOutput>;
-    synthesizeVariations(sourceMarkup: string, tokens: object, variantCount: number): Promise<ICompilerOutput[]>;
-  }
-  ```
+export interface IStyleCompilerCore {
+  compileStyleTensor(input: ICompilerInput): Promise<ICompilerOutput>;
+  synthesizeVariations(sourceMarkup: string, tokens: object, variantCount: number): Promise<ICompilerOutput[]>;
+}
+```
 
 ### 4.5 Adversarial Stress Tester Subsystem (Playwright Headless Hydrated Canvas)
 * **Path:** `src/core/adversary.ts`
-  ```typescript
-  export interface IStressParameters {
-    injectLongTokens: boolean;
-    simulateTextScale: boolean;
-    interruptInteractionPhases: boolean;
-    waitForHydrationMarker?: string; // CSS locator string or data attribute token
-  }
+```typescript
+export interface IStressParameters {
+  injectLongTokens: boolean;
+  simulateTextScale: boolean;
+  interruptInteractionPhases: boolean;
+  waitForHydrationMarker?: string; // CSS locator string or data attribute token
+}
 
-  export interface IViolationReport {
-    targetElementId: string;
-    violationType: 'overflow' | 'clipping' | 'state_desync';
-    failureDescription: string;
-  }
+export interface IViolationReport {
+  targetElementId: string;
+  violationType: 'overflow' | 'clipping' | 'state_desync';
+  failureDescription: string;
+}
 
-  export interface IStressTesterOutput {
-    hardenedMarkup: string;
-    violationsDetected: IViolationReport[];
-    isResilient: boolean;
-  }
+export interface IStressTesterOutput {
+  hardenedMarkup: string;
+  violationsDetected: IViolationReport[];
+  isResilient: boolean;
+}
 
-  export interface IAdversarialCore {
-    injectStressVectors(markup: string, params: IStressParameters): Promise<IStressTesterOutput>;
-  }
-  ```
+export interface IAdversarialCore {
+  injectStressVectors(markup: string, params: IStressParameters): Promise<IStressTesterOutput>;
+}
+```
+
+### 4.6 Automated Layout Healer Engine Contract
+* **Path:** `src/core/healer.ts`
+```typescript
+export interface ILayoutPatchPayload {
+  elementSelector: string;
+  violationType: 'overflow' | 'clipping';
+  suggestedInjections: string[]; // array of corrective classes e.g. ['flex-wrap', 'break-all']
+  targetFilePath: string;
+}
+
+export interface IHealingResult {
+  patchApplied: boolean;
+  mutatedMarkup: string;
+  verificationCheckPassed: boolean;
+}
+
+export interface ILayoutHealerCore {
+  synthesizeCorrectionPatch(violation: object): Promise<ILayoutPatchPayload>;
+  applyPatchInline(payload: ILayoutPatchPayload, sourceMarkup: string): Promise<IHealingResult>;
+}
+```
+
+### 4.7 Relational Token Matrix Core Engine Contract
+* **Path:** `src/core/matrix.ts`
+```typescript
+export interface IMatrixValidationInput {
+  colors: Record<string, string>;
+  typography: Record<string, string>;
+}
+
+export interface IMatrixValidationResult {
+  passesWcag: boolean;
+  calculatedContrastRatio: number;
+  lockedScaleCompatible: boolean;
+}
+
+export interface ITokenMatrixCore {
+  validateTokenRelations(input: IMatrixValidationInput): IMatrixValidationResult;
+  generateCompliantHarmonyPair(baseColor: string, mode: 'light' | 'dark'): Record<string, string>;
+}
+```
+
+### 4.8 Local Continuous Orchestration Engine Contract
+* **Path:** `src/core/orchestrator.ts`
+```typescript
+export interface IWatcherConfig {
+  watchPaths: string[];
+  localServerPort: number;
+  enableLiveReload: boolean;
+}
+
+export interface IOrchestratorState {
+  activeConnections: number;
+  isWatching: boolean;
+  lastCompiledStep: number;
+}
+
+export interface IContinuousOrchestratorCore {
+  startDevSession(config: IWatcherConfig): Promise<IOrchestratorState>;
+  broadcastMessage(payload: string): void;
+  stopDevSession(): Promise<void>;
+}
+```
+
 
 ---
 
@@ -290,13 +387,13 @@ All CLI command routers pass exact exit diagnostics to the host operating system
 
 ### 5.1 Root Architecture & Configuration Paths
 * **`bin/uipipe`**
-  Global entry executable bridge wrapper. Verifies the host local environment satisfies system boundaries (Node.js runtime engine level checkpoints) and dispatches processing arguments directly down to the primary compiler entry point. It also handles mapping fallback routes to the primary executable script.
+  Global entry executable bridge wrapper. Verifies the host local environment satisfies system boundaries (Node.js runtime engine level checkpoints) and dispatches processing arguments directly down to the primary compiler entry point. It handles mapping fallback routes to the primary executable script.
 * **`config/default_tokens.json`**
-  The global architectural system style baseline fallback file. Holds standard primitive layout configuration specifications used when `uipipe paint` runs outside custom option dictionary injections.
+  The global architectural system style baseline file, expanded to hold relational parameter metrics, luminosity ratios, and Light/Dark Mode structural lock definitions.
 * **`config/templates/layout_base.html`**
   Contains structural base configurations and base responsive constraints template fragments used to initialize new grayscale view constructions.
 * **`config/templates/react_canvas.html`**
-  Isolated browser DOM shell template framework. Used by `uipipe break` to securely mount JSX fragments alongside a localized, sandboxed React runtime layer to execute authentic layout state hydration before testing elements.
+  Isolated browser DOM shell template framework, loaded with runtime injection logic to accept WebSocket sync alerts during `uipipe dev` workflows.
 * **`config/templates/handoff_capsule.md`**
   Structural markdown boilerplate frame containing targeted token optimization framing instructions used to assemble context container strings for external browser text input interfaces.
 
@@ -309,6 +406,8 @@ All CLI command routers pass exact exit diagnostics to the host operating system
   Orchestrates visual execution parameters. It triggers active checksum scans to handle user code reconciliations, checks platform environment boundaries, routes targets to PostHTML nodes or `oxc-parser` ESTree structures, loops multi-variant arrays, and saves the output data snapshot.
 * **`break.ts`**
   The operational command wrapper executing code hardening constraints. Resolves sub-command mapping strings (`break`, `breakit`, `uibreakit`) directly into the core engine. Commands the adversary module to spin up its in-memory browser engine loop, maps parsing structural flaws via layout rect analysis, and formats explicit element violation notifications onto terminal layouts.
+* **`dev.ts`**
+  Unified orchestration sub-command. Instantiates the continuous hot-reloaded development routine. It sets up file watchers on code layouts and token catalogs, coordinates processing pipelines silently in the background, and dynamically boots local visual review views.
 * **`manifest.ts`**
   Calculates project map parameters. Runs crawler loops across adjacent local files, constructs an active context file blueprint list, and writes state mapping structures without scanning large dependency blackholes.
 * **`handoff.ts`**
@@ -325,13 +424,9 @@ All CLI command routers pass exact exit diagnostics to the host operating system
   The central stylistic layout class processor core. Houses a dual-engine architecture: compiles raw standard HTML structures using PostHTML, while routing framework-bound targets (React/JSX) through an ultra-fast native Rust `oxc-parser` ESTree compilation node loop. This fully prevents syntax corruption on expression statements or custom tags without adding JavaScript compilation weight.
 * **`adversary.ts`**
   The structural code resilience engine. Injects un-networked serverless text-growth constraints, triggers a fast headless Playwright container audit, measures layout parameters utilizing native browser bounding client rects via web-first `page.locator()` evaluations, logs element leaks, and attaches structural code adjustments.
-
-### 5.4 Cross-Cutting Infrastructure (`src/utils/` & `src/interfaces/`)
-* **`utils/crypto.ts`**
-  Calculates deterministic SHA-256 cryptographic hashes from file string layers, ensuring history rollbacks match tracking check conditions exactly.
-* **`utils/formatter.ts`**
-  Implements the strict, emoji-free typography language pipeline layer, processing formatting blocks onto clear console text layouts (`:::`, `==>`, `[!]`).
-* **`utils/fs.ts`**
-  Handles physical data disk activity. Conducts atomic file writes via staging swaps to completely guard against file corruption data losses during heavy process steps.
-* **`interfaces/`**
-  Houses strict TypeScript structural type system shapes, mapping API boundary constraints, data configurations, and object structures safely across internal codebase scripts.
+* **`matrix.ts`**
+  The relational constraint system core. Calculates WCAG relative luminance equations across active background and foreground colors to verify contrast criteria before layout token assignments are completed.
+* **`healer.ts`**
+  The automated structural repair synthesizer. Receives specific coordinate or box leakage pointers from Playwright evaluations, maps matching target element signatures back into the source syntax nodes, maps appropriate patch elements, and formats inline structural repairs.
+* **`orchestrator.ts`**
+  The hot-reload session lifecycle processor. Coordinates atomic filesystem updates, controls localized web server threads, and opens real-time pipeline notifications across rendering engines.
