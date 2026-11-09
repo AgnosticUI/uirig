@@ -1,0 +1,1315 @@
+diff --git a/README.md b/README.md
+index 454f8e8..79636b9 100644
+--- a/README.md
++++ b/README.md
+@@ -10,51 +10,63 @@ By adapting the **Unix Tools Philosophy** directly to AI-driven front-end engine
+        [Prompt Intent]
+               │
+               ▼
+-   :::   uipipe layout   ==>  [01_layout.html] (Grayscale, Rigid CSS Grid/Flex DOM Tree)
++   :::   uipipe layout     ==>  [01_layout.html] (Grayscale, Rigid DOM Tree Grid Core)
+               │
+               ▼
+-   :::   uipipe paint    ==>  [02_painted.html] (Token-Injected Skin, Variant Synthesis)
++   :::   uipipe paint      ==>  [02_painted.html] (Token-Injected Skin, Contrast Locked)
+               │
+               ▼
+-   :::   uipipe break    ==>  [03_hardened.html] (Defensive DOM Wrappers, Overflows Sealed)
++   :::   uipipe break      ==>  [03_hardened.html] (Defensive DOM Overflows Sealed)
+               │
+               ▼
+-   :::   uipipe handoff  ==>  [.uipipe/copy_paste_pack.md] (Context Engine Proxy)
++   :::   uipipe handoff    ==>  [.uipipe/copy_paste_pack.md] (Context Capsule Proxy)
+ ```
+ 
+ ---
+ 
+-## The System Architecture
++## 1. Core Philosophy
+ 
+-### 📐 1. `uipipe layout` (Structural Blueprint Engine)
+-Forces the AI model into a single responsibility parameter: **Generate DOM node relationships and responsive bounding paths.** It operates entirely in grayscale, emitting structurally invariant markup devoid of color variables, font families, shadows, animations, or styling details.
++`uipipe` breaks down the front-end layout engineering process into a deterministic sequence of single-purpose steps, directly honoring the **Unix Tools Philosophy**:
+ 
+-### 🎨 2. `uipipe paint` (The Style Tensor Mixer)
+-Fuses the grayscale layout framework with a design system definition configuration (`tokens.json`). By appending an optional `--shuffle` flag, it acts as an **"I'm Feeling Lucky" style explorer**, generating 3 to 5 distinct token configurations (compact vs. roomy densities, light/dark maps, corner-radius spectrum flips) across your unchanged markup frame. To cleanly target React frameworks without layout degradation, it completely drops old regex transformations in favor of a native, ultra-fast Rust processing layer via `oxc-parser`.
++1. **Do One Thing and Do It Well (DOTADIW):** Isolate structural layout architecture completely from aesthetic visual skinning.
++2. **Universal Interface:** Rely on plain-text streams (Semantic HTML/JSX structures and structured JSON tokens).
++3. **Composability:** Pipe the immutable output of a structural wireframe generation directly into token paint operations, followed by automated web-first hardening loops.
+ 
+-### 💥 3. `uipipe break` (Adversarial Robustness Linter)
+-A strict, locally executed stress injector (accessible via `uipipe break`, `breakit`, or `uibreakit`). It targets your styled interface component and applies automated boundary conditions:
+-*   **String Expansion Fuzzing:** Feeds elements long textual strings with zero white space or scales languages to simulate extreme translation variance (+30% tracking characters).
+-*   **Scale Fuzzing:** Simulates deep browser font-scaling alterations up to 200%.
+-*   **Phase Interruption Testing:** Audits structural interaction behaviors when async updates drop out of sequence.
+-It outputs hardened, defensive wrappers or exits with status code `2` while printing structural layout violations onto terminal screens (`[!] Fail: Container overflow at element badge_list`).
+-
+-### 📋 4. `uipipe handoff` & `uipipe manifest` (Context Engine Proxy)
+-Allows developers to transport their exact execution snapshots out of the local terminal environment directly into decoupled browser instances (Google AI Studio, ChatGPT, web tabs) with zero environment context decay.
++---
+ 
+-## Token Economy Profiles (Built for Your Budget)
++## 2. The 14 Core Tools Suite
+ 
+-`uipipe` handles AI token tracking and computational resources as a critical execution property. The tool runs completely offline and requires zero paid API tier commitments to operate.
++The toolchain provides total deterministic control over front-end compilation states through 14 distinct commands:
+ 
+-*   **The Enterprise Sovereign (`--agent`):** Uncapped context budgets. Runs `uipipe` fully integrated inside automated workflow pipelines or continuous integration triggers via tools like Claude Code or Cursor agent interfaces.
+-*   **The Metered Pragmatist (`--api`):** Standard subscription limitations ($20/month caps). `uipipe` strips conversational fluff, minifies templates, and optimizes prompt payloads locally before stream execution—reducing active token context overhead by up to 80%.
+-*   **The Free-Tier Alchemist (`--local-only`):** $0 AI computational access. `uipipe manifest` compiles project tree hierarchies (omitting blackholes like `node_modules/` or `.git/`) and captures snapshots into a single, ultra-dense markdown block (`.uipipe/copy_paste_pack.md`) ready for seamless clipboard injection into free browser LLMs.
++```text
++ ::: Structural Blueprint & Styling Engines
++ ::: uipipe layout         ==>  Compiles text intent into Grayscale Semantic Structure (No Color)
++ ::: uipipe paint          ==>  Fuses Grayscale Structure + tokens.json (Supports --shuffle)
++ ::: uipipe trace          ==>  Extracts existing layout classes to visualize spatial grids
++ ::: uipipe blueprint      ==>  Generates structural layout boilerplate from a matrix
++ 
++ ::: Adversarial Stress & Quality Assurance Rigs
++ ::: uipipe break          ==>  Adversarial Stress Tester (Playwright Headless Fuzzer)
++ ::: uipipe contrast       ==>  Throws error codes if text elements fall below WCAG 4.5:1
++ ::: uipipe bleed          ==>  Fuzzes container dimensions to spot structural break points
++ ::: uipipe flex           ==>  Audits alignment and wrapping under dynamic element counts
++ 
++ ::: Dev Orchestration, Workspace, & Session Lifecycle
++ ::: uipipe init           ==>  Scaffolds workspace pathing and initializes session tracker ledger
++ ::: uipipe manifest       ==>  Compiles a clean project file tree map blocking system blackholes
++ ::: uipipe session:sync   ==>  Captures out-of-band developer optimizations via SHA-256 byte-hash
++ ::: uipipe checkout       ==>  Forcefully rewinds local files back to a pristine snapshot step
++ 
++ ::: Context Portability & Export Tools
++ ::: uipipe handoff        ==>  Context Capsule Compiler (Formats context packs for browser tabs)
++ ::: uipipe pack           ==>  Compresses layout components to prevent lower-tier context saturation
++```
+ 
+ ---
+ 
+-## Typographic Interface Standards
++## 3. Typographic Interface Standards
+ 
+-`uipipe` strictly enforces an emoji-free, highly readable visual syntax across your shell matrix to preserve optimal console clarity:
++To preserve optimal console clarity across active terminal viewports, `uipipe` completely bans standard graphical emojis from terminal outputs, utilizing a strict alphanumeric anchor key:
+ *   `::: ` System Boundary Markers / Stable State Checkpoints
+ *   `==> ` Stream Pipelines / Successful Transformations
+ *   `[+] ` Appended DOM Tokens / Injected Modifiers
+@@ -63,27 +75,139 @@ Allows developers to transport their exact execution snapshots out of the local
+ 
+ ---
+ 
+-## Quickstart
++## 4. Installation & Environment Scope
++
++### Prerequisites
++* **Node.js Environment:** `v22.0.0` or higher (LTS Stable)
++* **Operating System:** POSIX-compliant platform (`Linux`, `macOS`) or Windows Subsystem for Linux (`WSL`)
+ 
+-Initialize a local workspace ecosystem on any front-end path:
++### Global Installation
+ ```bash
+-uipipe init --platform=html-tailwind
++npm install -g uipipe
+ ```
+ 
+-Generate your grayscale structural grid mapping:
++### Workspace Bootstrapping
++Scaffold your layout project directory to initialize the local session ledger infrastructure:
+ ```bash
+-uipipe layout "Create an unstyled layout blueprint for a healthcare metrics side-nav dashboard"
++cd my-layout-workspace
++uipipe init
+ ```
++## 5. Standard Pipeline Workflows
++
++### 5.1 The Anti-Slop Compilation Pipeline
++Compile high-fidelity interface markup from raw intent to hardened, zero-color layouts before styling:
+ 
+-Apply your theme parameters with style token mixing:
+ ```bash
+-cat .uipipe/snapshots/01_layout.html | uipipe paint --tokens=brand.json --shuffle
++# 1. Compile pure structural grayscale layout skeletons focus on bounding boundaries
++uipipe layout "desktop medical dashboard with sidebar navigation and client data grid" --platform react-tailwindcss
++
++# 2. Apply theme design tokens while mathematically locking WCAG relative contrast values
++uipipe paint --tokens config/default_tokens.json
++
++# 3. Run adversarial layout fuzzing to locate and patch element container overflows
++uipipe break --target .uipipe/snapshots/02_painted.tsx --fix
+ ```
+ 
+-Inject defensive, robust code modifiers against stress criteria:
++### 5.2 Deep Adversarial Verification and Perimeter QA Testing
++Execute localized un-networked Playwright stress injection loops to mathematically ascertain where component grids collapse under variable layout pressures:
++
+ ```bash
+-uipipe break --target=.uipipe/snapshots/02_painted.html
++# Explicitly intercept and capture typographic luminance contrast ratio failures
++uipipe contrast --target .uipipe/snapshots/02_painted.tsx
++
++# Fuzz wrapper metrics with incremental padding shifts to map grid leakage thresholds
++uipipe bleed --target .uipipe/snapshots/02_painted.tsx --steps 12
++
++# Audit flex rows to verify element wrapping holds against variable sub-element injection arrays
++uipipe flex --target .uipipe/snapshots/02_painted.tsx --count-range "1-24"
+ ```
+ 
+-## License
+-MIT
++---
++
++## 6. Command Reference Matrix
++
++### `uipipe layout`
++*   **Syntax:** `uipipe layout "<intent>" --platform <engine>`
++*   **Valid Platforms:** `html-tailwind` | `react-tailwindcss` | `vue-prime`
++*   **Description:** Compiles text intent into zero-color, invariant layout skeletons focusing exclusively on document outlines, containment flows, and responsive layouts.
++
++### `uipipe paint`
++*   **Syntax:** `uipipe paint --tokens <path> [--shuffle]`
++*   **Description:** Fuses the unstyled structure markup file with a design system token configuration using a secure virtual tree engine to prevent regex substitution collisions. `--shuffle` activates randomized harmony palette exploration.
++
++### `uipipe trace`
++*   **Syntax:** `uipipe trace --target <path>`
++*   **Description:** Parses display metrics via target abstract syntax trees and renders a geometric wireframe trace layout directly inside terminal consoles.
++
++### `uipipe blueprint`
++*   **Syntax:** `uipipe blueprint --matrix "<dimensions>" --platform <engine>`
++*   **Description:** Directly generates standard placeholder boilerplate skeletons from explicit dimension matrices completely offline, bypassing API processing layers.
++
++### `uipipe break`
++*   **Syntax:** `uipipe break --target <path> [--fix]`
++*   **Description:** Launches un-networked browser processes to append high-length tracking text extensions (+30% characters) and simulate 200% document zooming. `--fix` maps corrective inline attributes via `healer.ts`.
++
++### `uipipe contrast`
++*   **Syntax:** `uipipe contrast --target <path>`
++*   **Description:** Audits the current painted layout and outputs distinct stack tracks pointing to the precise elements that violate the absolute WCAG 4.5:1 relative luma contrast ratio.
++### `uipipe bleed`
++*   **Syntax:** `uipipe bleed --target <path> --steps <integer>`
++*   **Description:** Progressively stretches parent canvas padding to isolate the exact coordinate boundary threshold limits where grid elements drop out of alignment.
++
++### `uipipe flex`
++*   **Syntax:** `uipipe flex --target <path> --count-range "<min>-<max>"`
++*   **Description:** Loops row sub-element populations iteratively to assert layout wrap resilience and catch element clipping or overlap collisions early.
++
++### `uipipe manifest`
++*   **Syntax:** `uipipe manifest`
++*   **Description:** Runs an incredibly light index scan deep within local project roots, producing an active filesystem tree graph while systematically skipping heavy build block directory paths like `node_modules/` or `.git/`.
++
++### `uipipe pack`
++*   **Syntax:** `uipipe pack --target <path>`
++*   **Description:** A dedicated minification compressor that cleans layout comment blocks, trailing spacing, and lexical formatting anomalies to compress text volumes.
++
++### `uipipe handoff`
++*   **Syntax:** `uipipe handoff`
++*   **Description:** Assembles local session manifests, historical steps, and compressed code arrays into a single, cohesive portability markdown capsule block at `.uipipe/copy_paste_pack.md`.
++
++---
++
++## 7. State Invariant Reconciliation Protocol (SIRP)
++
++To protect manual IDE optimizations from accidental automated overwrites, `uipipe` verifies the working file's active SHA-256 checksum against the step history logged inside `.uipipe/session.json` prior to initiating any compilation loops.
++
++When file modifications drift out-of-band, the transaction process initiates a halt intercept path:
++1.  **Halt and Alert:** System blocks execution and yields a warning to stdout: `[!] Warning: Out-of-band developer modification detected.`
++2.  **Resolution Routes:**
++    *   Execute `uipipe session:sync` to cleanly absorb manual modifications, update the SHA-256 state ledger, and record an incremental milestone entry pass.
++    *   Execute `uipipe checkout <step>` to discard local mutations and revert workspace assets to a clean previous check snapshot.
++
++```bash
++# Sync out-of-band manual IDE changes directly into the session ledger tracking history
++uipipe session:sync
++
++# Instantly roll-back to Step 1 Snapshot (Pure Invariant Structural Grayscale Layout)
++uipipe checkout 1
++```
++
++---
++
++## 8. Token Budget Matrix Profiles
++
++`uipipe` considers computational resource profiles and context limits as critical front-end compilation constraints, offering native strategies across 3 economic tiers:
++
++*   **The Enterprise Sovereign (`--agent`):** Uncapped token resources. Integrates `uipipe` automated workflows into autonomous CLI agents (e.g., Cursor or Claude Code) via execution flags.
++*   **The Metered Pragmatist (`--api`):** Standard subscription limits ($20/month caps). Leverages `uipipe pack` to lexically compress template assets locally, eliminating prompt overhead before streams run through paid commercial APIs.
++*   **The Free-Tier Alchemist (`--local-only`):** $0 AI budget. Runs `uipipe handoff` locally to generate ultra-dense prompt portability blocks, completely avoiding progressive context degradation across free browser tabs.
++
++---
++
++## 9. Manifesto
++
++*"Built for Enterprise Sovereigns, Metered Pragmatists, and Free-Tier Alchemists alike. Zero token waste. 100% functional with raw clipboard copy-pasting via local context encapsulation. Elevate vibe coding into a high-discipline, predictable front-end software engineering methodology."*
++
++---
++
++## 10. License
++
++Distributed under the MIT License. See `LICENSE` for details.
+diff --git a/docs/IMPLEMENTATION_PLAN.md b/docs/IMPLEMENTATION_PLAN.md
+index 7da23f8..6b06f4c 100644
+--- a/docs/IMPLEMENTATION_PLAN.md
++++ b/docs/IMPLEMENTATION_PLAN.md
+@@ -1,12 +1,52 @@
+-# Implementation Plan: `uipipe` - Part 1
++# Implementation Plan: `uipipe`
+ 
+ This document details the engineering blueprint, technical choices, and incremental build tasks required to implement `uipipe` safely from a local system workspace.
+ 
++## Inter-Session Continuity & Context Hardening Protocol
++
++To preserve total engineering velocity across short, decoupled LLM sessions where memory state is completely lost, the project enforces a strict **Session Bootstrapping and Handoff Workflow**. At the conclusion of every turn or session exit, the developer and active LLM core must compile an invariant bridge payload to ensure seamless, hallucination-free initialization in the subsequent slate.
++
++### 1. The Context-Window Bootstrapping Package
++When initializing a brand-new session context window, the developer must feed the following foundational assets concurrently to enforce strict project boundaries:
++1.  **`docs/PRD.md`**: Provides the structural product architecture, 14-tool matrix scope, and non-emoji terminal anchor specifications.
++2.  **`docs/TECHNICAL_DESIGN_DOC.md`**: Provides the absolute database schemas (`session.json`, `default_tokens.json`), data model topologies, and programmatic interface contracts.
++3.  **`docs/IMPLEMENTATION_PLAN.md`**: Provides the current task checklist, project phase matrices, and foundational workflow guardrails.
++4.  **`.uipipe/NEXT_PROMPT.md`**: A volatile, single-purpose tracking bridge document populated at the immediate end of the prior session.
++
++### 2. The `NEXT_PROMPT.md` Generation Schema
++Every session-closing handoff pass must generate a fresh `.uipipe/NEXT_PROMPT.md` mapping block containing the exact following structural text elements with zero truncation:
++
++```text
++================================================================================
++          uipipe : Chronological Session Continuity Bridge Capsule              
++================================================================================
++ TIMESTAMP BASELINE : [YYYY-MM-DD THH:MM:SSZ] (Anchored to Nov 9, 2026 Timeline)
++ ACTIVE WORKSPACE   : [Active Target File Target Path, e.g., src/core/crawler.ts]
++ PREVIOUS SNAPSHOT  : [Exact short summary of the absolute last micro-chunk built]
++ METRIC HASH GAIN   : [Current active ledger step and latest SHA-256 state checksum]
++
++--- TARGET RUNTIME DELTA ---
++ EXACT NEXT TASK    : [Phase X Step Y / Task Title from Implementation Plan]
++ ENGINEERING "WHY"  : [Plain-language explanation of the immediate logic goal]
++ CODE BOUNDARIES    : [List of methods, structures, or properties to write next]
++ COMPANION TESTS    : [Precise assertions required in the sibling spec file]
++
++--- SYSTEM BOOT TRIGGER COMMAND ---
++::: [Developer: Paste this line to execute the protocol initialization loop]
++::: System Initialized. Awaiting command to begin Phase X Step Y on [File Path] :::
++================================================================================
++```
++
++### 3. The Zero-Code Boot Protocol Execution
++Upon receiving the Context Bootstrapping Package, the new LLM session is strictly forbidden from printing, editing, or assuming any production or test code blocks. It must intercept the `NEXT_PROMPT.md` metadata, print an ASCII validation block reflecting the active milestone metrics, and immediately yield the signature trigger string to return control to the developer:
++
++`::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN PHASE X STEP Y :::`
++
+ ## Technical Stack Bounds
+ To ensure **The Free-Tier Alchemist** execution property is strictly honored, the underlying CLI execution matrix must operate completely independently of paid cloud runtimes or network API constraints during base development:
+ *   **Runtime Environment:** Node.js 22+ LTS Stable Releases
+ *   **Core Compiler Engine:** Executable TypeScript 5.x ESM Engine
+-*   **AST & Parser Layers:** oxc-parser, posthtml, chokidar (watcher)
++*   **AST & Parser Layers:** `oxc-parser`, `posthtml`, `chokidar` (watcher)
+ *   **Testing Harness Framework:** Vitest integrated natively into a Vite processing configuration, paired with Playwright v1.64+ headless execution packages
+ *   **Local State Data:** Isolated JSON file structures (`.uipipe/session.json`)
+ *   **Local Layout Intermediaries:** Plain-text Markdown (`.uipipe/copy_paste_pack.md`) and raw static HTML/JSX structures.
+@@ -16,38 +56,103 @@ To ensure **The Free-Tier Alchemist** execution property is strictly honored, th
+ ## Implementation Checklist
+ 
+ ### Phase 1: Specifications & Documentation Design
+-- [x] Draft PRD.md (Core System Architecture, Philosophy, & Specifications Matrix)
+-- [x] Draft the GitHub 100k Stars README.md (High-Conversion Marketing & Architectural Core)
++- [x] Draft `docs/PRD.md` (Core System Architecture, Philosophy, & Specifications Matrix)
++- [x] Draft `docs/TECHNICAL_DESIGN_DOC.md` (Comprehensive Schema Models & 14-Tool Subsystems Matrix)
++- [x] Draft the GitHub 100k Stars `README.md` (High-Conversion Marketing & Architectural Core)
+ 
+ ### Phase 2: Core Workspace Engine & Manifest System
+-- [ ] Initialize bare system architecture workspace path environment variables via `npm init -y`.
+-- [ ] Run localized package acquisition streams via explicit save instructions to capture current stable releases (`npm i --save-dev typescript vitest vite ts-node @types/node playwright posthtml oxc-parser chokidar ws`).
+-- [ ] Configure localized system parameters (`tsconfig.json`, `vite.config.ts`, `vitest.config.ts`) directly from installed module parameters.
+-- [ ] Implement the local file scaffolding routine (`uipipe init`) to securely construct the `.uipipe/` workspace structure and layout browser template roots (`react_canvas.html`).
+-- [ ] Build the file tree crawling utility (`uipipe manifest`) to parse directory mapping definitions while safely ignoring blackholes (`node_modules/`, `.git/`, `dist/`).
+-- [ ] Define and schema-validate the session tracking database file (`.uipipe/session.json`) to accurately maintain the step tracking journal history.
++- [ ] **Task 2.1: Project Environment Scaffolding**
++  * **Motive:** Establish the primitive, isolated workspace configuration boundaries required to compile our ESM modules without remote environment tracking side-effects.
++  * **Action:** Initialize system context parameters via `npm init -y` and build a static `package.json` layout.
++- [ ] **Task 2.2: Local Dependency Acquisition**
++  * **Motive:** Secure the offline toolchain primitives (PostHTML, native Rust-bound Oxc, Playwright headless browsers, and WebSocket systems) ensuring zero hidden network runtime lookups.
++  * **Action:** Install pin-locked versions (`typescript`, `vitest`, `vite`, `ts-node`, `@types/node`, `playwright`, `posthtml`, `oxc-parser`, `chokidar`, `ws`).
++- [ ] **Task 2.3: Configuration Profile Matrix**
++  * **Motive:** Enforce strict ESM compilation constraints, path mappings, and testing isolation rules.
++  * **Action:** Generate complete definitions for `tsconfig.json`, `vite.config.ts`, and `vitest.config.ts`.
++- [ ] **Task 2.4: Workspace Initializer (`uipipe init`)**
++  * **Motive:** Establish the localized filesystem sandbox boundaries and tracking directory topologies.
++  * **Action:** Program `src/commands/init.ts` to scaffold `.uipipe/`, `.uipipe/snapshots/`, and local server baseline layouts (`react_canvas.html`).
++- [ ] **Task 2.5: Framework Blackhole Crawler (`uipipe manifest`)**
++  * **Motive:** Deep-scan the developer's working directory to map out structural context assets while explicitly filtering out environment overhead.
++  * **Action:** Code `src/core/crawler.ts` and `src/commands/manifest.ts` to filter out `node_modules/`, `.git/`, and build paths depth-first.
++- [ ] **Task 2.6: State Ledger Schema Validation**
++  * **Motive:** Lock down state entry parameters to protect historical generation trees from runtime corruption.
++  * **Action:** Code the baseline session mapping and tracking models inside `src/core/session.ts` to read/write `.uipipe/session.json`.
+ 
+ ### Phase 3: Token Injection & Mutation Utilities (Local Engine)
+-- [ ] Build the dynamic core engine router in `src/core/compiler.ts` to cleanly segregate static PostHTML DOM mapping loops from native Rust-backed `oxc-parser` ESTree syntax compilation paths.
+-- [ ] Implement token adapter strategy modules (`src/core/adapters/`) to map unified style variables cleanly across target syntaxes (`class` vs. `className`).
+-- [ ] Build the relational validation matrix engine (`src/core/matrix.ts`) to compute and lock real-time relative luminance metrics and WCAG contrast limits before compile steps.
+-- [ ] Program the token shuffle pipeline (`uipipe paint --shuffle`) to apply randomized mapping combinations from data maps onto structural classes.
+-- [ ] Implement the State Invariant Reconciliation Protocol (SIRP) inside `src/core/session.ts` to trap checksum drift on manual out-of-band IDE adjustments.
+-- [ ] Implement the time-travel rollback module (`uipipe checkout step-n`) to restore exact previous snapshots by reading file hashes from the journal history.
+-
+-### Phase 4: Dev Orchestration & Self-Healing Logic
+-- [ ] Implement the file watching and server synchronization orchestration layer inside `src/core/orchestrator.ts` using `chokidar` and native WebSocket components.
+-- [ ] Build the local continuous command execution handler (`src/commands/dev.ts`) to manage hot-reloaded canvas refresh signals.
+-- [ ] Code the headless browser instantiation scaffolding inside `src/core/adversary.ts` using stable Playwright configuration handlers.
+-- [ ] Build the layout self-healing engine inside `src/core/healer.ts` to calculate and patch missing responsive containment attributes onto target elements.
+-- [ ] Code the text expansion utility in `uipipe break` to inject non-breaking text patterns and translation expands into element targets using web-first `page.locator()`.
+-- [ ] Construct the container scale evaluator to check markup properties under simulated text growth bounds utilizing native browser `getBoundingClientRect` metrics.
+-- [ ] Build the structural visual alert generator using console symbols (`:::`, `==>`, `[!]`, `[+]`) to format edge-case structural layout violations and wire exit code `2` interrupts.
++- [ ] **Task 3.1: Visual Blueprint Generator (`uipipe blueprint`)**
++  * **Motive:** Allow high-discipline layout engineers to instantly synthesize raw, unstyled grid matrices without consuming cloud API budgets.
++  * **Action:** Code `src/commands/blueprint.ts` to map cell arrays directly into static framework grids.
++- [ ] **Task 3.2: Structural Intent Transformer (`uipipe layout`)**
++  * **Motive:** Isolate structural document containment rules completely from downstream visual style properties.
++  * **Action:** Code `src/commands/layout.ts` to translate structural layout strings into pure grayscale CSS Flexbox and Grid frames.
++- [ ] **Task 3.3: Dual-Engine Abstract Syntax Tree Core**
++  * **Motive:** Prevent standard string manipulation and regex injection attacks from breaking tag properties during token mapping loops.
++  * **Action:** Code `src/core/compiler.ts` to route markup to either a PostHTML engine array or an ultra-fast native Rust `oxc-parser` ESTree syntax loop.
++- [ ] **Task 3.4: Framework Token Transformation Adapters**
++  * **Motive:** Abstract multi-syntax class variations away from core design systems logic.
++  * **Action:** Code unified mapping strategies inside `src/core/adapters/html.ts` and `src/core/adapters/jsx.ts` (`class` vs. `className`).
++- [ ] **Task 3.5: Contrast Matrix & Relative Luminance Core**
++  * **Motive:** Automate accessibility checks directly inside compiler stages using exact color luma equations.
++  * **Action:** Build `src/core/matrix.ts` to perform mathematical color contrast checks.
++- [ ] **Task 3.6: Palette Harmony Auditor (`uipipe contrast`)**
++  * **Motive:** Provide a standalone verification rig to explicitly intercept and block low-contrast paint operations.
++  * **Action:** Build `src/commands/contrast.ts` to audit static files and exit with POSIX code `1` upon WCAG ratio failures.
++- [ ] **Task 3.7: Token Mixer Pipeline & Alternative Shuffle (`uipipe paint`)**
++  * **Motive:** Fuse unstyled wireframe layouts with design token system dictionaries safely.
++  * **Action:** Code `src/commands/paint.ts` to combine token variables into DOM structures, incorporating randomized harmony palette shifts when `--shuffle` is flagged.
++- [ ] **Task 3.8: Spatial Layout Console Wireframer (`uipipe trace`)**
++  * **Motive:** Provide immediate, text-based debugging grids to visualize element nesting directly in standard shells.
++  * **Action:** Implement `src/commands/trace.ts` to parse structural display parameters into a console ASCII map diagram.
++- [ ] **Task 3.9: State Invariant Reconciliation Protocol (SIRP)**
++  * **Motive:** Secure user IDE edits from accidental pipeline overwrites.
++  * **Action:** Build `src/core/session.ts` to trap checksum drifts via SHA-256 byte-hash routines.
++- [ ] **Task 3.10: Time-Travel Chronological Checkpoint Engine (`uipipe checkout`)**
++  * **Motive:** Decouple development from linear generation errors, allowing instant rollbacks to stable underlying structures.
++  * **Action:** Implement `src/commands/checkout.ts` to match state log history array indices and safely restore cached snapshots.
++
++### Phase 4: Dev Orchestration & Quality Assurance Rigs
++- [ ] **Task 4.1: Continuous Hot-Reloading Monitor**
++  * **Motive:** Drive an active local preview loop tracking both filesystem transformations and visual token updates in real time.
++  * **Action:** Code `src/core/orchestrator.ts` using `chokidar` file system monitors paired with local WebSocket connections.
++- [ ] **Task 4.2: Development Workspace Orchestration (`uipipe dev`)**
++  * **Motive:** Manage continuous automated compilation processes silently in background threads.
++  * **Action:** Program `src/commands/dev.ts` to boot local servers and sync modifications over runtime connections.
++- [ ] **Task 4.3: Headless Sandbox Intercept Scaffold**
++  * **Motive:** Set up an isolated serverless automated validation layer completely clear of third-party telemetry networks.
++  * **Action:** Implement the headless browser initialization logic inside `src/core/adversary.ts` utilizing local Playwright configurations.
++- [ ] **Task 4.4: Local Tracking Expansion Stressor (`uipipe break`)**
++  * **Motive:** Adversarially stress container properties by testing text growth limits under rapid locale reflow conditions.
++  * **Action:** Code `src/commands/break.ts` to inject text growth vectors (+30% tracking characters) into web-first browser frames.
++- [ ] **Task 4.5: Geometric Bounding & Reflow Monitor**
++  * **Motive:** Catch clipping and overflow failures inside the layout sandbox using absolute coordinate telemetry.
++  * **Action:** Code within `src/core/adversary.ts` to evaluate structural bounds utilizing native browser `getBoundingClientRect()` metrics.
++- [ ] **Task 4.6: Automated Component Healing Synthesizer**
++  * **Motive:** Dynamically patch broken responsive layouts by executing target AST repairs inline.
++  * **Action:** Code `src/core/healer.ts` to intercept layout violations and inject defensive class structures (`flex-wrap`, `break-all`).
++- [ ] **Task 4.7: Grid Margin Strain Fuzzer (`uipipe bleed`)**
++  * **Motive:** Map the exact limits where structural containers shatter by testing incremental padding expansions.
++  * **Action:** Implement `src/commands/bleed.ts` to track canvas padding stress tolerances over step intervals.
++- [ ] **Task 4.8: Sub-Element Injection Row Auditor (`uipipe flex`)**
++  * **Motive:** Verify that responsive grids handle dynamic layout updates gracefully without provoking box overlapping collisions.
++  * **Action:** Build `src/commands/flex.ts` to audit flex wrapping behaviors under fluid node populations.
+ 
+ ### Phase 5: Handoff Compilations & Release Setup
+-- [ ] Code the pack system for `uipipe handoff` to synthesize project schemas and steps into the universal markdown proxy block (`.uipipe/copy_paste_pack.md`).
+-- [ ] Build unit testing scripts using basic mock assertions to enforce validation constraints without calling external server nodes.
+-- [ ] Package the executable distribution system for open deployment on npm/GitHub.
++- [ ] **Task 5.1: Lexical Text Context Packer (`uipipe pack`)**
++  * **Motive:** Strip structural layout templates of white space and comment bulk to maximize efficiency for low-tier AI prompt contexts.
++  * **Action:** Program `src/commands/pack.ts` to provide highly optimized component string compressions.
++- [ ] **Task 5.2: Portable Context Portability Capsule (`uipipe handoff`)**
++  * **Motive:** Compile repository blueprints, token sets, and steps into an isolated Markdown block optimized for web-tab copy-pasting.
++  * **Action:** Implement `src/commands/handoff.ts` to write data structures out to `.uipipe/copy_paste_pack.md`.
++- [ ] **Task 5.3: Baseline Integration & Testing Manifest**
++  * **Motive:** Enforce absolute tool stability via isolated, hermetic mock evaluations.
++  * **Action:** Write integration verification test matrices inside `tests/integration/workflow.test.ts`.
++- [ ] **Task 5.4: CLI Executable Global Package Distribution**
++  * **Motive:** Build a lightweight global binary configuration node to deploy the executable tool.
++  * **Action:** Set up `bin/uipipe` global executable parameters and release routines.
++
++---
+ 
+ ## Session State Machine Constraints
+ 
+@@ -59,34 +164,3 @@ Every functional step modifies state inside `.uipipe/session.json`. The programm
+ ```
+ 
+ If an error configuration is applied during any single generation block, the tracking manifest must cleanly permit rollbacks to pristine, immutable structural state data blocks without forcing project state resets.
+-
+----
+-
+-## Implementation Rules
+-
+-### 1. Elite Mentor Workflow Guardrails
+-All software development, prompting, and orchestration tasks must follow the highly iterative, instructional workflow defined by the following foundational rules:
+-*   **Hyper-Iterative Slicing:** Never construct a feature or file all at once. Break code tasks down into the smallest possible logical increments. Multiple passes are a structural success.
+-*   **Co-Developed Specifications:** Every time an operational routine, logic fork, or behavioral chunk is introduced, its companion test spec must be written in the same response as an inseparable unit of work. 
+-    *   *Note:* Focus tests on demonstrating visual state changes, data flows, and perimeter boundaries in the terminal.
+-    *   *Exception:* Do not write specs for pure structural boilerplate, environment configurations, raw data fixtures, or isolated type/interface declarations.
+-*   **Environment Validation First:** Before writing code for any specific task, the very first step must outline the exact folder structure, system prerequisites, and the precise terminal commands required to install packages or initialize the test engine.
+-*   **Motive Precedes Syntax:** Before displaying code blocks, provide a plain-language explanation of the engineering "WHY" and architectural motivations (e.g., how a function boundary isolates an adversarial input stream).
+-*   **Pedantic, Dense Commenting:** All production source code and test files must be heavily documented with line-by-line or section-by-section inline comments over-explaining exactly what the logic is doing and why.
+-*   **Explanatory Logging Streams:** Inject explicit, descriptive console logging paths into both production blocks and test scripts (e.g., `console.log('\n::: START CRAWLER RUN: ... :::')`) to make internal processing execution flows visible directly in the shell.
+-*   **Zero Placeholders:** Comprehensive code blocks are mandatory. Code omission tricks like `// ... rest of your code here` are completely banned.
+-*   **Hardcoded Time Checkpoint Rule:** To maintain accurate runtime context, all code modifications, workspace installations, and file-saving operations must be timestamped and validated explicitly against the present execution baseline date of **November 9, 2026**.
+-*   **Explicit Trapping Sign-Off:** Every single response must conclude with a brief, 1-sentence summary of the micro-chunk built, followed by an explicit request for user permission to proceed. Do not generate the next increment until instructed.
+-
+-### 2. Documentation Synchronization & Anti-Drift Lifecycle
+-To prevent documentation decay during this highly iterative development cycle, the system must execute a strict sync routine at the end of every individual task loop:
+-*   **Drift Analysis:** Cross-examine code changes against `README.md` and `docs/TECHNICAL_DESIGN_DOC.md`. If transformations occur, modify the documentation immediately.
+-*   **Staging Validation:** Provide clear `git add` and `git commit` syntax suggestions utilizing strict conventional commit definitions (e.g., `feat: build local crawler directory filter`).
+-*   **Human-in-the-Loop Gate:** Halt the workflow execution path, render the current documentation drift balance to the console, and await formal user sign-off before selecting the next item on the implementation checklist.
+-
+-### 3. Context-Window Bootstrapping & LLM Session Hardening
+-To prevent contextual drift, hallucinations, or unprompted code drops when initializing a brand-new session context window, the following enforcement triggers are active:
+-*   **The Zero-Code Boot Protocol:** The first response of any new session must strictly contain zero production or testing code. The LLM must output an ASCII summary of the active phase checklist, print the typographic anchor keys (`:::`, `==>`), and end immediately with `::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN PHASE X STEP Y :::`.
+-*   **The Invariant 25-Line Method Cap:** A "micro-chunk" is programmatically defined as a single logic block, method, or helper utility containing fewer than 25 lines of actual code execution. Generating multiple methods or exceeding this threshold in a single turn constitutes a workflow violation.
+-*   **The Blank Slate Constraint:** The LLM must assume zero local system state. It is strictly forbidden from importing local modules, referencing external helper utilities, or assuming files exist unless that exact file architecture has been written out in full text within the active context window boundaries.
+-*   **State Sign-Post Requirement:** Every code block response must explicitly display the absolute file target path as a markdown header (e.g., `### File Target: src/core/crawler.ts`) immediately before explaining the engineering "WHY".
+diff --git a/docs/PRD.md b/docs/PRD.md
+index d7040de..52c0deb 100644
+--- a/docs/PRD.md
++++ b/docs/PRD.md
+@@ -1,4 +1,4 @@
+-# Product Requirement Document (PRD) - Part 1
++# Product Requirement Document (PRD)
+ 
+ ## Project: `uipipe`
+ ### Subtitle: The Composable Unix Pipeline for Token-Aware AI Design Engineering
+@@ -28,21 +28,40 @@ Current AI design generation toolchains are monolithic, fragile, and bound to an
+ | Persona Name | Economic Reality | Core Tool Interaction |
+ | :--- | :--- | :--- |
+ | **The Enterprise Sovereign** | Unlimited token budget; corporate infrastructure access. | Uses `uipipe` fully automated inside CLI agent loops (e.g., automated scripts running Claude Code or Cursor tools via `--agent` flags). |
+-| **The Metered Pragmatist** | $20/month subscription cap. Constantly managing mid-week token exhaustion or throttles. | Uses `uipipe` locally to prune context, compress layouts, and strip fluff *before* piping streams to paid APIs. |
+-| **The Free-Tier Alchemist** | $0 AI budget. Cobbles free web tabs (Google AI Studio, ChatGPT free, Grok) via browser copy-paste. | Uses `uipipe` entirely in `--local-only` mode to generate ultra-dense, text-based project maps and clipboard injection bundles. |
++| **The Metered Pragmatist** | \$20/month subscription cap. Constantly managing mid-week token exhaustion or throttles. | Uses `uipipe` locally to prune context, compress layouts, and strip fluff *before* piping streams to paid APIs. |
++| **The Free-Tier Alchemist** | \$0 AI budget. Cobbles free web tabs (Google AI Studio, ChatGPT free, Grok) via browser copy-paste. | Uses `uipipe` entirely in `--local-only` mode to generate ultra-dense, text-based project maps and clipboard injection bundles. |
+ 
+ > **Development Mandate:** The `uipipe` runtime and tooling matrix must remain entirely compilable and verifiable using only the free resources available to **The Free-Tier Alchemist**. The core toolchain requires zero paid runtime dependencies; local testing relies strictly on offline template synthesis, deterministic structural validation, and structured prompt generation templates.
+ 
++---
++
+ ## 3. Product Architecture & Functional Core
+ 
+ `uipipe` operates as a standalone CLI application. All commands manipulate files locally within a project directory inside a specialized workspace folder (`.uipipe/`).
+ 
+ ```text
+ [uipipe CLI Matrix]
+- ::: uipipe layout   ==>  Compiles text intent into Grayscale Semantic Structure (No Color)
+- ::: uipipe paint    ==>  Fuses Grayscale Structure + tokens.json (Supports --shuffle)
+- ::: uipipe break    ==>  Adversarial Stress Tester (Playwright Headless Hydrated Canvas Fuzzer)
+- ::: uipipe handoff  ==>  Context Capsule Compiler (Formats context packs for browser tabs)
++ ::: Structural Blueprint & Styling Engines
++ ::: uipipe layout         ==>  Compiles text intent into Grayscale Semantic Structure (No Color)
++ ::: uipipe paint          ==>  Fuses Grayscale Structure + tokens.json (Supports --shuffle)
++ ::: uipipe trace          ==>  Extracts existing layout classes to visualize spatial grids
++ ::: uipipe blueprint      ==>  Generates structural layout boilerplate from a matrix
++ 
++ ::: Adversarial Stress & Quality Assurance Rigs
++ ::: uipipe break          ==>  Adversarial Stress Tester (Playwright Headless Hydrated Canvas Fuzzer)
++ ::: uipipe contrast       ==>  Throws error codes if text elements fall below WCAG 4.5:1
++ ::: uipipe bleed          ==>  Fuzzes container dimensions to spot structural break points
++ ::: uipipe flex           ==>  Audits alignment and wrapping under dynamic element counts
++ 
++ ::: Dev Orchestration, Workspace, & Session Lifecycle
++ ::: uipipe init           ==>  Scaffolds workspace pathing and initializes session tracker ledger
++ ::: uipipe manifest       ==>  Compiles a clean project file tree map blocking system blackholes
++ ::: uipipe session:sync   ==>  Captures out-of-band developer optimizations via SHA-256 byte-hash
++ ::: uipipe checkout       ==>  Forcefully rewinds local files back to a pristine snapshot step
++ 
++ ::: Context Portability & Export Tools
++ ::: uipipe handoff        ==>  Context Capsule Compiler (Formats context packs for browser tabs)
++ ::: uipipe pack           ==>  Compresses layout components to prevent lower-tier context saturation
+ ```
+ 
+ ### 3.1 Non-Emoji Visual Anchor Language
+@@ -57,50 +76,254 @@ To project a professional toolchain aesthetic, `uipipe` explicitly and completel
+ 
+ ## 4. Component Interface Specifications
+ 
+-### 4.1 `uipipe layout` (Structural Blueprint Engine)
++### 4.1 Structural Blueprint & Styling Engines
++
++#### 4.1.1 `uipipe layout`
+ * **Description:** Generates zero-color, invariant layout skeletons focusing exclusively on document outlines, containment flows, and responsive layouts.
+-* **Input Parameters:**
+-  * `intent`: Natural language structural directive string.
+-  * `--platform`: Target rendering engine definition (`html-tailwind` | `react-tailwindcss`).
+-* **In-Memory Transformation:** Instantiates the base framework structural skeleton layout template, mapping user description keywords directly into pure CSS grid grids and flex layouts.
+-* **Output Artifact:** Emits `01_layout.html` or framework component file containing grayscale semantic markup stripped of any color, typography families, shadows, or motion styles.
+-* **Failure Matrix:** Throws exit code `1` if layout directives lack valid document containment boundaries or if write access to the workspace path is denied.
+-
+-### 4.2 `uipipe paint` & The Relational Token Matrix Core
+-* **Description:** Fuses the unstyled structure markup file with a design system token configuration using a secure virtual tree engine to prevent regex string substitution collisions.
+-* **Input Parameters:**
+-  * `--tokens`: Path pointer string to target design tokens JSON catalog dictionary.
+-  * `--shuffle`: Flag configuration activating the "I'm Feeling Lucky" alternative style mixer.
+-* **In-Memory Transformation:** Validates token properties against the Relational Matrix schema. If a color pairing falls below a 4.5:1 relative luminance WCAG contrast threshold, the engine discards the variation and dynamically calculates a compliant harmony pair out of the allowed spectrum tokens before converting the PostHTML DOM tree or Oxc ESTree nodes into final painted output code blocks.
+-* **Output Artifact:** Emits `02_painted.html` or a framework-specific painted style snapshot file.
+-* **Failure Matrix:** Throws exit code `1` if design token catalogs violate schema bounds or fail the mathematical contrast threshold rules during manual token overrides.
+-
+-### 4.3 `uipipe break` (The Adversarial Self-Healing Rig)
+-* **Description:** A local layout linter that launches a local, un-networked serverless browser thread to test component robustness under extreme real-world interface configurations.
+-* **Input Parameters:**
+-  * `--target`: Local path pointer targeting the styled visual layout file asset.
+-  * `--fix`: Operational configuration flag activating automated layout self-healing.
+-* **In-Memory Transformation:** Spawns a headless Playwright runner, injects custom locale tracking parameters (+30% tracking characters), and simulates 200% document scale reflows. If an element's bounding rect leaks outside parent box containment properties, it triggers an overflow violation. If `--fix` is passed, `src/core/healer.ts` intercepts the selector node and injects defensive class overrides (e.g., adding `flex-wrap` or `break-all`) onto the DOM/AST structures.
+-* **Output Artifact:** Emits a hardened `03_hardened.html` code file or throws layout leakage parameters directly to standard outputs.
+-* **Failure Matrix:** Exits with strict POSIX status code `2` if a layout boundary collapse is verified and the `--fix` parameter is absent or fails to achieve structural encapsulation.
+-
+-### 4.4 `uipipe handoff` & `uipipe manifest` (Context Portability Capsule)
+-* **Description:** Compiles local repository blueprints and execution steps into a single portable context text asset designed for zero environment context degradation.
+-* **Input Parameters:**
+-  * `--session`: Target execution session identification tracking uuid string.
+-* **In-Memory Transformation:** Executes a rapid local directory spider crawl to compile a file list tree map while completely blocking dependency blackholes (`node_modules/`, `.git/`, `dist/`). It stringifies local token definitions, crawls past snapshots, and minifies prompt frames.
+-* **Output Artifact:** Emits an ultra-dense, standalone markdown proxy file block saved directly at `.uipipe/copy_paste_pack.md` for seamless clipboard integration into external tools.
+-* **Failure Matrix:** Throws exit code `1` if tracking check validation checksums fail across the historical snapshot files.
+-
+-
+-## 5. Technical Session Lifecycle & State Engine
+-
+-`uipipe` manages session state via an immutable journal schema stored in `.uipipe/session.json`. This acts like a lightweight time-travel tracker designed explicitly for front-end architecture tracking.
+-
+-### 5.1 The Local Session Blueprint Example
++* **Input Parameters:** `intent` (string), `--platform` (`html-tailwind` | `react-tailwindcss` | `vue-prime`).
++* **Output Artifact:** Emits `01_layout.html` stripped of any color, typography families, shadows, or motion styles.
++
++#### 4.1.2 `uipipe paint`
++* **Description:** Fuses the unstyled structure markup file with a design system token configuration using a secure virtual tree engine to prevent regex collisions.
++* **Input Parameters:** `--tokens` (string), `--shuffle` (flag).
++* **In-Memory Transformation:** Validates tokens against the Relational Matrix schema. If color pairing falls below a 4.5:1 WCAG contrast threshold, it dynamically calculates a compliant harmony pair.
++* **Output Artifact:** Emits `02_painted.html` or framework style snapshot.
++
++#### 4.1.3 `uipipe trace`
++* **Description:** Extracts existing layout classes and renders a structural layout trace diagram directly to the console terminal to visualize spatial grid distribution.
++* **Input Parameters:** `--target` (string).
++* **Output Artifact:** Diagnostic plain-text console diagram map.
++
++#### 4.1.4 `uipipe blueprint`
++* **Description:** Generates pure structural layout boilerplate wireframe models based on explicit grid distribution matrices without processing external prompt contexts.
++* **Input Parameters:** `--matrix` (string), `--platform` (`html-tailwind` | `react-tailwindcss` | `vue-prime`).
++* **Output Artifact:** Emits raw unstyled boilerplate canvas components.
++### 4.2 Adversarial Stress & Quality Assurance Rigs
++
++#### 4.2.1 `uipipe break` (Aliases: `breakit`, `uibreakit`)
++* **Description:** A local layout linter that launches a local, un-networked serverless browser thread to test component robustness under extreme interface configurations.
++* **Input Parameters:** `--target` (string), `--fix` (flag).
++* **In-Memory Transformation:** Spawns a headless Playwright runner, injects custom locale tracking parameters (+30% tracking characters), and simulates 200% document scale reflows. If `--fix` is active, `src/core/healer.ts` injects defensive class overrides (e.g., `flex-wrap`, `break-all`).
++* **Output Artifact:** Emits hardened `03_hardened.html` or throws leakage parameters.
++
++#### 4.2.2 `uipipe contrast`
++* **Description:** Evaluates the active painted file layout snapshot and explicitly throws error codes if text color elements fall below a mathematical 4.5:1 relative contrast threshold.
++* **Input Parameters:** `--target` (string).
++* **Output Artifact:** Exits with status `1` and prints precise DOM element paths failing WCAG guidelines.
++
++#### 4.2.3 `uipipe bleed`
++* **Description:** Fuzzes container dimensions with incremental non-breaking padding to locate exactly where structural elements break encapsulation grids.
++* **Input Parameters:** `--target` (string), `--steps` (integer).
++* **Output Artifact:** Comprehensive visual breakdown matrix indicating layout strain points.
++
++#### 4.2.4 `uipipe flex`
++* **Description:** Audits the flex-wrap and layout alignment properties under dynamic element counts to isolate structural collisions or line-break overlaps.
++* **Input Parameters:** `--target` (string), `--count-range` (string).
++* **Output Artifact:** Structural overlap diagnostic report.
++
++---
++
++### 4.3 Dev Orchestration, Workspace, & Session Lifecycle
++
++#### 4.3.1 `uipipe init`
++* **Description:** Scaffolds the workspace directory paths, layout baselines, template mounting targets, and initializes the `.uipipe/session.json` state tracking ledger.
++* **Output Artifact:** Standardized `.uipipe/` structural workspace ecosystem directory.
++
++#### 4.3.2 `uipipe manifest`
++* **Description:** Compiles a full project file tree map while cleanly filtering out system blackholes (`node_modules/`, `.git/`, `dist/`).
++* **Output Artifact:** Updated file indexing schema maps.
++
++#### 4.3.3 `uipipe session:sync`
++* **Description:** Forces an immediate reconciliation loop between the local developer filesystem and the session ledger, computing current SHA-256 hashes to absorb out-of-band manual IDE changes cleanly.
++* **Input Parameters:** None.
++* **In-Memory Transformation:** Reads the working directory code files, generates an active SHA-256 byte-hash, compares it against the last state journaled in `.uipipe/session.json`, and updates the current historical sequence block to `status: stable` without incrementing the step counter.
++* **Output Artifact:** Updates `.uipipe/session.json` state inline.
++* **Failure Matrix:** Throws exit code `1` if the current files contain catastrophic structural syntax parsing errors (e.g., unclosed tags, invalid JSX) that prevent standard DOM/AST compilation.
++
++#### 4.3.4 `uipipe checkout <step>`
++* **Description:** Performs a local workspace chronological rollback or roll-forward to restore files to a pristine historical file state snapshot.
++* **Input Parameters:** `step` (integer target matching a recorded step index or string alias like `step-1`).
++* **In-Memory Transformation:** Locates the specified step array item within the local ledger, validates its recorded file checksum against the immutable snapshot artifact cache stored inside `.uipipe/snapshots/`, and overwrites the active project working file pointer.
++* **Output Artifact:** Restores the active localized code files (e.g., `01_layout.html` or `02_painted.html`) to their historical variants.
++* **Failure Matrix:** Exits with strict status code `1` if the targeted step index does not exist in the journal history or if its cached snapshot artifact file has been deleted from the filesystem.
++
++---
++
++### 4.4 Context Portability & Export Tools
++
++#### 4.4.1 `uipipe handoff`
++* **Description:** Bundles active design artifacts, configuration states, and local repository metadata maps into a zero-overhead, portable Markdown transfer capsule optimized for browser copy-paste workflows.
++* **Input Parameters:** `--session` (string UUID, optional).
++* **In-Memory Transformation:** Reads current design files, serialized token schemas, and token ledger trees, stripping out large dependency blackholes. It maps text contents directly into predefined structural markdown blocks inside `config/templates/handoff_capsule.md`.
++* **Output Artifact:** Emits an ultra-dense markdown transfer document saved directly to `.uipipe/copy_paste_pack.md`.
++* **Failure Matrix:** Throws exit code `1` if the current active session state is completely blank or corrupt.
++
++#### 4.4.2 `uipipe pack`
++* **Description:** A dedicated minification and structural code compression utility that strips out boilerplate fluff, comments, and redundant formatting spacing to optimize raw text tokens for lower-tier AI prompt structures.
++* **Input Parameters:** `--target` (string file path).
++* **In-Memory Transformation:** Compiles the targeted file stream through a token-preserving lexical compressor that deletes unnecessary whitespace and internal source comments while explicitly retaining crucial framework structural data attributes and Tailwind class strings.
++* **Output Artifact:** Rewrites the target layout component to an ultra-dense string layout or outputs a compressed string buffer directly to the terminal stdout stream.
++* **Failure Matrix:** Throws exit code `1` if the file targeting mapping path fails validation checks.
++
++---
++
++## 5. Advanced Operational Invariants & Algorithmic Guardrails
++
++### 5.1 The Relational Token Matrix Rules (Contrast & Fluid Scale Locks)
++To eliminate visually broken layouts, `uipipe` executes mathematical constraint filtering inside `src/core/matrix.ts` before allowing token attributes to compile into DOM/AST trees. 
++
++1. **Relative Luminance Evaluation (WCAG 2.1 AA Compliance):**
++   The matrix engine computes relative luminance ($Y$) for proposed background ($L_1$) and foreground ($L_2$) hex colors using the standard formula:
++   $$Y = 0.2126 \cdot R + 0.7152 \cdot G + 0.0722 \cdot B$$
++   If the resulting contrast ratio $(\frac{L_1 + 0.05}{L_2 + 0.05})$ falls below **4.5:1**, the application rejects the stylistic token pass. If `--shuffle` is active, it mutates the palette down a compliant harmony scale instead of rendering unreadable layout code.
++
++2. **Typography Fluid Scale Lock:**
++   The typography system enforces rigid geometric proportion steps (`minor-third`, `perfect-fourth`, `golden-ratio`) configured in `config/default_tokens.json`. Heading font sizes are calculated programmatically from a single base font configuration token rather than generated via separate text string prompts, ensuring absolute structural rhythm across screen changes.
++
++### 5.2 The Adversarial Fuzzing Rig Mechanics
++The QA tools suite (`break`, `bleed`, `flex`) uses localized, sandboxed browser testing to evaluate design durability against extreme data mutations:
++
++* **Text Tracking Expansion Fuzzing:** Modifies text strings within layouts by appending high-length localized dummy content (+30% character tracking) to evaluate how containers wrap text and flex under translation stress.
++* **Reflow Defenses:** Evaluates element bounding boundaries inside Playwright. If an element's calculated `getBoundingClientRect()` width or height exceeds its parent element container bounding boxes, a layout boundary collision violation is caught and output to standard diagnostic text channels.
++* **Automated Component Healing:** When vulnerabilities are detected under the `--fix` parameter flag, the healing system loops back to inject precise corrective style tokens (e.g., appending structural parameters like `min-w-0`, `flex-wrap`, or `break-all`) safely into the corresponding PostHTML or Oxc abstract syntax tree layout indices.
++
++---
++
++## 6. Execution Lifecycle Scenarios
++
++### 6.1 Standard Workflow Sequence
++The following chronological terminal sequence highlights how the 14 core tools combine to handle layout generation, code hardening, and context-aware external handoffs without suffering from architectural design degradation:
++
++```bash
++# Step 1: Initialize local workspace boundaries
++$ uipipe init
++::: Initializing Workspace Environment ==> .uipipe/ generated successfully.
++
++# Step 2: Compile pure structural design blueprint skeletons
++$ uipipe layout "desktop medical dashboard with sidebar navigation and tabular patient grids" --platform html-tailwind
++::: Compiling Grayscale Blueprint ==> Emitted 01_layout.html [Stable Step 1 Checkpoint]
++
++# Step 3: Apply design tokens while verifying relative visual contrast bounds
++$ uipipe paint --tokens config/default_tokens.json
++::: Running Relational Matrix Verification ==> Contrast Check Passed (5.4:1 ratio)
++::: Fusing Visual Style Tokens ==> Emitted 02_painted.html [Active Step 2 Checkpoint]
++
++# Step 4: Run adversarial layout fuzzing to hunt down element clipping flaws
++$ uipipe break --target .uipipe/snapshots/02_painted.html --fix
++::: Spawning Headless Playwright Context Rig...
++::: Injecting Stress Vectors [+30% Tracking Characters, 200% Scale Reflow]
++[!] Element Collision Warning: Selector (.patient-table-cell) overflows parent container!
++[+] Applying Defensive Patch Class Overrides ==> Injected [break-all, flex-wrap]
++::: Hardening Complete ==> Emitted 03_hardened.html
++
++# Step 5: Export project context capsule to paste directly into browser chat inputs
++$ uipipe handoff
++::: Gathering Local Directory Tree Blueprint...
++::: Packaging Local Tokens and Historical Snapshot State Ledger Maps...
++==> Portability Capsule Compiled to .uipipe/copy_paste_pack.md [Handoff Ready]
++```
++
++## 7. Extended Error Matrix & Invariant Enforcement Systems
++
++### 7.1 Diagnostic Error Code Architecture
++`uipipe` implements a strict, non-ambiguous error handling architecture. When a background compilation pass or headless browser test violates structural integrity rules, the CLI intercepts the error, prevents file system corruption, and yields specific POSIX codes paired with plaintext alphanumeric identifiers.
++
++| Error Code Identifier | POSIX Exit Code | Primary System Trigger | Mitigation Path Resolution Strategy |
++| :--- | :--- | :--- | :--- |
++| `ERR_INV_CHECKSUM_DRIFT` | `1` | The SHA-256 byte-hash of the local target file does not match the ledger state tracked within `session.json`. | Execute `uipipe session:sync` to safely record user IDE structural optimizations or force rollback with `uipipe checkout <step>`. |
++| `ERR_MAT_CONTRAST_FAIL` | `1` | A manual or automated text-to-background color token pairing falls below the mathematical threshold limit of 4.5:1. | Re-evaluate the token palette mapping dictionaries; pass the `--shuffle` flag during a paint pass to force compliance. |
++| `ERR_ADV_CONTAIN_COLLAPSE` | `2` | Headless Playwright engine verifies a child DOM node's `getBoundingClientRect()` bounds leak past its parent grid element boundaries. | Append the `--fix` parameter to trigger the `healer.ts` automated structural repair utility tree injection mechanism. |
++| `ERR_AST_SYNTAX_CORRUPT` | `1` | The Oxc ESTree engine parser or PostHTML DOM core catches incomplete tags, expression faults, or broken structural blocks. | Halt compilation sequence immediately, protect the last stable snapshot step, and display the line number failure on the console layout. |
++
++### 7.2 The State Invariant Reconciliation Protocol (SIRP) Tree
++To safely preserve manual human developer edits while retaining automated layout pipelines, the runtime system runs a multi-phase verification loop upon executing any modifier command:
++
++```text
++       [Command Invocation (e.g., uipipe paint)]
++                          │
++                          ▼
++            Compute Local File SHA-256 Hash
++                          │
++                          ▼
++         Does Hash Match session.json Ledger?
++              ├─── YES ───► Proceed to Execution Pipeline Loop
++              └─── NO  ───► [SIRP Intercept Triggered]
++                                 │
++                                 ▼
++                     Halt Execution & Print
++             "::: [!] Warning: Out-of-band drift detected."
++                                 │
++                                 ▼
++                     Await User Override Route
++         ┌───────────────────────┴───────────────────────┐
++         ▼                                               ▼
++[Route A: uipipe session:sync]                [Route B: uipipe checkout <step>]
++  ├─ Read user IDE updates                      ├─ Purge out-of-band updates
++  ├─ Re-calculate current SHA-256               ├─ Pull last stable snapshot
++  ├─ Commit state to history array              ├─ Overwrite local file pointer
++  └─ Resume processing pipelines                └─ Restore historical ecosystem
++```
++
++---
++
++## 8. Technical Environment Boundaries
++
++### 8.1 Zero-Dependency Offline Execution Mandate
++To ensure support for **The Free-Tier Alchemist**, `uipipe` operates with completely isolated execution constraints:
++* **No Premium Subscriptions:** Zero run-time reliance on commercial SaaS tools, hosted microservices, or paid open-source platforms.
++* **Network-Independent Mode:** All layout validation models, relational matrices, and tree-shaking mechanisms execute entirely locally within memory space without invoking remote API connections.
++* **Hermetic Sandbox Operations:** The headless browser layer powered by Playwright relies on isolated text generators and standard local stylesheets rather than fetching tracking components or online CDNs.
++* **Lightweight Runtime Profile:** Bypasses bloated server runtimes by routing JSX abstractions directly through ultra-fast, native Rust-bound `oxc-parser` binaries, allowing rapid compilation routines on standard developer laptops.
++## 9. Distribution Model & Enterprise Hardening
++
++### 9.1 The Package Blueprint & Installation Footprint
++`uipipe` distributes as a self-contained open-source global executable utility module via standard package registries. It contains an efficient local footprint structure designed to initialize instantaneously without system drift:
++
++```text
++[Global Executable Scope Map]
++ npm install -g uipipe 
++   └── uipipe (Global CLI Executable Router Symbol Link)
++        ├── src/index.ts (Directs Execution Args)
++        └── config/
++             ├── default_tokens.json (Local Structural Baseline Rules Configuration File)
++             └── templates/
++                  ├── layout_base.html (Grayscale Layout Standard Wireframe Template File)
++                  └── handoff_capsule.md (Markdown Compilation Target Standard Framework File)
++```
++
++The global installer contains direct check gates verifying the execution platform matches safe system environments (e.g., Node.js versions >= 18.0.0).
++
++### 9.2 The Secure Local Context Capsule Lifecycle
++The `uipipe handoff` context engine treats local workspace project code explicitly as highly private infrastructure data:
++1. **Total Isolation Safeguards:** The parsing crawler strictly enforces system exclusion blocklists (`node_modules/`, `.git/`, `dist/`, `.env`) to block private credentials, infrastructure keys, or heavy external modules from slipping into clipboard structures.
++2. **Context Density Minimization:** Minifies structure frames to compress tracking assets. This lowers context window congestion limits by up to 75% on low-tier browser tab interfaces, completely eliminating the progressive generation rot that typically happens when passing heavy raw markup strings through commercial chat tools.
++
++---
++
++## 10. Open-Source Success Metrics & Validation Protocols
++
++### 10.1 Viral Evaluation Target Benchmarks
++To guarantee project momentum during the target **100k GitHub Stars Open-Source Launch**, the pipeline is mathematically evaluated against rigorous performance criteria:
++
++* **Execution Velocity Target:** Standard `uipipe layout` execution routines must compile from plain text instructions to grayscale DOM structures within a threshold window of less than **150ms**.
++* **Tree Modification Reliability:** Running complex structural design updates via `uipipe paint` across PostHTML or Oxc ESTree syntax engines must demonstrate a **0.00% syntax degradation rate** (no broken tags, or corrupted variable injections).
++* **Self-Healing Resolution Efficiency:** Under active adversarial layout tests with `--fix` active, the internal healing system must resolve a minimum of **90% of bounding box container leaks** on the first patch pass.
++
++### 10.2 Strict Continuous Integration Invariants
++The release pipeline validation rules require that every open-source code commit passes absolute health conditions prior to artifact deployment:
++* **100% Core Matrix Test Pass:** Test suites must execute all structural evaluation matrices against invalid token mappings (`tests/mocks/invalid_tokens.json`) to confirm contrast errors trigger exit codes instantly.
++* **Zero Graphic Emoji Rule:** The build configuration parses all logging files and terminal strings via automated scripts to confirm that zero standard visual emojis are included, ensuring strict adherence to the typographic visual anchor framework.
++
++---
++
++## 11. Technical Session Lifecycle & State Engine
++
++`uipipe` manages session states via an immutable chronological journal schema stored inside `.uipipe/session.json`. This local engine functions as a lightweight time-travel tracker built specifically to protect front-end architectures across active execution states.
++
++#### 11.1 The Local Session Blueprint Example
+ ```json
+ {
+-  "$schema": "http://json-schema.org",
++  "\$schema": "http://json-schema.org",
+   "sessionId": "medical-dashboard-029",
+   "meta": {
+     "platform": "html-tailwind",
+@@ -129,48 +352,42 @@ To project a professional toolchain aesthetic, `uipipe` explicitly and completel
+ }
+ ```
+ 
+-### 5.2 Time-Travel Operation
+-If an automated token application or adversarial mutation degrades the component structure, the user drops back to a specific checkpoint instantly:
++#### 11.2 Time-Travel Operation
++If an automated token application, layout trace, or adversarial mutation degrades the component structure, the developer drops back to any safe historical step instantly using the expanded command matrix:
+ ```bash
+-\$ uipipe checkout step-1
++\$ uipipe checkout 1
+ ::: Restoring Step 1 Snapshot [01_layout.html] ==> Active State Restored.
+ ```
+-This detaches development from linear generation errors, allowing users to rapidly experiment with different token skins on top of the identical underlying grayscale architecture without suffering from progressive generation rot.
+ 
+-### 5.3 State Invariant Reconciliation Protocol (SIRP)
++#### 11.3 State Invariant Reconciliation Protocol (SIRP)
+ To protect a developer's manual IDE optimizations from being overwritten during pipeline steps, the engine verifies the local working file's active SHA-256 checksum against the checkpoint hash inside `session.json` before triggering commands. If manual, out-of-band updates are discovered, `uipipe` initiates the following resolution tree:
+ 1. **Halt and Alert:** Stop execution and display a strict warning notice layout to the console: `[!] Warning: Out-of-band developer modification detected. Current file checksum has drifted from session ledger history.`
+ 2. **Fork and Preserved State Actions:** The CLI prompts the user with an interactive decision checkpoint:
+    * `uipipe session:sync` -> Captures the developer's manual optimizations, re-calculates the local checksum snapshot, and updates the step history ledger state cleanly as an incremental commit pass.
+-   * `uipipe checkout step-n` -> Forcefully discards manual modifications and rewinds the local target file to a pristine historical file state snapshot.
+-
+----
++   * `uipipe checkout <step>` -> Forcefully discards manual modifications and rewinds the local target file to a pristine historical file state snapshot.
+ 
+-## 6. Competitive Landscape & Market Differentiation
++## 12. Competitive Landscape & Market Differentiation
+ 
+-### 6.1 Comprehensive Competitor & Capability Matrix
++#### 12.1 Comprehensive Competitor & Capability Matrix
+ 
+ | Competitor / Skill Vector | Primary System Architecture | Target Audience Profile | Core Capability Focus | Glaring Operational Weakness(es) | `uipipe` Strategic Counter-Positioning |
+ | :--- | :--- | :--- | :--- | :--- | :--- |
+ | **v0.dev & Bolt.new** | Monolithic web runtime environments. | Enterprise Sovereigns / Metered Pragmatist devs. | Full-stack scaffolding, package installations, and rapid sandboxed web iteration. | **Total Vendor Lock-In & Cloud Token Bleed:** High infrastructure latency, high subscription overhead, and immediate workflow failure if network access or API budgets dry up. | **Deterministic Offline Control:** Replaces bloated, opaque, high-latency online platform loops with localized Unix CLI command controls. |
+-| **Replit Agent 4 & Infinite Canvas** | Infinite state tracking workspace canvas. | Metered Pragmatists / Collaborative Teams. | Multi-user parallel task execution and interactive visual design tweaks directly on active live applications. | **Massive Cognitive Context Bloat:** Constant file modifications quickly saturate prompt context windows, causing progressive generation rot during long sessions. | **Modular Decoupling:** Replaces complex cloud-hosted IDE boundaries with plain-text Markdown structure capsules optimized for any LLM tier. |
+-| **Anthropic Frontend Design & Artifacts** | Specialized system prompt heuristics. | Advanced Vibe Coders / Product Designers. | Structural clarity, semantic minimalist layouts, and clean visual execution states. | **Purely Advisory & Visual Only:** The model weights completely lack an automated local execution layer to enforce or mathematically verify their own architectural design rules. | **The Hardened Automation Rig:** Translates abstract behavioral prompts into a deterministic, local layout linter that outputs exact terminal errors. |
+-| **The "Taste Skill" / UI/UX Pro Max** | Custom fine-tunes and specialized persona contexts. | Design Engineers / AI Enthusiasts. | Visual asymmetry, responsive fluid hierarchies, typography configurations, and premium UI Polish. | **Fragile Structural Drift:** Attempting to alter aesthetic themes simultaneously mutates underlying DOM nodes, breaking semantic layout structure. | **Invariant Visual Splits:** Forces models to generate raw grayscale layouts first, completely isolating structural balance from aesthetic variations. |
+-| **Impeccable / Hallmark / Anti-Slop** | Strict rule-driven defensive validation guardrails. | Senior Engineers / System Operators. | Preventing generic card grids, infinite online dots, and common "AI tells" or element styling overlaps. | **High False-Positive Strictness:** Heavily over-engineered string-matching rules frequently reject highly creative, valid, edge-case interface patterns. | **Locally Injected Fuzz Tester:** Active browser adversarial fuzzing via Playwright to uncover element clipping automatically before production commits. |
+-| **GSAP AI Skills** | Advanced animation state models and vector choreography. | Creative Developers / UI Innovators. | Highly interactive canvas timelines, expressive layout physics, and custom state transition animations. | **DOM Event Handler Collisions:** Script injections frequently corrupt elements, detaching active event listeners when layouts are updated mid-stream. | **Immutable Base + Variant Motion:** Pipes clean, structured DOM trees directly into variant style configurations without corrupting event listeners. |
++| **Replit Agent 4 & Infinite Canvas** | Infinite state tracking workspace canvas. | Metered Pragmatists / Collaborative Teams. | Multi-user parallel task execution and interactive visual design tweaks directly on active live applications. | **Massive Cognitive Context Bloat:** Constant file modifications quickly saturate prompt context windows, causing progressive generation rot during long sessions. | **Modular Decoupling:** Replaces complex cloud-hosted IDE boundaries with plain-text Markdown structure capsules optimized for any LLM tier via `uipipe handoff` and `uipipe pack`. |
++| **Anthropic Frontend Design & Artifacts** | Specialized system prompt heuristics. | Advanced Vibe Coders / Product Designers. | Structural clarity, semantic minimalist layouts, and clean visual execution states. | **Purely Advisory & Visual Only:** The model weights completely lack an automated local execution layer to enforce or mathematically verify their own architectural design rules. | **The Hardened Automation Rig:** Translates abstract behavioral prompts into a deterministic, local layout linter (`uipipe break`, `bleed`, `flex`) that outputs exact terminal errors. |
+ 
+-### 6.2 Market Demand Summary
++#### 12.2 Market Demand Summary
+ "Vibe coders," design engineers, and creative developers across active developer forums are experiencing deep fatigue with first-generation layout generation tools. The demand vectors have systematically shifted from absolute generation velocity to architectural discipline and interactive precision:
+ *   **The Rejection of "AI Slop":** The market has moved past the novelty of simple single-prompt inputs. Technical teams are looking for "Anti-Slop" filters—strict mechanisms that introduce typographic variation, spatial whitespace allocation, and structural resilience into raw components.
+ *   **The Craving for Aesthetic Taste:** Standard base models default to conservative, generic design patterns. Developers are manually stringing together custom system prompt matrices to inject "Taste Skills"—forcing AI layouts to adopt complex editorial alignments, micro-interactions, fluid scales, and elevated visual minimalism.
+ *   **Choreographed Motion Over Static Components:** Creators leveraging motion skill models (e.g., GSAP AI) find that when models attempt to write deep layout classes and timeline structural animations simultaneously, the code breaks instantly under tracking desyncs. The market is asking for pipelines that keep base element code lightweight while allowing robust animation vectors to sit cleanly on top.
+-*   **Context Window Fatigue:** As models regenerate complete files repeatedly to patch minor alignment issues, context windows saturate, triggering token limits. Developers demand local optimization tools that handle context pruning before pushing data out to AI endpoints.
++*   **Context Window Fatigue:** As models regenerate complete files repeatedly to patch minor alignment issues, context windows saturate, triggering token limits. Developers demand local optimization tools like `uipipe pack` that handle context pruning before pushing data out to AI endpoints.
+ 
+ ---
+ 
+-## 7. Community Viral Growth Strategy
++## 13. Community Viral Growth Strategy
+ 
+ To hit **100k GitHub stars within 2 weeks of release**, `uipipe` addresses these core demand vectors directly:
+-1. **Zero-Lock-In Exit Strategy:** The presence of `uipipe handoff` means the tool openly advertises itself as a launchpad. It explicitly encourages users to take their clean code out to Cursor or web tabs whenever they want, building massive goodwill.
++1. **Zero-Lock-In Exit Strategy:** The presence of `uipipe handoff` means the tool openly advertises itself as a launchpad. It explicitly encourages users to take their clean, packed context capsules out to Cursor, Claude Code, or browser tabs whenever they want, building massive open-source goodwill.
+ 2. **Aggressive Financial Accessibility:** The README leads with a proud manifesto: *"Built for Enterprise Sovereigns, Metered Pragmatists, and Free-Tier Alchemists alike. Zero token waste. 100% functional with raw clipboard copy-pasting via local context encapsulation."*
+-3. **The Developer Pride Factor:** By framing UI generation through the lenses of compilers, linters, and classic Unix pipelines (`cat struct.html \| uipipe paint --shuffle`), it elevates the vibe coding lifestyle into a respected, high-discipline software engineering methodology.
++3. **The Developer Pride Factor:** By framing UI generation through the lenses of compilers, linters, and classic Unix pipelines (`uipipe layout "intent" | uipipe paint --shuffle | uipipe trace`), it elevates the vibe coding lifestyle into a respected, high-discipline software engineering methodology.
+diff --git a/docs/TECHNICAL_DESIGN_DOC.md b/docs/TECHNICAL_DESIGN_DOC.md
+index b6d9fe7..ecbfb85 100644
+--- a/docs/TECHNICAL_DESIGN_DOC.md
++++ b/docs/TECHNICAL_DESIGN_DOC.md
+@@ -27,25 +27,32 @@ uipipe/
+ ├── package.json                     # Project manifest and distribution config
+ ├── src/
+ │   ├── index.ts                     # Core routing and entry orchestration
+-│   ├── commands/                    # CLI user interaction handlers
++│   ├── commands/                    # CLI user interaction handlers (14 Tools Suite Layer)
++│   │   ├── bleed.ts                 # Handles uipipe bleed padding fuzzer command
++│   │   ├── blueprint.ts             # Handles uipipe blueprint matrix command
+ │   │   ├── break.ts                 # Handles uipipe break | breakit | uibreakit aliases
++│   │   ├── checkout.ts              # Handles uipipe checkout step restorations
++│   │   ├── contrast.ts              # Handles uipipe contrast verification command
+ │   │   ├── dev.ts                   # Inits local hot-reloaded watcher orchestration
+-│   │   ├── handoff.ts
+-│   │   ├── init.ts
+-│   │   ├── layout.ts
+-│   │   ├── manifest.ts
+-│   │   └── paint.ts
++│   │   ├── flex.ts                  # Handles uipipe flex wrap structural auditor command
++│   │   ├── handoff.ts               # Handles uipipe handoff session capsule pack command
++│   │   ├── init.ts                  # Handles uipipe init workspace directory command
++│   │   ├── layout.ts                # Handles uipipe layout structural prompt command
++│   │   ├── manifest.ts              # Handles uipipe manifest repository crawler command
++│   │   ├── pack.ts                  # Handles uipipe pack text compression utility command
++│   │   ├── paint.ts                 # Handles uipipe paint design token mixer command
++│   │   └── trace.ts                 # Handles uipipe trace console ascii visualizer command
+ │   ├── core/                        # Pure domain logic (Platform & Framework Agnostic)
+ │   │   ├── adapters/                # Framework transpilation strategies
+ │   │   │   ├── html.ts              # Maps standard class structures via PostHTML
+ │   │   │   └── jsx.ts               # Maps React className structures via oxc-parser
+-│   │   ├── adversary.ts             # Playwright-driven headless stress rig with hydration flags
+-│   │   ├── compiler.ts              # Dual-Engine (PostHTML / Oxc ESTree) design token compiler
+-│   │   ├── crawler.ts               # Local workspace filesystem analysis
+-│   │   ├── healer.ts                # Structural DOM layout patch synthesizer
+-│   │   ├── matrix.ts                # Enforces relational constraints & contrast filters
+-│   │   ├── orchestrator.ts          # File watcher, web sockets, & dev state engine
+-│   │   └── session.ts               # Local state lifecycle & reconciliation manager
++│   │   ├── adversary.ts             # Playwright headless stress rig (break/bleed/flex)
++│   │   ├── compiler.ts              # Dual-Engine (PostHTML / Oxc ESTree) compiler and trace core
++│   │   ├── crawler.ts               # Local workspace filesystem deep analysis crawler
++│   │   ├── healer.ts                # Structural DOM layout patch repair synthesizer
++│   │   ├── matrix.ts                # Enforces relational constraints, luminance, & contrast filters
++│   │   ├── orchestrator.ts          # File watcher, web sockets, & dev state runtime engine
++│   │   └── session.ts               # Local state lifecycle ledger & reconciliation manager
+ │   ├── interfaces/                  # Shared data shapes and type declarations
+ │   │   ├── config.ts
+ │   │   ├── schema.ts
+@@ -97,27 +104,23 @@ graph TD
+ 
+ When a transaction or filesystem mutation event runs through the toolchain, execution transforms through three distinct in-memory data states managed inside transient byte buffers and pointer graphs:
+ 
+-1. **The Structural Token Stream (Layout Phase):**
+-   The prompt string is handled by the entry router and passed down to `src/core/compiler.ts`. The blueprint engine assembles a pure, unstyled layout array. This array represents raw semantic DOM nodes containing layout constraints but absolutely zero visual embellishments. In-memory, this is held as a flat UTF-8 encoded string buffer containing structural primitive layouts (e.g., standard CSS Grid and Flexbox container utility frames). Fallback layout anchor indices are injected into elements to serve as targets for the downstream compiler steps.
++1. **The Structural Token Stream (Layout & Blueprint Phase):**
++   The prompt string or layout matrix payload is handled by the entry router and passed down to `src/core/compiler.ts`. The blueprint engine assembles a pure, unstyled layout array. This array represents raw semantic DOM nodes containing layout constraints but absolutely zero visual embellishments. In-memory, this is held as a flat UTF-8 encoded string buffer containing structural primitive layouts (e.g., standard CSS Grid and Flexbox container utility frames). Fallback layout anchor indices are injected into elements to serve as targets for downstream compiler steps.
+ 
+-2. **The Dual-Engine Tree Graph Synthesis (Paint Phase):**
++2. **The Dual-Engine Tree Graph Synthesis (Paint, Contrast, & Trace Phase):**
+    Upon entry, `src/core/session.ts` runs a SHA-256 byte-hash computation against the targeted layout file to verify it hasn't drifted from the state log tracking ledger. If validated, the compiler core branches execution based on the active ecosystem profile:
+-   * **PostHTML Core (`html-tailwind`):** The raw HTML string buffer is compiled into a virtual tree node graph using a strict PostHTML plugin array interface. The algorithm traverses the tree, matches the injected layout anchor indices, maps the target node attributes, and fuses style variables directly out of `config/default_tokens.json`.
++   * **PostHTML Core (`html-tailwind`):** The raw HTML string buffer is compiled into a virtual tree node graph using a strict PostHTML plugin array interface. The algorithm traverses the tree, matches the injected layout anchor indices, maps target node attributes, and fuses style variables directly out of `config/default_tokens.json`.
+    * **Oxc ESTree Core (`react-tailwindcss`):** The JSX/TSX string buffer is processed by `oxc-parser` using low-overhead native bindings. It bypasses heavy JavaScript runtimes and instantly generates a standard ESTree-compliant Abstract Syntax Tree object graph in Node memory. The `src/core/adapters/jsx.ts` module traverses this syntax graph, identifies hybrid tag expressions, and directly mutates `JSXAttribute` node objects to swap raw design properties without risk of string interpolation corruption.
+-   Before the tree is stringified back to storage, the `src/core/matrix.ts` layer runs relative luminance computations on the proposed color tokens, ensuring a mathematical minimum 4.5:1 text-to-background contrast ratio is held.
+-
+-3. **The Hydrated Headless Playwright Pipeline (Break & Heal Phase):**
+-   The styled layout component string is loaded into a local headless Playwright browser thread. For framework targets, it is injected directly into a sandboxed mounting canvas (`config/templates/react_canvas.html`) loaded with zero-dependency framework bundles. The adversarial engine triggers a custom, blocking `page.waitForFunction()` hook that loops until client-side state hydration markers are active. Once hydrated, `ui-break-it` executes text expansions and element bounding evaluations via native layout evaluate channels, testing node bounding boxes using precise `getBoundingClientRect` metrics. On boundary collapse, the selector tree path is passed back to `src/core/healer.ts` to execute automated AST structural repair overrides before final compilation strings hit the snapshot cache.
+-
+-
+----
++   Before the tree is stringified back to storage, the `src/core/matrix.ts` layer runs relative luminance computations on proposed color tokens, ensuring a mathematical minimum 4.5:1 text-to-background contrast ratio is held.
+ 
++3. **The Hydrated Headless Playwright Pipeline (Break, Bleed, & Flex Phase):**
++   The styled layout component string is loaded into a local headless Playwright browser thread. For framework targets, it is injected directly into a sandboxed mounting canvas (`config/templates/react_canvas.html`) loaded with zero-dependency framework bundles. The adversarial engine triggers a custom, blocking `page.waitForFunction()` hook that loops until client-side state hydration markers are active. Once hydrated, the engine executes targeted tracking text expansions (+30% characters for `break`), incremental step padding modifiers (`bleed`), or dynamic sub-element population arrays (`flex`). Element boundaries are validated via native browser evaluation channels testing node bounding boxes using precise `getBoundingClientRect` metrics. On boundary collapse or container breach, the selector tree path is passed back to `src/core/healer.ts` to execute automated AST structural repair overrides before final compilation strings hit the snapshot cache.
+ ## 3. Exact Data Model & Schema Definitions
+ 
+ All operations inside `uipipe` track modifications inside `.uipipe/session.json`. The application relies entirely on deterministic data schemas to guarantee time-travel stability and cross-session reproducibility.
+ 
+ ### 3.1 Session Tracking Schema (`.uipipe/session.json`)
+-The fundamental architectural state log ledger tracking execution chronology.
++The fundamental architectural state log ledger tracking execution chronology across all 14 tools.
+ 
+ ```json
+ {
+@@ -133,7 +136,8 @@ The fundamental architectural state log ledger tracking execution chronology.
+         "createdAt": { "type": "string", "format": "date-time" },
+         "updatedAt": { "type": "string", "format": "date-time" }
+       },
+-      "required": ["platform", "createdAt", "updatedAt"]
++      "required": ["platform", "createdAt", "updatedAt"],
++      "additionalProperties": false
+     },
+     "history": {
+       "type": "array",
+@@ -141,17 +145,23 @@ The fundamental architectural state log ledger tracking execution chronology.
+         "type": "object",
+         "properties": {
+           "step": { "type": "integer", "minimum": 1 },
+-          "command": { "type": "string", "enum": ["layout", "paint", "break", "dev"] },
++          "command": { 
++            "type": "string", 
++            "enum": ["layout", "paint", "trace", "blueprint", "break", "contrast", "bleed", "flex", "init", "manifest", "dev", "handoff", "pack"] 
++          },
+           "variantName": { "type": "string" },
+           "filePointer": { "type": "string" },
+           "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}\$" },
+-          "timestamp": { "type": "string", "format": "date-time" }
++          "timestamp": { "type": "string", "format": "date-time" },
++          "status": { "type": "string", "enum": ["stable", "active", "drifting"] }
+         },
+-        "required": ["step", "command", "variantName", "filePointer", "checksum", "timestamp"]
++        "required": ["step", "command", "variantName", "filePointer", "checksum", "timestamp", "status"],
++        "additionalProperties": false
+       }
+     }
+   },
+-  "required": ["sessionId", "meta", "history"]
++  "required": ["sessionId", "meta", "history"],
++  "additionalProperties": false
+ }
+ ```
+ 
+@@ -172,25 +182,28 @@ The system schema expanded to map strict structural contrast dependencies, light
+         "harmonyMappings": {
+           "type": "object",
+           "properties": {
+-            "lightModeLock": { "type": "array", "items": { "type": "string" } },
+-            "darkModeLock": { "type": "array", "items": { "type": "string" } }
++            "lightModeLock": { "type": "array", "items": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" } },
++            "darkModeLock": { "type": "array", "items": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" } }
+           },
+-          "required": ["lightModeLock", "darkModeLock"]
++          "required": ["lightModeLock", "darkModeLock"],
++          "additionalProperties": false
+         }
+       },
+-      "required": ["minWcagContrastRatio", "enforceScaleLock", "harmonyMappings"]
++      "required": ["minWcagContrastRatio", "enforceScaleLock", "harmonyMappings"],
++      "additionalProperties": false
+     },
+     "density": { "type": "string", "enum": ["compact", "normal", "roomy"] },
+     "colors": {
+       "type": "object",
+       "properties": {
+-        "canvas": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\$" },
+-        "surface": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\$" },
+-        "primary": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\$" },
+-        "accent": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\$" },
+-        "border": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\$" }
++        "canvas": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
++        "surface": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
++        "primary": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
++        "accent": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
++        "border": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" }
+       },
+-      "required": ["canvas", "surface", "primary", "accent", "border"]
++      "required": ["canvas", "surface", "primary", "accent", "border"],
++      "additionalProperties": false
+     },
+     "typography": {
+       "type": "object",
+@@ -199,7 +212,8 @@ The system schema expanded to map strict structural contrast dependencies, light
+         "headingFamily": { "type": "string" },
+         "scale": { "type": "string", "enum": ["minor-third", "perfect-fourth", "golden-ratio"] }
+       },
+-      "required": ["baseFamily", "headingFamily", "scale"]
++      "required": ["baseFamily", "headingFamily", "scale"],
++      "additionalProperties": false
+     },
+     "geometry": {
+       "type": "object",
+@@ -208,26 +222,77 @@ The system schema expanded to map strict structural contrast dependencies, light
+         "borderWidthBase": { "type": "string" },
+         "shadowBase": { "type": "string" }
+       },
+-      "required": ["radiusBase", "borderWidthBase", "shadowBase"]
++      "required": ["radiusBase", "borderWidthBase", "shadowBase"],
++      "additionalProperties": false
+     }
+   },
+-  "required": ["matrixConstraints", "density", "colors", "typography", "geometry"]
++  "required": ["matrixConstraints", "density", "colors", "typography", "geometry"],
++  "additionalProperties": false
+ }
+ ```
+ 
+----
+-
+----
++### 3.3 Dynamic QA Fuzz Analysis & Layout Diagnostic Schema
++When running adversarial pipeline fuzzing (`uipipe break`, `bleed`, `flex`), the engine outputs reports matching this formal validation schema.
+ 
++```json
++{
++  "\$schema": "http://json-schema.org",
++  "title": "UiPipeFuzzDiagnosticReport",
++  "type": "object",
++  "properties": {
++    "targetFilePath": { "type": "string" },
++    "executionTimestamp": { "type": "string", "format": "date-time" },
++    "isResilient": { "type": "boolean" },
++    "metrics": {
++      "type": "object",
++      "properties": {
++        "textExpansionTrackingMultiplier": { "type": "number", "constant": 1.3 },
++        "documentScalePercentage": { "type": "integer", "constant": 200 },
++        "totalElementsAudited": { "type": "integer", "minimum": 0 }
++      },
++      "required": ["textExpansionTrackingMultiplier", "documentScalePercentage", "totalElementsAudited"],
++      "additionalProperties": false
++    },
++    "violations": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "properties": {
++          "targetElementSelector": { "type": "string" },
++          "violationType": { "type": "string", "enum": ["overflow", "clipping", "contrast_drop", "wrapping_overlap"] },
++          "boundingGeometry": {
++            "type": "object",
++            "properties": {
++              "elementWidth": { "type": "number" },
++              "elementHeight": { "type": "number" },
++              "parentContainerWidth": { "type": "number" },
++              "parentContainerHeight": { "type": "number" }
++            },
++            "required": ["elementWidth", "elementHeight", "parentContainerWidth", "parentContainerHeight"],
++            "additionalProperties": false
++          },
++          "failureDescription": { "type": "string" },
++          "automatedPatchApplied": { "type": "boolean" },
++          "remedialClassesInjected": { "type": "array", "items": { "type": "string" } }
++        },
++        "required": ["targetElementSelector", "violationType", "boundingGeometry", "failureDescription", "automatedPatchApplied"],
++        "additionalProperties": false
++      }
++    }
++  },
++  "required": ["targetFilePath", "executionTimestamp", "isResilient", "metrics", "violations"],
++  "additionalProperties": false
++}
++```
+ ## 4. Interface, API, & Pipeline Exit Contracts
+ 
+ Internal application modules communicate across strict operational interfaces. These contracts enforce deterministic outcomes, enabling developers to easily construct alternative mock drivers or independent adapters.
+ 
+ ### 4.1 System POSIX Exit Code Specifications
+ All CLI command routers pass exact exit diagnostics to the host operating system shell standard outputs:
+-*   `0`: Operational Success (Pipeline process complete; clean state invariant held)
+-*   `1`: General Operational Crash (Missing file access layers, configuration typing mutations, structural syntax errors)
+-*   `2`: Adversarial Execution Break (Emitted by the `break` subsystem if text overflows break layout boundary containment grids during stress tests)
++*   `0`: Operational Success (Pipeline process complete; clean state invariant held).
++*   `1`: General Operational Crash (Missing file access layers, configuration typing mutations, structural syntax errors, or WCAG contrast failures).
++*   `2`: Adversarial Execution Break (Emitted by `break`, `bleed`, or `flex` subsystems if element boxes break layout boundaries or container boundaries during stress testing).
+ 
+ ### 4.2 Framework Token Adapter Transformers Contract Matrix
+ * **Path:** `src/core/adapters/`
+@@ -301,7 +366,7 @@ export interface IStressParameters {
+ 
+ export interface IViolationReport {
+   targetElementId: string;
+-  violationType: 'overflow' | 'clipping' | 'state_desync';
++  violationType: 'overflow' | 'clipping' | 'state_desync' | 'wrapping_overlap';
+   failureDescription: string;
+ }
+ 
+@@ -380,9 +445,120 @@ export interface IContinuousOrchestratorCore {
+ }
+ ```
+ 
++### 4.9 Core Architectural Entry Router Engine Contract
++* **Path:** `src/index.ts`
++```typescript
++export interface ICLIArgumentPayload {
++  command: string;
++  args: string[];
++  options: {
++    target?: string;
++    tokens?: string;
++    shuffle?: boolean;
++    fix?: boolean;
++    platform?: 'html-tailwind' | 'react-tailwindcss' | 'vue-prime';
++    steps?: number;
++    countRange?: string;
++    matrix?: string;
++  };
++}
+ 
+----
++export interface ICLICommandRouter {
++  dispatchRoute(payload: ICLIArgumentPayload): Promise<void>;
++}
++```
++
++### 4.10 Visual Canvas Bleed & Padding Fuzzer Engine Contract
++* **Path:** `src/core/adversary.ts`
++```typescript
++export interface IBleedFuzzParameters {
++  targetFilePath: string;
++  incrementalPaddingSteps: number; // mapping to --steps parameter flag
++  maxPaddingPixelLimit: number;
++}
++
++export interface IGridStrainSnapshot {
++  appliedPaddingPx: number;
++  hasBrokenEncapsulation: boolean;
++  collapsingSelectorPath?: string;
++}
++
++export interface IBleedFuzzerOutput {
++  strainMatrix: IGridStrainSnapshot[];
++  isEncapsulationPreserved: boolean;
++}
+ 
++export interface IVisualBleedCore {
++  executePaddingFuzzLoop(params: IBleedFuzzParameters): Promise<IBleedFuzzerOutput>;
++}
++```
++
++### 4.11 Structural Flex Collision & Sub-Element Auditor Engine Contract
++* **Path:** `src/core/adversary.ts`
++```typescript
++export interface IFlexAuditParameters {
++  targetFilePath: string;
++  elementCountRange: { min: number; max: number }; // parsed out-of-band from --count-range values
++}
++
++export interface IFlexCollisionViolation {
++  populatedElementCount: number;
++  offendingDOMSelector: string;
++  interferingDOMSelector: string;
++  collisionType: 'overlap' | 'line_break_overflow';
++}
++
++export interface IFlexAuditorOutput {
++  collisionsDetected: IFlexCollisionViolation[];
++  passesFlexEncapsulation: boolean;
++}
++
++export interface IStructuralFlexCore {
++  auditFlexWrapConstraints(params: IFlexAuditParameters): Promise<IFlexAuditorOutput>;
++}
++```
++
++### 4.12 Spatial Geometric Console Trace Engine Contract
++* **Path:** `src/core/compiler.ts`
++```typescript
++export interface ILayoutTraceNode {
++  elementTag: string;
++  computedClasses: string[];
++  depthLevel: number;
++  layoutRole: 'grid' | 'flex' | 'block' | 'inline-flex';
++  children?: ILayoutTraceNode[];
++}
++
++export interface ILayoutTraceOutput {
++  treeRootNode: ILayoutTraceNode;
++  formattedConsoleAsciiDiagram: string; // alphanumeric trace maps output to standard stdout streams
++}
++
++export interface ISpatialTraceCore {
++  extractLayoutStructures(sourceMarkup: string): Promise<ILayoutTraceOutput>;
++}
++```
++
++### 4.13 Context Compression & Text Packer Subsystem Contract
++* **Path:** `src/core/compiler.ts`
++```typescript
++export interface IPackOptions {
++  stripComments: boolean;
++  collapseWhitespace: boolean;
++  preserveDataAttributes: boolean;
++}
++
++export interface IPackOutput {
++  minifiedContentString: string;
++  originalByteSize: number;
++  compressedByteSize: number;
++  tokenSavingsRatio: number;
++}
++
++export interface ITextPackerCore {
++  compressLayoutAsset(sourceMarkup: string, options: IPackOptions): Promise<IPackOutput>;
++}
++```
+ ## 5. Component-by-Component Breakdown
+ 
+ ### 5.1 Root Architecture & Configuration Paths
+@@ -404,14 +580,28 @@ export interface IContinuousOrchestratorCore {
+   Acts as the pipeline input bridge step. It receives spatial descriptive instructions, maps structural context dependencies, and writes the invariant grayscale structural markup snapshot onto the local path file tracker.
+ * **`paint.ts`**
+   Orchestrates visual execution parameters. It triggers active checksum scans to handle user code reconciliations, checks platform environment boundaries, routes targets to PostHTML nodes or `oxc-parser` ESTree structures, loops multi-variant arrays, and saves the output data snapshot.
++* **`trace.ts`**
++  Extracts design class properties and outputs geometric grid lines array maps directly onto stdout terminal layouts to let developers visually monitor spatial flow mapping desyncs.
++* **`blueprint.ts`**
++  Directly synthesizes empty framework boilerplate layouts from predefined wireframe dimension tables without requiring an external semantic prompt engine connection pass.
+ * **`break.ts`**
+   The operational command wrapper executing code hardening constraints. Resolves sub-command mapping strings (`break`, `breakit`, `uibreakit`) directly into the core engine. Commands the adversary module to spin up its in-memory browser engine loop, maps parsing structural flaws via layout rect analysis, and formats explicit element violation notifications onto terminal layouts.
++* **`contrast.ts`**
++  Runs relative luminance checking scans against targeted static component documents. Throws an exit code `1` immediately if elements fail the minimum mathematical contrast threshold of 4.5:1.
++* **`bleed.ts`**
++  Commands the headless Playwright adversary driver to iteratively inject fluid pixel margins into parent grid bounding areas, pinpointing precisely where flex encapsulation zones begin to shatter.
++* **`flex.ts`**
++  Injects varying dummy sub-element nodes inline to test wrapping tolerance limits and trace element collisions across adaptive template canvas rows.
+ * **`dev.ts`**
+   Unified orchestration sub-command. Instantiates the continuous hot-reloaded development routine. It sets up file watchers on code layouts and token catalogs, coordinates processing pipelines silently in the background, and dynamically boots local visual review views.
+ * **`manifest.ts`**
+   Calculates project map parameters. Runs crawler loops across adjacent local files, constructs an active context file blueprint list, and writes state mapping structures without scanning large dependency blackholes.
++* **`checkout.ts`**
++  Restores specified system snapshots tracked within the ledger array, forcefully overwriting local file drifts to cleanly recover from layout corruption loops.
+ * **`handoff.ts`**
+   Assembles portability payloads. Pulls historical state file nodes, gathers crawled local workspace snapshots, maps tokens, and compiles them cleanly into the local static markdown target bundle file.
++* **`pack.ts`**
++  Invokes the structural semantic text compressor tool to compress structural elements and clear white space clutter, lowering token usage footprints by up to 75% on clipboard operations.
+ 
+ ### 5.3 Pure Domain Logical Subsystems (`src/core/`)
+ * **`adapters/html.ts` & `adapters/jsx.ts`**
+@@ -421,9 +611,9 @@ export interface IContinuousOrchestratorCore {
+ * **`session.ts`**
+   The transaction manager for session state. Reads state logs, calculates checksum validations, detects developer IDE modifications, coordinates the State Invariant Reconciliation Protocol, pushes structural record updates, and executes snapshot checkpoint restorations when time-travel commands are fired.
+ * **`compiler.ts`**
+-  The central stylistic layout class processor core. Houses a dual-engine architecture: compiles raw standard HTML structures using PostHTML, while routing framework-bound targets (React/JSX) through an ultra-fast native Rust `oxc-parser` ESTree compilation node loop. This fully prevents syntax corruption on expression statements or custom tags without adding JavaScript compilation weight.
++  The central stylistic layout class processor core. Houses a dual-engine architecture: compiles raw standard HTML structures using PostHTML, while routing framework-bound targets (React/JSX) through an ultra-fast native Rust `oxc-parser` ESTree compilation node loop. This fully prevents syntax corruption on expression statements or custom tags without adding JavaScript compilation weight. This module additionally handles parsing standard display tokens to extract layout nodes for the `uipipe trace` ascii visual generation routines.
+ * **`adversary.ts`**
+-  The structural code resilience engine. Injects un-networked serverless text-growth constraints, triggers a fast headless Playwright container audit, measures layout parameters utilizing native browser bounding client rects via web-first `page.locator()` evaluations, logs element leaks, and attaches structural code adjustments.
++  The structural code resilience engine. Injects un-networked serverless text-growth constraints, triggers a fast headless Playwright container audit, measures layout parameters utilizing native browser bounding client rects via web-first `page.locator()` evaluations, logs element leaks, and attaches structural code adjustments. This core handles multi-phase fuzzer evaluation vectors for both padding stress limits (`bleed`) and layout element injection tolerances (`flex`).
+ * **`matrix.ts`**
+   The relational constraint system core. Calculates WCAG relative luminance equations across active background and foreground colors to verify contrast criteria before layout token assignments are completed.
+ * **`healer.ts`**

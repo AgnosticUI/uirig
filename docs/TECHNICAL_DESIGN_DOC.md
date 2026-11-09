@@ -27,25 +27,32 @@ uipipe/
 ├── package.json                     # Project manifest and distribution config
 ├── src/
 │   ├── index.ts                     # Core routing and entry orchestration
-│   ├── commands/                    # CLI user interaction handlers
+│   ├── commands/                    # CLI user interaction handlers (14 Tools Suite Layer)
+│   │   ├── bleed.ts                 # Handles uipipe bleed padding fuzzer command
+│   │   ├── blueprint.ts             # Handles uipipe blueprint matrix command
 │   │   ├── break.ts                 # Handles uipipe break | breakit | uibreakit aliases
+│   │   ├── checkout.ts              # Handles uipipe checkout step restorations
+│   │   ├── contrast.ts              # Handles uipipe contrast verification command
 │   │   ├── dev.ts                   # Inits local hot-reloaded watcher orchestration
-│   │   ├── handoff.ts
-│   │   ├── init.ts
-│   │   ├── layout.ts
-│   │   ├── manifest.ts
-│   │   └── paint.ts
+│   │   ├── flex.ts                  # Handles uipipe flex wrap structural auditor command
+│   │   ├── handoff.ts               # Handles uipipe handoff session capsule pack command
+│   │   ├── init.ts                  # Handles uipipe init workspace directory command
+│   │   ├── layout.ts                # Handles uipipe layout structural prompt command
+│   │   ├── manifest.ts              # Handles uipipe manifest repository crawler command
+│   │   ├── pack.ts                  # Handles uipipe pack text compression utility command
+│   │   ├── paint.ts                 # Handles uipipe paint design token mixer command
+│   │   └── trace.ts                 # Handles uipipe trace console ascii visualizer command
 │   ├── core/                        # Pure domain logic (Platform & Framework Agnostic)
 │   │   ├── adapters/                # Framework transpilation strategies
 │   │   │   ├── html.ts              # Maps standard class structures via PostHTML
 │   │   │   └── jsx.ts               # Maps React className structures via oxc-parser
-│   │   ├── adversary.ts             # Playwright-driven headless stress rig with hydration flags
-│   │   ├── compiler.ts              # Dual-Engine (PostHTML / Oxc ESTree) design token compiler
-│   │   ├── crawler.ts               # Local workspace filesystem analysis
-│   │   ├── healer.ts                # Structural DOM layout patch synthesizer
-│   │   ├── matrix.ts                # Enforces relational constraints & contrast filters
-│   │   ├── orchestrator.ts          # File watcher, web sockets, & dev state engine
-│   │   └── session.ts               # Local state lifecycle & reconciliation manager
+│   │   ├── adversary.ts             # Playwright headless stress rig (break/bleed/flex)
+│   │   ├── compiler.ts              # Dual-Engine (PostHTML / Oxc ESTree) compiler and trace core
+│   │   ├── crawler.ts               # Local workspace filesystem deep analysis crawler
+│   │   ├── healer.ts                # Structural DOM layout patch repair synthesizer
+│   │   ├── matrix.ts                # Enforces relational constraints, luminance, & contrast filters
+│   │   ├── orchestrator.ts          # File watcher, web sockets, & dev state runtime engine
+│   │   └── session.ts               # Local state lifecycle ledger & reconciliation manager
 │   ├── interfaces/                  # Shared data shapes and type declarations
 │   │   ├── config.ts
 │   │   ├── schema.ts
@@ -97,27 +104,23 @@ graph TD
 
 When a transaction or filesystem mutation event runs through the toolchain, execution transforms through three distinct in-memory data states managed inside transient byte buffers and pointer graphs:
 
-1. **The Structural Token Stream (Layout Phase):**
-   The prompt string is handled by the entry router and passed down to `src/core/compiler.ts`. The blueprint engine assembles a pure, unstyled layout array. This array represents raw semantic DOM nodes containing layout constraints but absolutely zero visual embellishments. In-memory, this is held as a flat UTF-8 encoded string buffer containing structural primitive layouts (e.g., standard CSS Grid and Flexbox container utility frames). Fallback layout anchor indices are injected into elements to serve as targets for the downstream compiler steps.
+1. **The Structural Token Stream (Layout & Blueprint Phase):**
+   The prompt string or layout matrix payload is handled by the entry router and passed down to `src/core/compiler.ts`. The blueprint engine assembles a pure, unstyled layout array. This array represents raw semantic DOM nodes containing layout constraints but absolutely zero visual embellishments. In-memory, this is held as a flat UTF-8 encoded string buffer containing structural primitive layouts (e.g., standard CSS Grid and Flexbox container utility frames). Fallback layout anchor indices are injected into elements to serve as targets for downstream compiler steps.
 
-2. **The Dual-Engine Tree Graph Synthesis (Paint Phase):**
+2. **The Dual-Engine Tree Graph Synthesis (Paint, Contrast, & Trace Phase):**
    Upon entry, `src/core/session.ts` runs a SHA-256 byte-hash computation against the targeted layout file to verify it hasn't drifted from the state log tracking ledger. If validated, the compiler core branches execution based on the active ecosystem profile:
-   * **PostHTML Core (`html-tailwind`):** The raw HTML string buffer is compiled into a virtual tree node graph using a strict PostHTML plugin array interface. The algorithm traverses the tree, matches the injected layout anchor indices, maps the target node attributes, and fuses style variables directly out of `config/default_tokens.json`.
+   * **PostHTML Core (`html-tailwind`):** The raw HTML string buffer is compiled into a virtual tree node graph using a strict PostHTML plugin array interface. The algorithm traverses the tree, matches the injected layout anchor indices, maps target node attributes, and fuses style variables directly out of `config/default_tokens.json`.
    * **Oxc ESTree Core (`react-tailwindcss`):** The JSX/TSX string buffer is processed by `oxc-parser` using low-overhead native bindings. It bypasses heavy JavaScript runtimes and instantly generates a standard ESTree-compliant Abstract Syntax Tree object graph in Node memory. The `src/core/adapters/jsx.ts` module traverses this syntax graph, identifies hybrid tag expressions, and directly mutates `JSXAttribute` node objects to swap raw design properties without risk of string interpolation corruption.
-   Before the tree is stringified back to storage, the `src/core/matrix.ts` layer runs relative luminance computations on the proposed color tokens, ensuring a mathematical minimum 4.5:1 text-to-background contrast ratio is held.
+   Before the tree is stringified back to storage, the `src/core/matrix.ts` layer runs relative luminance computations on proposed color tokens, ensuring a mathematical minimum 4.5:1 text-to-background contrast ratio is held.
 
-3. **The Hydrated Headless Playwright Pipeline (Break & Heal Phase):**
-   The styled layout component string is loaded into a local headless Playwright browser thread. For framework targets, it is injected directly into a sandboxed mounting canvas (`config/templates/react_canvas.html`) loaded with zero-dependency framework bundles. The adversarial engine triggers a custom, blocking `page.waitForFunction()` hook that loops until client-side state hydration markers are active. Once hydrated, `ui-break-it` executes text expansions and element bounding evaluations via native layout evaluate channels, testing node bounding boxes using precise `getBoundingClientRect` metrics. On boundary collapse, the selector tree path is passed back to `src/core/healer.ts` to execute automated AST structural repair overrides before final compilation strings hit the snapshot cache.
-
-
----
-
+3. **The Hydrated Headless Playwright Pipeline (Break, Bleed, & Flex Phase):**
+   The styled layout component string is loaded into a local headless Playwright browser thread. For framework targets, it is injected directly into a sandboxed mounting canvas (`config/templates/react_canvas.html`) loaded with zero-dependency framework bundles. The adversarial engine triggers a custom, blocking `page.waitForFunction()` hook that loops until client-side state hydration markers are active. Once hydrated, the engine executes targeted tracking text expansions (+30% characters for `break`), incremental step padding modifiers (`bleed`), or dynamic sub-element population arrays (`flex`). Element boundaries are validated via native browser evaluation channels testing node bounding boxes using precise `getBoundingClientRect` metrics. On boundary collapse or container breach, the selector tree path is passed back to `src/core/healer.ts` to execute automated AST structural repair overrides before final compilation strings hit the snapshot cache.
 ## 3. Exact Data Model & Schema Definitions
 
 All operations inside `uipipe` track modifications inside `.uipipe/session.json`. The application relies entirely on deterministic data schemas to guarantee time-travel stability and cross-session reproducibility.
 
 ### 3.1 Session Tracking Schema (`.uipipe/session.json`)
-The fundamental architectural state log ledger tracking execution chronology.
+The fundamental architectural state log ledger tracking execution chronology across all 14 tools.
 
 ```json
 {
@@ -133,7 +136,8 @@ The fundamental architectural state log ledger tracking execution chronology.
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["platform", "createdAt", "updatedAt"]
+      "required": ["platform", "createdAt", "updatedAt"],
+      "additionalProperties": false
     },
     "history": {
       "type": "array",
@@ -141,17 +145,23 @@ The fundamental architectural state log ledger tracking execution chronology.
         "type": "object",
         "properties": {
           "step": { "type": "integer", "minimum": 1 },
-          "command": { "type": "string", "enum": ["layout", "paint", "break", "dev"] },
+          "command": { 
+            "type": "string", 
+            "enum": ["layout", "paint", "trace", "blueprint", "break", "contrast", "bleed", "flex", "init", "manifest", "dev", "handoff", "pack"] 
+          },
           "variantName": { "type": "string" },
           "filePointer": { "type": "string" },
           "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}\$" },
-          "timestamp": { "type": "string", "format": "date-time" }
+          "timestamp": { "type": "string", "format": "date-time" },
+          "status": { "type": "string", "enum": ["stable", "active", "drifting"] }
         },
-        "required": ["step", "command", "variantName", "filePointer", "checksum", "timestamp"]
+        "required": ["step", "command", "variantName", "filePointer", "checksum", "timestamp", "status"],
+        "additionalProperties": false
       }
     }
   },
-  "required": ["sessionId", "meta", "history"]
+  "required": ["sessionId", "meta", "history"],
+  "additionalProperties": false
 }
 ```
 
@@ -172,25 +182,28 @@ The system schema expanded to map strict structural contrast dependencies, light
         "harmonyMappings": {
           "type": "object",
           "properties": {
-            "lightModeLock": { "type": "array", "items": { "type": "string" } },
-            "darkModeLock": { "type": "array", "items": { "type": "string" } }
+            "lightModeLock": { "type": "array", "items": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" } },
+            "darkModeLock": { "type": "array", "items": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" } }
           },
-          "required": ["lightModeLock", "darkModeLock"]
+          "required": ["lightModeLock", "darkModeLock"],
+          "additionalProperties": false
         }
       },
-      "required": ["minWcagContrastRatio", "enforceScaleLock", "harmonyMappings"]
+      "required": ["minWcagContrastRatio", "enforceScaleLock", "harmonyMappings"],
+      "additionalProperties": false
     },
     "density": { "type": "string", "enum": ["compact", "normal", "roomy"] },
     "colors": {
       "type": "object",
       "properties": {
-        "canvas": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\$" },
-        "surface": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\$" },
-        "primary": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\$" },
-        "accent": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\$" },
-        "border": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\$" }
+        "canvas": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
+        "surface": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
+        "primary": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
+        "accent": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
+        "border": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" }
       },
-      "required": ["canvas", "surface", "primary", "accent", "border"]
+      "required": ["canvas", "surface", "primary", "accent", "border"],
+      "additionalProperties": false
     },
     "typography": {
       "type": "object",
@@ -199,7 +212,8 @@ The system schema expanded to map strict structural contrast dependencies, light
         "headingFamily": { "type": "string" },
         "scale": { "type": "string", "enum": ["minor-third", "perfect-fourth", "golden-ratio"] }
       },
-      "required": ["baseFamily", "headingFamily", "scale"]
+      "required": ["baseFamily", "headingFamily", "scale"],
+      "additionalProperties": false
     },
     "geometry": {
       "type": "object",
@@ -208,26 +222,77 @@ The system schema expanded to map strict structural contrast dependencies, light
         "borderWidthBase": { "type": "string" },
         "shadowBase": { "type": "string" }
       },
-      "required": ["radiusBase", "borderWidthBase", "shadowBase"]
+      "required": ["radiusBase", "borderWidthBase", "shadowBase"],
+      "additionalProperties": false
     }
   },
-  "required": ["matrixConstraints", "density", "colors", "typography", "geometry"]
+  "required": ["matrixConstraints", "density", "colors", "typography", "geometry"],
+  "additionalProperties": false
 }
 ```
 
----
+### 3.3 Dynamic QA Fuzz Analysis & Layout Diagnostic Schema
+When running adversarial pipeline fuzzing (`uipipe break`, `bleed`, `flex`), the engine outputs reports matching this formal validation schema.
 
----
-
+```json
+{
+  "\$schema": "http://json-schema.org",
+  "title": "UiPipeFuzzDiagnosticReport",
+  "type": "object",
+  "properties": {
+    "targetFilePath": { "type": "string" },
+    "executionTimestamp": { "type": "string", "format": "date-time" },
+    "isResilient": { "type": "boolean" },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "textExpansionTrackingMultiplier": { "type": "number", "constant": 1.3 },
+        "documentScalePercentage": { "type": "integer", "constant": 200 },
+        "totalElementsAudited": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["textExpansionTrackingMultiplier", "documentScalePercentage", "totalElementsAudited"],
+      "additionalProperties": false
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "targetElementSelector": { "type": "string" },
+          "violationType": { "type": "string", "enum": ["overflow", "clipping", "contrast_drop", "wrapping_overlap"] },
+          "boundingGeometry": {
+            "type": "object",
+            "properties": {
+              "elementWidth": { "type": "number" },
+              "elementHeight": { "type": "number" },
+              "parentContainerWidth": { "type": "number" },
+              "parentContainerHeight": { "type": "number" }
+            },
+            "required": ["elementWidth", "elementHeight", "parentContainerWidth", "parentContainerHeight"],
+            "additionalProperties": false
+          },
+          "failureDescription": { "type": "string" },
+          "automatedPatchApplied": { "type": "boolean" },
+          "remedialClassesInjected": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["targetElementSelector", "violationType", "boundingGeometry", "failureDescription", "automatedPatchApplied"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["targetFilePath", "executionTimestamp", "isResilient", "metrics", "violations"],
+  "additionalProperties": false
+}
+```
 ## 4. Interface, API, & Pipeline Exit Contracts
 
 Internal application modules communicate across strict operational interfaces. These contracts enforce deterministic outcomes, enabling developers to easily construct alternative mock drivers or independent adapters.
 
 ### 4.1 System POSIX Exit Code Specifications
 All CLI command routers pass exact exit diagnostics to the host operating system shell standard outputs:
-*   `0`: Operational Success (Pipeline process complete; clean state invariant held)
-*   `1`: General Operational Crash (Missing file access layers, configuration typing mutations, structural syntax errors)
-*   `2`: Adversarial Execution Break (Emitted by the `break` subsystem if text overflows break layout boundary containment grids during stress tests)
+*   `0`: Operational Success (Pipeline process complete; clean state invariant held).
+*   `1`: General Operational Crash (Missing file access layers, configuration typing mutations, structural syntax errors, or WCAG contrast failures).
+*   `2`: Adversarial Execution Break (Emitted by `break`, `bleed`, or `flex` subsystems if element boxes break layout boundaries or container boundaries during stress testing).
 
 ### 4.2 Framework Token Adapter Transformers Contract Matrix
 * **Path:** `src/core/adapters/`
@@ -301,7 +366,7 @@ export interface IStressParameters {
 
 export interface IViolationReport {
   targetElementId: string;
-  violationType: 'overflow' | 'clipping' | 'state_desync';
+  violationType: 'overflow' | 'clipping' | 'state_desync' | 'wrapping_overlap';
   failureDescription: string;
 }
 
@@ -380,9 +445,120 @@ export interface IContinuousOrchestratorCore {
 }
 ```
 
+### 4.9 Core Architectural Entry Router Engine Contract
+* **Path:** `src/index.ts`
+```typescript
+export interface ICLIArgumentPayload {
+  command: string;
+  args: string[];
+  options: {
+    target?: string;
+    tokens?: string;
+    shuffle?: boolean;
+    fix?: boolean;
+    platform?: 'html-tailwind' | 'react-tailwindcss' | 'vue-prime';
+    steps?: number;
+    countRange?: string;
+    matrix?: string;
+  };
+}
 
----
+export interface ICLICommandRouter {
+  dispatchRoute(payload: ICLIArgumentPayload): Promise<void>;
+}
+```
 
+### 4.10 Visual Canvas Bleed & Padding Fuzzer Engine Contract
+* **Path:** `src/core/adversary.ts`
+```typescript
+export interface IBleedFuzzParameters {
+  targetFilePath: string;
+  incrementalPaddingSteps: number; // mapping to --steps parameter flag
+  maxPaddingPixelLimit: number;
+}
+
+export interface IGridStrainSnapshot {
+  appliedPaddingPx: number;
+  hasBrokenEncapsulation: boolean;
+  collapsingSelectorPath?: string;
+}
+
+export interface IBleedFuzzerOutput {
+  strainMatrix: IGridStrainSnapshot[];
+  isEncapsulationPreserved: boolean;
+}
+
+export interface IVisualBleedCore {
+  executePaddingFuzzLoop(params: IBleedFuzzParameters): Promise<IBleedFuzzerOutput>;
+}
+```
+
+### 4.11 Structural Flex Collision & Sub-Element Auditor Engine Contract
+* **Path:** `src/core/adversary.ts`
+```typescript
+export interface IFlexAuditParameters {
+  targetFilePath: string;
+  elementCountRange: { min: number; max: number }; // parsed out-of-band from --count-range values
+}
+
+export interface IFlexCollisionViolation {
+  populatedElementCount: number;
+  offendingDOMSelector: string;
+  interferingDOMSelector: string;
+  collisionType: 'overlap' | 'line_break_overflow';
+}
+
+export interface IFlexAuditorOutput {
+  collisionsDetected: IFlexCollisionViolation[];
+  passesFlexEncapsulation: boolean;
+}
+
+export interface IStructuralFlexCore {
+  auditFlexWrapConstraints(params: IFlexAuditParameters): Promise<IFlexAuditorOutput>;
+}
+```
+
+### 4.12 Spatial Geometric Console Trace Engine Contract
+* **Path:** `src/core/compiler.ts`
+```typescript
+export interface ILayoutTraceNode {
+  elementTag: string;
+  computedClasses: string[];
+  depthLevel: number;
+  layoutRole: 'grid' | 'flex' | 'block' | 'inline-flex';
+  children?: ILayoutTraceNode[];
+}
+
+export interface ILayoutTraceOutput {
+  treeRootNode: ILayoutTraceNode;
+  formattedConsoleAsciiDiagram: string; // alphanumeric trace maps output to standard stdout streams
+}
+
+export interface ISpatialTraceCore {
+  extractLayoutStructures(sourceMarkup: string): Promise<ILayoutTraceOutput>;
+}
+```
+
+### 4.13 Context Compression & Text Packer Subsystem Contract
+* **Path:** `src/core/compiler.ts`
+```typescript
+export interface IPackOptions {
+  stripComments: boolean;
+  collapseWhitespace: boolean;
+  preserveDataAttributes: boolean;
+}
+
+export interface IPackOutput {
+  minifiedContentString: string;
+  originalByteSize: number;
+  compressedByteSize: number;
+  tokenSavingsRatio: number;
+}
+
+export interface ITextPackerCore {
+  compressLayoutAsset(sourceMarkup: string, options: IPackOptions): Promise<IPackOutput>;
+}
+```
 ## 5. Component-by-Component Breakdown
 
 ### 5.1 Root Architecture & Configuration Paths
@@ -404,14 +580,28 @@ export interface IContinuousOrchestratorCore {
   Acts as the pipeline input bridge step. It receives spatial descriptive instructions, maps structural context dependencies, and writes the invariant grayscale structural markup snapshot onto the local path file tracker.
 * **`paint.ts`**
   Orchestrates visual execution parameters. It triggers active checksum scans to handle user code reconciliations, checks platform environment boundaries, routes targets to PostHTML nodes or `oxc-parser` ESTree structures, loops multi-variant arrays, and saves the output data snapshot.
+* **`trace.ts`**
+  Extracts design class properties and outputs geometric grid lines array maps directly onto stdout terminal layouts to let developers visually monitor spatial flow mapping desyncs.
+* **`blueprint.ts`**
+  Directly synthesizes empty framework boilerplate layouts from predefined wireframe dimension tables without requiring an external semantic prompt engine connection pass.
 * **`break.ts`**
   The operational command wrapper executing code hardening constraints. Resolves sub-command mapping strings (`break`, `breakit`, `uibreakit`) directly into the core engine. Commands the adversary module to spin up its in-memory browser engine loop, maps parsing structural flaws via layout rect analysis, and formats explicit element violation notifications onto terminal layouts.
+* **`contrast.ts`**
+  Runs relative luminance checking scans against targeted static component documents. Throws an exit code `1` immediately if elements fail the minimum mathematical contrast threshold of 4.5:1.
+* **`bleed.ts`**
+  Commands the headless Playwright adversary driver to iteratively inject fluid pixel margins into parent grid bounding areas, pinpointing precisely where flex encapsulation zones begin to shatter.
+* **`flex.ts`**
+  Injects varying dummy sub-element nodes inline to test wrapping tolerance limits and trace element collisions across adaptive template canvas rows.
 * **`dev.ts`**
   Unified orchestration sub-command. Instantiates the continuous hot-reloaded development routine. It sets up file watchers on code layouts and token catalogs, coordinates processing pipelines silently in the background, and dynamically boots local visual review views.
 * **`manifest.ts`**
   Calculates project map parameters. Runs crawler loops across adjacent local files, constructs an active context file blueprint list, and writes state mapping structures without scanning large dependency blackholes.
+* **`checkout.ts`**
+  Restores specified system snapshots tracked within the ledger array, forcefully overwriting local file drifts to cleanly recover from layout corruption loops.
 * **`handoff.ts`**
   Assembles portability payloads. Pulls historical state file nodes, gathers crawled local workspace snapshots, maps tokens, and compiles them cleanly into the local static markdown target bundle file.
+* **`pack.ts`**
+  Invokes the structural semantic text compressor tool to compress structural elements and clear white space clutter, lowering token usage footprints by up to 75% on clipboard operations.
 
 ### 5.3 Pure Domain Logical Subsystems (`src/core/`)
 * **`adapters/html.ts` & `adapters/jsx.ts`**
@@ -421,9 +611,9 @@ export interface IContinuousOrchestratorCore {
 * **`session.ts`**
   The transaction manager for session state. Reads state logs, calculates checksum validations, detects developer IDE modifications, coordinates the State Invariant Reconciliation Protocol, pushes structural record updates, and executes snapshot checkpoint restorations when time-travel commands are fired.
 * **`compiler.ts`**
-  The central stylistic layout class processor core. Houses a dual-engine architecture: compiles raw standard HTML structures using PostHTML, while routing framework-bound targets (React/JSX) through an ultra-fast native Rust `oxc-parser` ESTree compilation node loop. This fully prevents syntax corruption on expression statements or custom tags without adding JavaScript compilation weight.
+  The central stylistic layout class processor core. Houses a dual-engine architecture: compiles raw standard HTML structures using PostHTML, while routing framework-bound targets (React/JSX) through an ultra-fast native Rust `oxc-parser` ESTree compilation node loop. This fully prevents syntax corruption on expression statements or custom tags without adding JavaScript compilation weight. This module additionally handles parsing standard display tokens to extract layout nodes for the `uipipe trace` ascii visual generation routines.
 * **`adversary.ts`**
-  The structural code resilience engine. Injects un-networked serverless text-growth constraints, triggers a fast headless Playwright container audit, measures layout parameters utilizing native browser bounding client rects via web-first `page.locator()` evaluations, logs element leaks, and attaches structural code adjustments.
+  The structural code resilience engine. Injects un-networked serverless text-growth constraints, triggers a fast headless Playwright container audit, measures layout parameters utilizing native browser bounding client rects via web-first `page.locator()` evaluations, logs element leaks, and attaches structural code adjustments. This core handles multi-phase fuzzer evaluation vectors for both padding stress limits (`bleed`) and layout element injection tolerances (`flex`).
 * **`matrix.ts`**
   The relational constraint system core. Calculates WCAG relative luminance equations across active background and foreground colors to verify contrast criteria before layout token assignments are completed.
 * **`healer.ts`**
