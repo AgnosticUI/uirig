@@ -6,7 +6,7 @@ This document details the engineering blueprint, technical choices, and incremen
 To ensure **The Free-Tier Alchemist** execution property is strictly honored, the underlying CLI execution matrix must operate completely independently of paid cloud runtimes or network API constraints during base development:
 *   **Runtime Environment:** Node.js 22+ LTS Stable Releases
 *   **Core Compiler Engine:** Executable TypeScript 5.x ESM Engine
-*   **AST Dependency Layers:** oxc-parser, posthtml
+*   **AST & Parser Layers:** oxc-parser, posthtml, chokidar (watcher)
 *   **Testing Harness Framework:** Vitest integrated natively into a Vite processing configuration, paired with Playwright v1.64+ headless execution packages
 *   **Local State Data:** Isolated JSON file structures (`.uipipe/session.json`)
 *   **Local Layout Intermediaries:** Plain-text Markdown (`.uipipe/copy_paste_pack.md`) and raw static HTML/JSX structures.
@@ -21,7 +21,7 @@ To ensure **The Free-Tier Alchemist** execution property is strictly honored, th
 
 ### Phase 2: Core Workspace Engine & Manifest System
 - [ ] Initialize bare system architecture workspace path environment variables via `npm init -y`.
-- [ ] Run localized package acquisition streams via explicit save instructions to capture current stable releases (`npm i --save-dev typescript vitest vite ts-node @types/node playwright posthtml oxc-parser`).
+- [ ] Run localized package acquisition streams via explicit save instructions to capture current stable releases (`npm i --save-dev typescript vitest vite ts-node @types/node playwright posthtml oxc-parser chokidar ws`).
 - [ ] Configure localized system parameters (`tsconfig.json`, `vite.config.ts`, `vitest.config.ts`) directly from installed module parameters.
 - [ ] Implement the local file scaffolding routine (`uipipe init`) to securely construct the `.uipipe/` workspace structure and layout browser template roots (`react_canvas.html`).
 - [ ] Build the file tree crawling utility (`uipipe manifest`) to parse directory mapping definitions while safely ignoring blackholes (`node_modules/`, `.git/`, `dist/`).
@@ -30,13 +30,16 @@ To ensure **The Free-Tier Alchemist** execution property is strictly honored, th
 ### Phase 3: Token Injection & Mutation Utilities (Local Engine)
 - [ ] Build the dynamic core engine router in `src/core/compiler.ts` to cleanly segregate static PostHTML DOM mapping loops from native Rust-backed `oxc-parser` ESTree syntax compilation paths.
 - [ ] Implement token adapter strategy modules (`src/core/adapters/`) to map unified style variables cleanly across target syntaxes (`class` vs. `className`).
+- [ ] Build the relational validation matrix engine (`src/core/matrix.ts`) to compute and lock real-time relative luminance metrics and WCAG contrast limits before compile steps.
 - [ ] Program the token shuffle pipeline (`uipipe paint --shuffle`) to apply randomized mapping combinations from data maps onto structural classes.
 - [ ] Implement the State Invariant Reconciliation Protocol (SIRP) inside `src/core/session.ts` to trap checksum drift on manual out-of-band IDE adjustments.
 - [ ] Implement the time-travel rollback module (`uipipe checkout step-n`) to restore exact previous snapshots by reading file hashes from the journal history.
 
-### Phase 4: Adversarial Rigidity Logic (`uipipe break`)
+### Phase 4: Dev Orchestration & Self-Healing Logic
+- [ ] Implement the file watching and server synchronization orchestration layer inside `src/core/orchestrator.ts` using `chokidar` and native WebSocket components.
+- [ ] Build the local continuous command execution handler (`src/commands/dev.ts`) to manage hot-reloaded canvas refresh signals.
 - [ ] Code the headless browser instantiation scaffolding inside `src/core/adversary.ts` using stable Playwright configuration handlers.
-- [ ] Implement the framework client template canvas mount loop to force blocking wait markers for runtime code state hydration before evaluating boxes.
+- [ ] Build the layout self-healing engine inside `src/core/healer.ts` to calculate and patch missing responsive containment attributes onto target elements.
 - [ ] Code the text expansion utility in `uipipe break` to inject non-breaking text patterns and translation expands into element targets using web-first `page.locator()`.
 - [ ] Construct the container scale evaluator to check markup properties under simulated text growth bounds utilizing native browser `getBoundingClientRect` metrics.
 - [ ] Build the structural visual alert generator using console symbols (`:::`, `==>`, `[!]`, `[+]`) to format edge-case structural layout violations and wire exit code `2` interrupts.
@@ -45,7 +48,6 @@ To ensure **The Free-Tier Alchemist** execution property is strictly honored, th
 - [ ] Code the pack system for `uipipe handoff` to synthesize project schemas and steps into the universal markdown proxy block (`.uipipe/copy_paste_pack.md`).
 - [ ] Build unit testing scripts using basic mock assertions to enforce validation constraints without calling external server nodes.
 - [ ] Package the executable distribution system for open deployment on npm/GitHub.
-# Implementation Plan: `uipipe` - Part 2
 
 ## Session State Machine Constraints
 
