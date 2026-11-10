@@ -1,39 +1,39 @@
 # uirig
 
-**Ship AI-generated UI with confidence: visually safe, accessible, stress-tested, and CI/CD ready.**
+**Ship AI-generated UI with confidence: framework-agnostic, visually safe, accessible, stress-tested, and CI/CD ready.**
 
-AI-generated interfaces look great with placeholder text until you ask a model to tweak a theme (and it breaks your component logic), load a long username (and your layout overflows), or check accessibility (and half your text fails contrast).
+AI-generated interfaces look great with placeholder text until you change a theme variation (and it mangles your code syntax), load a long username (and your layout overflows), or check accessibility (and half your text fails contrast).
 
-`uirig` is a local CLI workbench that wraps AI-assisted React + Tailwind development in deterministic engineering guardrails. Instead of re-prompting an LLM and hoping nothing breaks, `uirig` compiles, verifies, and hardens your UI in isolated, reversible stages:
+`uirig` is a local CLI workbench that wraps AI-assisted front-end development in deterministic engineering guardrails. Instead of re-prompting an LLM or using fragile, over-engineered code parsers, `uirig` lets your own local build tools render the page, then evaluates and hardens the layout directly inside a headless browser:
 
-* **Visual safety & confidence (`uirig paint`):** Restyle colors, spacing, and tokens through syntax-safe AST mutations, never risking broken JSX or lost component logic.
-* **Accessibility compliance & broader reach (`uirig contrast`):** Enforce WCAG 4.5:1 contrast math at compile time to improve usability, serve more users, and reduce compliance and legal risk.
-* **Stress-tested, unbreakable layouts (`uirig break --fix`):** Mitigate production risk by fuzzing components in a headless browser with +30% longer text and 200% zoom, then auto-patching overflows so your UI stays rock solid.
-* **Faster, safer DX (`uirig session:sync` / `checkout` / `pack`):** Move fast without losing manual IDE edits thanks to SHA-256 drift checks, one-command snapshot rollbacks, and up to 75% smaller context packs.
-* **Drop-in CI/CD quality gates:** Returns standard POSIX exit codes (`0`, `1`, `2`) in milliseconds so you can block contrast failures and layout regressions on every pull request in GitHub Actions.
+* **Framework-Blind Safety (`uirig paint`):** Tweak design palettes, spacing variations, and layouts framework-blindly. By updating simple JSON design token files instead of modifying live source components, you eliminate the risk of syntax corruption.
+* **Rendered Contrast Gates (`uirig contrast`):** Audit color contrast on rendered pixel channels using exact browser computed styles. Enforce WCAG 4.5:1 math at build time to catch illegible text, improve usability, and lower compliance risk.
+* **Stress-Tested Layouts (`uirig break --fix`):** Fuzz components inside an isolated headless Playwright browser with +30% longer text tracking and 200% zoom. Map overflows instantly and auto-patch components on disk via simple metadata-tracking attributes.
+* **Faster, Safer DX (`uirig session:sync` / `checkout` / `pack`):** Move fast without losing manual IDE edits thanks to SHA-256 ledger drift checks, single-command snapshot rollbacks, and up to 75% smaller context packs.
+* **Drop-in CI/CD Quality Gates:** Returns standard POSIX exit codes (`0`, `1`, `2`) in milliseconds so you can automatically block contrast failures and layout regressions on every pull request in GitHub Actions.
 
 ```text
-       [Unstyled Structure]
-                │
-                ▼
-   :::   uirig paint      ==>  [02_painted.tsx]  (Visual Safety: AST Styling + WCAG 4.5:1)
-                │
-                ▼
-   :::   uirig break      ==>  [03_hardened.tsx] (Stress-Tested: Overflow Fuzzing + Auto-Heal)
-                │
-                ▼
-   :::   uirig pack       ==>  [stdout / clip]   (Faster DX: Token-Compressed Context Capsule)
+       [Your App Context]
+               │
+               ▼
+   :::   uirig paint      ==>  [tokens.json]   (Visual Safety: Swaps Themes via Disk JSON)
+               │
+               ▼
+   :::   uirig break      ==>  [Auto-Heal]     (Stress-Tested: Playwright Fuzz + Line Repair)
+               │
+               ▼
+   :::   uirig pack       ==>  [stdout / clip] (Faster DX: Token-Compressed Context Capsule)
 ```
 
 ---
 
 ## 1. Core Philosophy
 
-`uirig` replaces fragile, one-shot AI prompting with a deterministic, `git`-style stage-gate workflow built on three principles:
+`uirig` replaces fragile, one-shot AI prompting with a deterministic, stage-gate workflow built on three principles:
 
-1. **Single-Responsibility Passes (DOTADIW):** Separate structural layout from AST token styling (`paint`), accessibility compliance (`contrast`), and browser stress-testing (`break`).
-2. **Plain-Text Artifact Sovereignty:** Every stage reads and writes standard, version-controllable plain-text files (`.tsx`, `.html`, `.json`, `.md`) without proprietary formats or cloud lock-in.
-3. **Deterministic Stage Gates:** Each command validates and transforms a verified snapshot from Stage N into Stage N+1, governed by a local ledger (`.uirig/session.json`) with SHA-256 manual-edit protection, instant rollbacks, and CI/CD exit codes.
+1. **Single-Responsibility Evaluation (DOTADIW):** Separate visual parameters, accessibility compliance, and browser layout stress-testing into clear, independent passes.
+2. **Evaluation-First Architecture:** Stop writing brittle, framework-specific compilers. Let the browser act as the ultimate universal adapter, transforming any framework output into raw elements with real pixels.
+3. **Deterministic Stage Gates:** Each command validates and transforms verified states governed by a local ledger (`.uirig/session.json`) with SHA-256 manual-edit protection, instant rollbacks, and strict CI/CD exit codes.
 
 ---
 
@@ -76,9 +76,13 @@ To preserve optimal console clarity across active terminal viewports, `uirig` co
 *   `[+] ` Appended DOM Tokens / Injected Modifiers
 *   `[!] ` Adversarial Structural Violations / Linter Breaks
 *   `_ \ | /` Multi-frame background engine spinners
-
 ---
 
+### 📐 Part 2: Environment Prerequisites and Standard Workflows
+**File Path Target:** `README.md` (Sections 4 through 5)  
+**Execution Verification Baseline Date:** **November 9, 2026**
+
+```markdown
 ## 4. Installation & Environment Scope
 
 ### Prerequisites
@@ -101,18 +105,18 @@ uirig init
 
 ## 5. Standard Pipeline Workflows
 
-### 5.1 The Anti-Slop Compilation Pipeline
-Compile high-fidelity interface markup from raw intent to hardened, zero-color layouts before styling:
+### 5.1 Framework-Agnostic Hardening Pipeline
+Inject identification tracking attributes (`data-uirig-id`) into your components and leverage the browser fuzzer to harden your interfaces:
 
 ```bash
-# 1. Compile pure structural grayscale layout skeletons focus on bounding boundaries
-uirig layout "desktop medical dashboard with sidebar navigation and client data grid" --platform react-tailwindcss
+# 1. Tweak layout palettes or spacing metrics via safe configuration updates
+uirig paint --tokens config/default_tokens.json --shuffle
 
-# 2. Apply theme design tokens while mathematically locking WCAG relative contrast values
-uirig paint --tokens config/default_tokens.json
+# 2. Run adversarial browser fuzzing to locate and patch element container overflows
+uirig break --target ./src/components/Card.html --fix
 
-# 3. Run adversarial layout fuzzing to locate and patch element container overflows
-uirig break --target .uirig/snapshots/02_painted.tsx --fix
+# 3. Compress your layout string parameters to prune lower-tier prompt context windows
+uirig pack --target ./src/components/Card.html
 ```
 
 ### 5.2 Deep Adversarial Verification and Perimeter QA Testing
@@ -120,36 +124,45 @@ Execute localized un-networked Playwright stress injection loops to mathematical
 
 ```bash
 # Explicitly intercept and capture typographic luminance contrast ratio failures
-uirig contrast --target .uirig/snapshots/02_painted.tsx
+uirig contrast --target ./dist/index.html
 
 # Fuzz wrapper metrics with incremental padding shifts to map grid leakage thresholds
-uirig bleed --target .uirig/snapshots/02_painted.tsx --steps 12
+uirig bleed --target ./dist/index.html --steps 12
 
 # Audit flex rows to verify element wrapping holds against variable sub-element injection arrays
-uirig flex --target .uirig/snapshots/02_painted.tsx --count-range "1-24"
+uirig flex --target ./dist/index.html --count-range "1-24"
 ```
+```
+
+---
+
+### 📐 Part 3: Command Reference, State Machine, and Manifesto
+**File Path Target:** `README.md` (Sections 6 through 10)  
+**Execution Verification Baseline Date:** **November 9, 2026**
+
+```markdown
 ## 6. Command Reference Matrix
 
 ### `uirig layout`
 *   **Syntax:** `uirig layout "<intent>" --platform <engine>`
-*   **Valid Platforms:** `html-tailwind` | `react-tailwindcss` | `vue-prime`
+*   **Valid Platforms:** `html-vanilla` | `react-jsx` | `vue-sfc` | `svelte-sfc` | `web-components`
 *   **Description:** Compiles text intent into zero-color, invariant layout skeletons focusing exclusively on document outlines, containment flows, and responsive layouts.
 
 ### `uirig paint`
 *   **Syntax:** `uirig paint --tokens <path> [--shuffle]`
-*   **Description:** Fuses the unstyled structure markup file with a design system token configuration using a secure virtual tree engine to prevent regex substitution collisions. `--shuffle` activates randomized harmony palette exploration.
+*   **Description:** Swaps visual styling variants by editing theme configuration dictionaries safely on disk. `--shuffle` activates randomized harmony palette exploration.
 
 ### `uirig trace`
 *   **Syntax:** `uirig trace --target <path>`
-*   **Description:** Parses display metrics via target abstract syntax trees and renders a geometric wireframe trace layout directly inside terminal consoles.
+*   **Description:** Renders a geometric wireframe trace layout directly inside terminal consoles via browser layout telemetry parameters.
 
 ### `uirig blueprint`
 *   **Syntax:** `uirig blueprint --matrix "<dimensions>" --platform <engine>`
-*   **Description:** Directly generates standard placeholder boilerplate skeletons from explicit dimension matrices completely offline, bypassing API processing layers.
+*   **Description:** Directly generates empty structural layout placeholder boilerplate models from explicit dimension matrices completely offline.
 
 ### `uirig break`
 *   **Syntax:** `uirig break --target <path> [--fix]`
-*   **Description:** Launches un-networked browser processes to append high-length tracking text extensions (+30% characters) and simulate 200% document zooming. `--fix` maps corrective inline attributes via `healer.ts`.
+*   **Description:** Launches browser testing tabs to append high-length tracking text extensions (+30% characters) and simulate 200% document zooming. `--fix` maps corrective inline attributes onto file line records via matched `data-uirig-id` values.
 
 ### `uirig contrast`
 *   **Syntax:** `uirig contrast --target <path>`
@@ -157,11 +170,11 @@ uirig flex --target .uirig/snapshots/02_painted.tsx --count-range "1-24"
 
 ### `uirig bleed`
 *   **Syntax:** `uirig bleed --target <path> --steps <integer>`
-*   **Description:** Progressively stretches parent canvas padding to isolate the exact coordinate boundary threshold limits where grid elements drop out of alignment.
+*   **Description:** Progressively stretches parent canvas padding to isolate the exact coordinate boundary threshold limits where grid elements drop out of alignment inside Playwright.
 
 ### `uirig flex`
 *   **Syntax:** `uirig flex --target <path> --count-range "<min>-<max>"`
-*   **Description:** Loops row sub-element populations iteratively to assert layout wrap resilience and catch element clipping or overlap collisions early.
+*   **Description:** Loops row sub-element populations iteratively inside the browser engine to assert layout wrap resilience and catch element clipping or overlap collisions early.
 
 ### `uirig init`
 *   **Syntax:** `uirig init`
@@ -169,7 +182,7 @@ uirig flex --target .uirig/snapshots/02_painted.tsx --count-range "1-24"
 
 ### `uirig dev`
 *   **Syntax:** `uirig dev [--port <number>]`
-*   **Description:** Instantiates the continuous workspace live orchestrator, watching layout components and token configs for mutations and broadcasting live hot-reload updates over local WebSockets.
+*   **Description:** Instantiates the continuous workspace live orchestrator, watching layout assets and token configs for mutations and broadcasting live hot-reload updates over local WebSockets.
 
 ### `uirig manifest`
 *   **Syntax:** `uirig manifest`
@@ -218,8 +231,8 @@ uirig checkout 1
 `uirig` considers computational resource profiles and context limits as critical front-end compilation constraints, offering native strategies across 3 economic tiers:
 
 *   **The Enterprise Sovereign (`--agent`):** Uncapped token resources. Integrates `uirig` automated workflows into autonomous CLI agents (e.g., Cursor or Claude Code) via execution flags.
-*   **The Metered Pragmatist (`--api`):** Standard subscription limits ($20/month caps). Leverages `uirig pack` to lexically compress template assets locally, eliminating prompt overhead before streams run through paid commercial APIs.
-*   **The Free-Tier Alchemist (`--local-only`):** $0 AI budget. Runs `uirig handoff` locally to generate ultra-dense prompt portability blocks, completely avoiding progressive context degradation across free browser tabs.
+*   **The Metered Pragmatist (`--api`):** Standard subscription limits (\$20/month caps). Leverages `uirig pack` to lexically compress template assets locally, eliminating prompt overhead before streams run through paid commercial APIs.
+*   **The Free-Tier Alchemist (`--local-only`):** \$0 AI budget. Runs `uirig handoff` locally to generate ultra-dense prompt portability blocks, completely avoiding progressive context degradation across free browser tabs.
 
 ---
 

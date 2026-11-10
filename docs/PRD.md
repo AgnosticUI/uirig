@@ -12,11 +12,11 @@
 Current AI design workflows rely on a fragile "one-shot" paradigm. Asking an LLM to simultaneously invent layout structure, apply design tokens, maintain accessibility contrast, and anticipate edge-case text overflow inside a single prompt produces **AI Slop**: interfaces that look passable in a demo screenshot but break under real production conditions. Teams suffer from silent logic regressions during restyling, inaccessible low-contrast text, clipped layouts under real data, overwritten manual IDE edits, and zero automated guardrails in CI/CD.
 
 ### 1.2 The Solution
-`uirig` turns AI front-end generation into a deterministic, multi-stage local CLI compiler inspired by **Unix modularity** and **`git`-style state management**, delivering five concrete outcomes:
+`uirig` turns AI front-end generation into a deterministic, multi-stage local CLI workflow inspired by **Unix modularity** and **`git`-style state management**, delivering five concrete outcomes:
 
-1. **Visual Safety & Confidence:** Syntax-safe AST token injection (`uirig paint`) updates visual styles without risking broken JSX or altered component logic.
-2. **Compliance & Broader Usability:** Compile-time WCAG 4.5:1 luminance gates (`uirig contrast`) ensure every shipped screen is legible to more users while lowering accessibility compliance and legal risk.
-3. **Stress-Tested, Unbreakable Resilience:** Headless Playwright overflow fuzzing and automated patching (`uirig break --fix`) mitigate production risk by catching and healing layout breaks under +30% text expansion and 200% zoom.
+1. **Visual Safety & Confidence:** Framework-blind visual styling operations update layouts via safe token dictionary file mutations without touching delicate source code or component logic.
+2. **Compliance & Broader Usability:** Rendered contrast checking gates ensure every shipped screen is legible by executing WCAG 4.5:1 math on living elements inside a browser instance.
+3. **Stress-Tested, Unbreakable Resilience:** Headless Playwright overflow fuzzing and automated line patching mitigate production risk by catching and healing layout breaks under +30% text expansion and 200% zoom.
 4. **Faster, Safer Developer Experience (DX):** A local **Session State Director** (`.uirig/session.json`) protects manual IDE changes via SHA-256 checksums, enables instant snapshot rollbacks (`uirig checkout`), and compresses context packs (`uirig pack`) for faster iteration across any AI budget tier.
 5. **Automated CI/CD Enforcement:** Fast headless execution and strict POSIX exit codes (`0`, `1`, `2`) let teams drop `uirig` directly into pull-request pipelines to block regressions before merge.
 
@@ -46,12 +46,12 @@ Everything runs locally on the user's filesystem with zero required cloud servic
 [uirig CLI Matrix]
  ::: Structural Blueprint & Styling Engines
  ::: uirig layout         ==>  Compiles text intent into Grayscale Semantic Structure (No Color)
- ::: uirig paint          ==>  Fuses Grayscale Structure + tokens.json (Supports --shuffle)
- ::: uirig trace          ==>  Extracts existing layout classes to visualize spatial grids
- ::: uirig blueprint      ==>  Generates structural layout boilerplate from a matrix
+ ::: uirig paint          ==>  Swaps design system tokens.json configs safely on disk
+ ::: uirig trace          ==>  Extracts layout classes to visualize spatial grids via telemetry
+ ::: uirig blueprint      ==>  Generates structural layout boilerplate from a matrix offline
  
  ::: Adversarial Stress & Quality Assurance Rigs
- ::: uirig break          ==>  Adversarial Stress Tester (Playwright Headless Hydrated Canvas Fuzzer)
+ ::: uirig break          ==>  Adversarial Stress Tester (Playwright Headless Bounding Box Fuzzer)
  ::: uirig contrast       ==>  Throws error codes if text elements fall below WCAG 4.5:1
  ::: uirig bleed          ==>  Fuzzes container dimensions to spot structural break points
  ::: uirig flex           ==>  Audits alignment and wrapping under dynamic element counts
@@ -84,44 +84,50 @@ To project a professional toolchain aesthetic, `uirig` explicitly and completely
 
 #### 4.1.1 `uirig layout`
 * **Description:** Generates zero-color, invariant layout skeletons focusing exclusively on document outlines, containment flows, and responsive layouts.
-* **Input Parameters:** `intent` (string), `--platform` (`html-tailwind` | `react-tailwindcss` | `vue-prime`).
-* **Output Artifact:** Emits `01_layout.html` stripped of any color, typography families, shadows, or motion styles.
+* **Input Parameters:** `intent` (string), `--platform` (`html-vanilla` | `react-jsx` | `vue-sfc` | `svelte-sfc` | `web-components`).
+* **Output Artifact:** Emits layout skeletons stripped of any color, typography families, shadows, or motion styles.
 
 #### 4.1.2 `uirig paint`
-* **Description:** Fuses the unstyled structure markup file with a design system token configuration using a secure virtual tree engine to prevent regex collisions.
+* **Description:** Fuses the active canvas with a design system token configuration by updating theme files on disk, ensuring layout styles can be modified without altering live component logic.
 * **Input Parameters:** `--tokens` (string), `--shuffle` (flag).
-* **In-Memory Transformation:** Validates tokens against the Relational Matrix schema. If color pairing falls below a 4.5:1 WCAG contrast threshold, it dynamically calculates a compliant harmony pair.
-* **Output Artifact:** Emits `02_painted.html` or framework style snapshot.
+* **Output Artifact:** Updates global visual token palettes cleanly.
 
 #### 4.1.3 `uirig trace`
-* **Description:** Extracts existing layout classes and renders a structural layout trace diagram directly to the console terminal to visualize spatial grid distribution.
+* **Description:** Extracts existing layout utility configurations and renders a structural layout trace diagram directly to the console terminal to visualize spatial grid distribution via browser-backed layout telemetry.
 * **Input Parameters:** `--target` (string).
 * **Output Artifact:** Diagnostic plain-text console diagram map.
 
 #### 4.1.4 `uirig blueprint`
-* **Description:** Generates pure structural layout boilerplate wireframe models based on explicit grid distribution matrices without processing external prompt contexts.
-* **Input Parameters:** `--matrix` (string), `--platform` (`html-tailwind` | `react-tailwindcss` | `vue-prime`).
-* **Output Artifact:** Emits raw unstyled boilerplate canvas components.
+* **Description:** Generates pure structural layout boilerplate wireframe models based on explicit grid distribution matrices completely offline without processing external prompt contexts.
+* **Input Parameters:** `--matrix` (string), `--platform` (string).
+* **Output Artifact:** Emits raw unstyled boilerplate wireframe elements.
+---
+
+### 📐 Part 2: QA Rigs, Lifecycle, and Relational Contrast Matrix Rules
+**File Path Target:** `docs/PRD.md` (Sections 4.2 through 5)  
+**Execution Verification Baseline Date:** **November 9, 2026**
+
+```markdown
 ### 4.2 Adversarial Stress & Quality Assurance Rigs
 
 #### 4.2.1 `uirig break` (Aliases: `breakit`, `uibreakit`)
-* **Description:** A local layout linter that launches a local, un-networked serverless browser thread to test component robustness under extreme interface configurations.
+* **Description:** A local layout linter that launches a local, un-networked serverless browser thread via Playwright to evaluate layout durability under extreme interface configurations.
 * **Input Parameters:** `--target` (string), `--fix` (flag).
-* **In-Memory Transformation:** Spawns a headless Playwright runner, injects custom locale tracking parameters (+30% tracking characters), and simulates 200% document scale reflows. If `--fix` is active, `src/core/healer.ts` injects defensive class overrides (e.g., `flex-wrap`, `break-all`).
-* **Output Artifact:** Emits hardened `03_hardened.html` or throws leakage parameters.
+* **In-Memory Transformation:** Spawns a headless Playwright runner, injects custom locale tracking parameters (+30% tracking characters), and simulates 200% document scale reflows. If `--fix` is active, `src/core/healer.ts` uses element metadata-tracking indicators (`data-uirig-id`) to inject defensive inline class overrides (e.g., `flex-wrap`, `break-all`) onto source file paths.
+* **Output Artifact:** Emits a hardened file on pass, or throws structural layout bounding violations.
 
 #### 4.2.2 `uirig contrast`
-* **Description:** Evaluates the active painted file layout snapshot and explicitly throws error codes if text color elements fall below a mathematical 4.5:1 relative contrast threshold.
+* **Description:** Evaluates the active layout viewport using `window.getComputedStyle()` inside Playwright to execute exact luminance checks on rendered pixels. Throws error codes if text elements fall below a mathematical 4.5:1 relative contrast threshold.
 * **Input Parameters:** `--target` (string).
-* **Output Artifact:** Exits with status `1` and prints precise DOM element paths failing WCAG guidelines.
+* **Output Artifact:** Exits with status `1` and prints precise element selector paths failing WCAG guidelines.
 
 #### 4.2.3 `uirig bleed`
-* **Description:** Fuzzes container dimensions with incremental non-breaking padding to locate exactly where structural elements break encapsulation grids.
+* **Description:** Commands Playwright to fuzz container dimensions with incremental padding shifts to locate exactly where structural elements break encapsulation grids.
 * **Input Parameters:** `--target` (string), `--steps` (integer).
-* **Output Artifact:** Comprehensive visual breakdown matrix indicating layout strain points.
+* **Output Artifact:** Visual breakdown matrix indicating padding strain limits.
 
 #### 4.2.4 `uirig flex`
-* **Description:** Audits the flex-wrap and layout alignment properties under dynamic element counts to isolate structural collisions or line-break overlaps.
+* **Description:** Audits the flex-wrap and layout alignment properties under dynamic element counts inside the browser to isolate structural collisions or line-break overlaps.
 * **Input Parameters:** `--target` (string), `--count-range` (string).
 * **Output Artifact:** Structural overlap diagnostic report.
 
@@ -130,13 +136,13 @@ To project a professional toolchain aesthetic, `uirig` explicitly and completely
 ### 4.3 Dev Orchestration, Workspace, & Session Lifecycle
 
 #### 4.3.1 `uirig init`
-* **Description:** Scaffolds the workspace directory paths, layout baselines, template mounting targets, and initializes the `.uirig/session.json` state tracking ledger.
-* **Output Artifact:** Standardized `.uirig/` structural workspace ecosystem directory.
+* **Description:** Scaffolds the workspace directory paths, configuration templates, and initializes the `.uirig/session.json` state tracking ledger.
+* **Output Artifact:** Standardized `.uirig/` tracking folder topology.
 
 #### 4.3.2 `uirig dev`
-* **Description:** Instantiates the continuous workspace live orchestrator, watching layout components and design token files for changes and broadcasting live hot-reload updates over local WebSockets.
+* **Description:** Instantiates the continuous workspace live orchestrator, monitoring components and design token files via chokidar file watchers and broadcasting live hot-reload updates over local WebSockets.
 * **Input Parameters:** `--port` (integer, optional).
-* **Output Artifact:** Establishes real-time background compilation logs and local WebSocket synchronization channels.
+* **Output Artifact:** Establishes real-time background compilation logs and local WebSocket synchronization connections.
 
 #### 4.3.3 `uirig manifest`
 * **Description:** Compiles a full project file tree map while cleanly filtering out system blackholes (`node_modules/`, `.git/`, `dist/`).
@@ -145,273 +151,68 @@ To project a professional toolchain aesthetic, `uirig` explicitly and completely
 #### 4.3.4 `uirig session:sync`
 * **Description:** Forces an immediate reconciliation loop between the local developer filesystem and the session ledger, computing current SHA-256 hashes to absorb out-of-band manual IDE changes cleanly.
 * **Input Parameters:** None.
-* **In-Memory Transformation:** Reads the working directory code files, generates an active SHA-256 byte-hash, compares it against the last state journaled in `.uirig/session.json`, and updates the current historical sequence block to `status: stable` without incrementing the step counter.
 * **Output Artifact:** Updates `.uirig/session.json` state inline.
-* **Failure Matrix:** Throws exit code `1` if the current files contain catastrophic structural syntax parsing errors (e.g., unclosed tags, invalid JSX) that prevent standard DOM/AST compilation.
 
 #### 4.3.5 `uirig checkout <step>`
 * **Description:** Performs a local workspace chronological rollback or roll-forward to restore files to a pristine historical file state snapshot.
-* **Input Parameters:** `step` (integer target matching a recorded step index or string alias like `step-1`).
-* **In-Memory Transformation:** Locates the specified step array item within the local ledger, validates its recorded file checksum against the immutable snapshot artifact cache stored inside `.uirig/snapshots/`, and overwrites the active project working file pointer.
-* **Output Artifact:** Restores the active localized code files (e.g., `01_layout.html` or `02_painted.html`) to their historical variants.
-* **Failure Matrix:** Exits with strict status code `1` if the targeted step index does not exist in the journal history or if its cached snapshot artifact file has been deleted from the filesystem.
+* **Input Parameters:** `step` (integer target matching a recorded step index).
+* **Output Artifact:** Restores active workspace code files to previous snapshot targets.
 
 ---
 
 ### 4.4 Context Portability & Export Tools
 
 #### 4.4.1 `uirig handoff`
-* **Description:** Bundles active design artifacts, configuration states, and local repository metadata maps into a zero-overhead, portable Markdown transfer capsule optimized for browser copy-paste workflows.
-* **Input Parameters:** `--session` (string UUID, optional).
-* **In-Memory Transformation:** Reads current design files, serialized token schemas, and token ledger trees, stripping out large dependency blackholes. It maps text contents directly into predefined structural markdown blocks inside `config/templates/handoff_capsule.md`.
+* **Description:** Bundles active design artifacts, configuration states, and local repository metadata maps into a portable Markdown transfer capsule optimized for browser copy-paste workflows.
+* **Input Parameters:** `--session` (string, optional).
 * **Output Artifact:** Emits an ultra-dense markdown transfer document saved directly to `.uirig/copy_paste_pack.md`.
-* **Failure Matrix:** Throws exit code `1` if the current active session state is completely blank or corrupt.
 
 #### 4.4.2 `uirig pack`
-* **Description:** A dedicated minification and structural code compression utility that strips out boilerplate fluff, comments, and redundant formatting spacing to optimize raw text tokens for lower-tier AI prompt structures.
+* **Description:** A dedicated minification and text compression utility that strips out comments and redundant formatting spacing to optimize raw text tokens for lower-tier AI prompt structures.
 * **Input Parameters:** `--target` (string file path).
-* **In-Memory Transformation:** Compiles the targeted file stream through a token-preserving lexical compressor that deletes unnecessary whitespace and internal source comments while explicitly retaining crucial framework structural data attributes and Tailwind class strings.
-* **Output Artifact:** Rewrites the target layout component to an ultra-dense string layout or outputs a compressed string buffer directly to the terminal stdout stream.
-* **Failure Matrix:** Throws exit code `1` if the file targeting mapping path fails validation checks.
+* **Output Artifact:** Outputs a compressed string buffer directly to stdout.
 
 ---
 
 ## 5. Advanced Operational Invariants & Algorithmic Guardrails
 
-### 5.1 The Relational Token Matrix Rules (Contrast & Fluid Scale Locks)
-To eliminate visually broken layouts, `uirig` executes mathematical constraint filtering inside `src/core/matrix.ts` before allowing token attributes to compile into DOM/AST trees. 
+### 5.1 The Relational Token Matrix Rules (Agnostic Contrast & Fluid Scale Locks)
+To eliminate visually broken layouts, `uirig` executes mathematical contrast evaluation frameworks inside Playwright via standard Web APIs before code passes finalize.
 
 1. **Relative Luminance Evaluation (WCAG 2.1 AA Compliance):**
-   The matrix engine computes relative luminance ($Y$) for proposed background ($L_1$) and foreground ($L_2$) hex colors using the standard formula:
-   $$Y = 0.2126 \cdot R + 0.7152 \cdot G + 0.0722 \cdot B$$
-   If the resulting contrast ratio $(\frac{L_1 + 0.05}{L_2 + 0.05})$ falls below **4.5:1**, the application rejects the stylistic token pass. If `--shuffle` is active, it mutates the palette down a compliant harmony scale instead of rendering unreadable layout code.
+   The browser automation framework inspects every visible text node and computes relative luminance (Y) for background (L₁) and foreground (L₂) colors using standard computed style rgb channels:
+   \[Y = 0.2126 \cdot R + 0.7152 \cdot G + 0.0722 \cdot B\]
+   If the resulting contrast ratio \((\frac{L_1 + 0.05}{L_2 + 0.05})\) falls below **4.5:1**, the build pass is instantly blocked with a validation error code.
 
 2. **Typography Fluid Scale Lock:**
-   The typography system enforces rigid geometric proportion steps (`minor-third`, `perfect-fourth`, `golden-ratio`) configured in `config/default_tokens.json`. Heading font sizes are calculated programmatically from a single base font configuration token rather than generated via separate text string prompts, ensuring absolute structural rhythm across screen changes.
+   The typography system enforces rigid geometric proportion steps (`minor-third`, `perfect-fourth`, `golden-ratio`) configured inside `config/default_tokens.json`. Heading font sizes are calculated programmatically from a single base font configuration token rather than generated via separate text prompts, ensuring absolute structural rhythm across screen changes.
 
-### 5.2 The Adversarial Fuzzing Rig Mechanics
-The QA tools suite (`break`, `bleed`, `flex`) uses localized, sandboxed browser testing to evaluate design durability against extreme data mutations:
+## 6. Technical Session Lifecycle & State Engine
 
-* **Text Tracking Expansion Fuzzing:** Modifies text strings within layouts by appending high-length localized dummy content (+30% character tracking) to evaluate how containers wrap text and flex under translation stress.
-* **Reflow Defenses:** Evaluates element bounding boundaries inside Playwright. If an element's calculated `getBoundingClientRect()` width or height exceeds its parent element container bounding boxes, a layout boundary collision violation is caught and output to standard diagnostic text channels.
-* **Automated Component Healing:** When vulnerabilities are detected under the `--fix` parameter flag, the healing system loops back to inject precise corrective style tokens (e.g., appending structural parameters like `min-w-0`, `flex-wrap`, or `break-all`) safely into the corresponding PostHTML or Oxc abstract syntax tree layout indices.
+`uirig` manages session states via an immutable chronological journal schema stored inside `.uirig/session.json`. This local engine functions as a lightweight time-travel tracker built specifically to protect layout architectures across active execution states.
 
----
-
-## 6. Execution Lifecycle Scenarios
-
-### 6.1 Standard Workflow Sequence
-The following chronological terminal sequence highlights how the 15 core tools combine to handle layout generation, code hardening, and context-aware external handoffs without suffering from architectural design degradation:
-
-
-```bash
-# Step 1: Initialize local workspace boundaries
-$ uirig init
-::: Initializing Workspace Environment ==> .uirig/ generated successfully.
-
-# Step 2: Compile pure structural design blueprint skeletons
-$ uirig layout "desktop medical dashboard with sidebar navigation and tabular patient grids" --platform html-tailwind
-::: Compiling Grayscale Blueprint ==> Emitted 01_layout.html [Stable Step 1 Checkpoint]
-
-# Step 3: Apply design tokens while verifying relative visual contrast bounds
-$ uirig paint --tokens config/default_tokens.json
-::: Running Relational Matrix Verification ==> Contrast Check Passed (5.4:1 ratio)
-::: Fusing Visual Style Tokens ==> Emitted 02_painted.html [Active Step 2 Checkpoint]
-
-# Step 4: Run adversarial layout fuzzing to hunt down element clipping flaws
-$ uirig break --target .uirig/snapshots/02_painted.html --fix
-::: Spawning Headless Playwright Context Rig...
-::: Injecting Stress Vectors [+30% Tracking Characters, 200% Scale Reflow]
-[!] Element Collision Warning: Selector (.patient-table-cell) overflows parent container!
-[+] Applying Defensive Patch Class Overrides ==> Injected [break-all, flex-wrap]
-::: Hardening Complete ==> Emitted 03_hardened.html
-
-# Step 5: Export project context capsule to paste directly into browser chat inputs
-$ uirig handoff
-::: Gathering Local Directory Tree Blueprint...
-::: Packaging Local Tokens and Historical Snapshot State Ledger Maps...
-==> Portability Capsule Compiled to .uirig/copy_paste_pack.md [Handoff Ready]
-```
-
-## 7. Extended Error Matrix & Invariant Enforcement Systems
-
-### 7.1 Diagnostic Error Code Architecture
-`uirig` implements a strict, non-ambiguous error handling architecture. When a background compilation pass or headless browser test violates structural integrity rules, the CLI intercepts the error, prevents file system corruption, and yields specific POSIX codes paired with plaintext alphanumeric identifiers.
-
-| Error Code Identifier | POSIX Exit Code | Primary System Trigger | Mitigation Path Resolution Strategy |
-| :--- | :--- | :--- | :--- |
-| `ERR_INV_CHECKSUM_DRIFT` | `1` | The SHA-256 byte-hash of the local target file does not match the ledger state tracked within `session.json`. | Execute `uirig session:sync` to safely record user IDE structural optimizations or force rollback with `uirig checkout <step>`. |
-| `ERR_MAT_CONTRAST_FAIL` | `1` | A manual or automated text-to-background color token pairing falls below the mathematical threshold limit of 4.5:1. | Re-evaluate the token palette mapping dictionaries; pass the `--shuffle` flag during a paint pass to force compliance. |
-| `ERR_ADV_CONTAIN_COLLAPSE` | `2` | Headless Playwright engine verifies a child DOM node's `getBoundingClientRect()` bounds leak past its parent grid element boundaries. | Append the `--fix` parameter to trigger the `healer.ts` automated structural repair utility tree injection mechanism. |
-| `ERR_AST_SYNTAX_CORRUPT` | `1` | The Oxc ESTree engine parser or PostHTML DOM core catches incomplete tags, expression faults, or broken structural blocks. | Halt compilation sequence immediately, protect the last stable snapshot step, and display the line number failure on the console layout. |
-
-### 7.2 The State Invariant Reconciliation Protocol (SIRP) Tree
-To safely preserve manual human developer edits while retaining automated layout pipelines, the runtime system runs a multi-phase verification loop upon executing any modifier command:
-
-```text
-       [Command Invocation (e.g., uirig paint)]
-                          │
-                          ▼
-            Compute Local File SHA-256 Hash
-                          │
-                          ▼
-         Does Hash Match session.json Ledger?
-              ├─── YES ───► Proceed to Execution Pipeline Loop
-              └─── NO  ───► [SIRP Intercept Triggered]
-                                 │
-                                 ▼
-                     Halt Execution & Print
-             "::: [!] Warning: Out-of-band drift detected."
-                                 │
-                                 ▼
-                     Await User Override Route
-         ┌───────────────────────┴───────────────────────┐
-         ▼                                               ▼
-[Route A: uirig session:sync]                [Route B: uirig checkout <step>]
-  ├─ Read user IDE updates                      ├─ Purge out-of-band updates
-  ├─ Re-calculate current SHA-256               ├─ Pull last stable snapshot
-  ├─ Commit state to history array              ├─ Overwrite local file pointer
-  └─ Resume processing pipelines                └─ Restore historical ecosystem
-```
+### 6.1 State Invariant Reconciliation Protocol (SIRP)
+To protect a developer's manual IDE optimizations from being overwritten during pipeline steps, the engine verifies the local working file's active SHA-256 checksum against the checkpoint hash inside `session.json` before triggering commands. If manual, out-of-band updates are discovered, `uirig` initiates a halt intercept path:
+1. **Halt and Alert:** Stop execution and display a strict warning notice layout to the console: `[!] Warning: Out-of-band developer modification detected.`
+2. **Resolution Routes:**
+   * `uirig session:sync` -> Captures the developer's manual optimizations, re-calculates the local checksum snapshot, and updates the step history ledger state cleanly.
+   * `uirig checkout <step>` -> Forcefully discards manual modifications and rewinds local target files to a pristine historical state snapshot.
 
 ---
 
-## 8. Technical Environment Boundaries
+## 7. Competitive Landscape & Market Differentiation
 
-### 8.1 Zero-Dependency Offline Execution Mandate
-To ensure support for **The Free-Tier Alchemist**, `uirig` operates with completely isolated execution constraints:
-* **No Premium Subscriptions:** Zero run-time reliance on commercial SaaS tools, hosted microservices, or paid open-source platforms.
-* **Network-Independent Mode:** All layout validation models, relational matrices, and tree-shaking mechanisms execute entirely locally within memory space without invoking remote API connections.
-* **Hermetic Sandbox Operations:** The headless browser layer powered by Playwright relies on isolated text generators and standard local stylesheets rather than fetching tracking components or online CDNs.
-* **Lightweight Runtime Profile:** Bypasses bloated server runtimes by routing JSX abstractions directly through ultra-fast, native Rust-bound `oxc-parser` binaries, allowing rapid compilation routines on standard developer laptops.
-## 9. Distribution Model & Enterprise Hardening
-
-### 9.1 The Package Blueprint & Installation Footprint
-`uirig` distributes as a self-contained open-source global executable utility module via standard package registries. It contains an efficient local footprint structure designed to initialize instantaneously without system drift:
-
-```text
-[Global Executable Scope Map]
- npm install -g uirig 
-   └── uirig (Global CLI Executable Router Symbol Link)
-        ├── src/index.ts (Directs Execution Args)
-        └── config/
-             ├── default_tokens.json (Local Structural Baseline Rules Configuration File)
-             └── templates/
-                  ├── layout_base.html (Grayscale Layout Standard Wireframe Template File)
-                  └── handoff_capsule.md (Markdown Compilation Target Standard Framework File)
-```
-
-The global installer contains direct check gates verifying the execution platform matches safe system environments (e.g., Node.js versions >= 18.0.0).
-
-### 9.2 The Secure Local Context Capsule Lifecycle
-The `uirig handoff` context engine treats local workspace project code explicitly as highly private infrastructure data:
-1. **Total Isolation Safeguards:** The parsing crawler strictly enforces system exclusion blocklists (`node_modules/`, `.git/`, `dist/`, `.env`) to block private credentials, infrastructure keys, or heavy external modules from slipping into clipboard structures.
-2. **Context Density Minimization:** Minifies structure frames to compress tracking assets. This lowers context window congestion limits by up to 75% on low-tier browser tab interfaces, completely eliminating the progressive generation rot that typically happens when passing heavy raw markup strings through commercial chat tools.
+| Competitor / Skill Vector | Primary System Architecture | Core Capability Focus | Glaring Operational Weakness(es) | `uirig` Strategic Counter-Positioning |
+| :--- | :--- | :--- | :--- | :--- |
+| **v0.dev & Bolt.new** | Monolithic web runtime environments. | Full-stack scaffolding and sandboxed web iteration. | **Total Vendor Lock-In & Cloud Token Bleed:** Workflow failure if network access or API budgets dry up. | **Deterministic Offline Control:** Replaces high-latency online loops with localized browser-driven CLI controls. |
+| **Anthropic Artifacts** | System prompt heuristics. | Structural clarity and semantic minimalist layouts. | **Purely Advisory & Visual Only:** Completely lacks an automated local execution layer to verify rules. | **The Hardened Automation Rig:** Translates abstract layout prompts into exact terminal bounding box validation tests. |
 
 ---
 
-## 10. Open-Source Success Metrics & Validation Protocols
+## 8. Distribution Model & Enterprise Hardening
 
-### 10.1 Viral Evaluation Target Benchmarks
-To guarantee project momentum during the target **100k GitHub Stars Open-Source Launch**, the pipeline is mathematically evaluated against rigorous performance criteria:
-
-* **Execution Velocity Target:** Standard `uirig layout` execution routines must compile from plain text instructions to grayscale DOM structures within a threshold window of less than **150ms**.
-* **Tree Modification Reliability:** Running complex structural design updates via `uirig paint` across PostHTML or Oxc ESTree syntax engines must demonstrate a **0.00% syntax degradation rate** (no broken tags, or corrupted variable injections).
-* **Self-Healing Resolution Efficiency:** Under active adversarial layout tests with `--fix` active, the internal healing system must resolve a minimum of **90% of bounding box container leaks** on the first patch pass.
-
-### 10.2 Strict Continuous Integration Invariants
-The release pipeline validation rules require that every open-source code commit passes absolute health conditions prior to artifact deployment:
-* **100% Core Matrix Test Pass:** Test suites must execute all structural evaluation matrices against invalid token mappings (`tests/mocks/invalid_tokens.json`) to confirm contrast errors trigger exit codes instantly.
-* **Zero Graphic Emoji Rule:** The build configuration parses all logging files and terminal strings via automated scripts to confirm that zero standard visual emojis are included, ensuring strict adherence to the typographic visual anchor framework.
-
----
-
-## 11. Technical Session Lifecycle & State Engine
-
-`uirig` manages session states via an immutable chronological journal schema stored inside `.uirig/session.json`. This local engine functions as a lightweight time-travel tracker built specifically to protect front-end architectures across active execution states.
-
-#### 11.1 The Local Session Blueprint Example
-```json
-{
-  "\$schema": "http://json-schema.org",
-  "sessionId": "medical-dashboard-029",
-  "meta": {
-    "platform": "html-tailwind",
-    "updatedAt": "2026-11-09T14:14:00Z"
-  },
-  "history": [
-    {
-      "step": 1,
-      "command": "layout",
-      "variantName": "01_layout",
-      "status": "stable",
-      "filePointer": ".uirig/snapshots/01_layout.html",
-      "checksum": "a7b3c9d8e7f6a5b4c3d2e1f0a7b3c9d8e7f6a5b4c3d2e1f0a7b3c9d8e7f6a5b4",
-      "timestamp": "2026-11-09T14:05:00Z"
-    },
-    {
-      "step": 2,
-      "command": "paint",
-      "variantName": "02_painted_lucky_variant_3",
-      "status": "active",
-      "filePointer": ".uirig/snapshots/02_painted.html",
-      "checksum": "f2e9d4c3b2a1f0e9d8c7b6a5f2e9d4c3b2a1f0e9d8c7b6a5f2e9d4c3b2a1f0e9",
-      "timestamp": "2026-11-09T14:14:00Z"
-    }
-  ]
-}
-```
-
-#### 11.2 Time-Travel Operation
-If an automated token application, layout trace, or adversarial mutation degrades the component structure, the developer drops back to any safe historical step instantly using the expanded command matrix:
-```bash
-\$ uirig checkout 1
-::: Restoring Step 1 Snapshot [01_layout.html] ==> Active State Restored.
-```
-
-#### 11.3 State Invariant Reconciliation Protocol (SIRP)
-To protect a developer's manual IDE optimizations from being overwritten during pipeline steps, the engine verifies the local working file's active SHA-256 checksum against the checkpoint hash inside `session.json` before triggering commands. If manual, out-of-band updates are discovered, `uirig` initiates the following resolution tree:
-1. **Halt and Alert:** Stop execution and display a strict warning notice layout to the console: `[!] Warning: Out-of-band developer modification detected. Current file checksum has drifted from session ledger history.`
-2. **Fork and Preserved State Actions:** The CLI prompts the user with an interactive decision checkpoint:
-   * `uirig session:sync` -> Captures the developer's manual optimizations, re-calculates the local checksum snapshot, and updates the step history ledger state cleanly as an incremental commit pass.
-   * `uirig checkout <step>` -> Forcefully discards manual modifications and rewinds the local target file to a pristine historical file state snapshot.
-
-## 12. Competitive Landscape & Market Differentiation
-
-#### 12.1 Comprehensive Competitor & Capability Matrix
-
-| Competitor / Skill Vector | Primary System Architecture | Target Audience Profile | Core Capability Focus | Glaring Operational Weakness(es) | `uirig` Strategic Counter-Positioning |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **v0.dev & Bolt.new** | Monolithic web runtime environments. | Enterprise Sovereigns / Metered Pragmatist devs. | Full-stack scaffolding, package installations, and rapid sandboxed web iteration. | **Total Vendor Lock-In & Cloud Token Bleed:** High infrastructure latency, high subscription overhead, and immediate workflow failure if network access or API budgets dry up. | **Deterministic Offline Control:** Replaces bloated, opaque, high-latency online platform loops with localized Unix CLI command controls. |
-| **Replit Agent 4 & Infinite Canvas** | Infinite state tracking workspace canvas. | Metered Pragmatists / Collaborative Teams. | Multi-user parallel task execution and interactive visual design tweaks directly on active live applications. | **Massive Cognitive Context Bloat:** Constant file modifications quickly saturate prompt context windows, causing progressive generation rot during long sessions. | **Modular Decoupling:** Replaces complex cloud-hosted IDE boundaries with plain-text Markdown structure capsules optimized for any LLM tier via `uirig handoff` and `uirig pack`. |
-| **Anthropic Frontend Design & Artifacts** | Specialized system prompt heuristics. | Advanced Vibe Coders / Product Designers. | Structural clarity, semantic minimalist layouts, and clean visual execution states. | **Purely Advisory & Visual Only:** The model weights completely lack an automated local execution layer to enforce or mathematically verify their own architectural design rules. | **The Hardened Automation Rig:** Translates abstract behavioral prompts into a deterministic, local layout linter (`uirig break`, `bleed`, `flex`) that outputs exact terminal errors. |
-
-#### 12.2 Market Demand Summary
-"Vibe coders," design engineers, and creative developers across active developer forums are experiencing deep fatigue with first-generation layout generation tools. The demand vectors have systematically shifted from absolute generation velocity to architectural discipline and interactive precision:
-*   **The Rejection of "AI Slop":** The market has moved past the novelty of simple single-prompt inputs. Technical teams are looking for "Anti-Slop" filters—strict mechanisms that introduce typographic variation, spatial whitespace allocation, and structural resilience into raw components.
-*   **The Craving for Aesthetic Taste:** Standard base models default to conservative, generic design patterns. Developers are manually stringing together custom system prompt matrices to inject "Taste Skills"—forcing AI layouts to adopt complex editorial alignments, micro-interactions, fluid scales, and elevated visual minimalism.
-*   **Choreographed Motion Over Static Components:** Creators leveraging motion skill models (e.g., GSAP AI) find that when models attempt to write deep layout classes and timeline structural animations simultaneously, the code breaks instantly under tracking desyncs. The market is asking for pipelines that keep base element code lightweight while allowing robust animation vectors to sit cleanly on top.
-*   **Context Window Fatigue:** As models regenerate complete files repeatedly to patch minor alignment issues, context windows saturate, triggering token limits. Developers demand local optimization tools like `uirig pack` that handle context pruning before pushing data out to AI endpoints.
-
----
-
-## 13. Community Viral Growth Strategy
-
-To build strong open-source adoption upon release, `uirig` addresses these core demand vectors directly:
-
-1. **Zero-Lock-In Exit Strategy:** The presence of `uirig handoff` means the tool openly advertises itself as a launchpad. It explicitly encourages users to take their clean, packed context capsules out to Cursor, Claude Code, or browser tabs whenever they want, building massive open-source goodwill.
-2. **Aggressive Financial Accessibility:** The README leads with a proud manifesto: *"Built for Enterprise Sovereigns, Metered Pragmatists, and Free-Tier Alchemists alike. Zero token waste. 100% functional with raw clipboard copy-pasting via local context encapsulation."*
-3. **The Developer Pride Factor:** By framing UI generation through the lenses of compilers, linters, and stage-gate verification (`uirig layout` -> `uirig paint --shuffle` -> `uirig break --fix`), it elevates AI-assisted front-end work into a high-discipline software engineering methodology.
-
-### 13.1 The Universal Boundary Tool Persona Matrix
-`uirig` unifies completely different personas across the AI design engineering spectrum by delivering specific, role-targeted value:
-
-* **[Design & UI Engineers / Technologists]:** Gains deterministic layout architecture enforcement and type-safe linting primitives (`uirig contrast`, `trace`, `blueprint`) to replace fragile visual regression suites inside team workflows.
-* **[Technical PMs & Technical Designers]:** Protects visual product governance. Allows instant iteration across fluid design tokens, dark/light themes, and layout densities (`uirig paint --shuffle`) over an invariant, production-safe frame.
-* **[Vibe Coders & AI Builders]:** Eliminates repetitive engineering loops by trapping and auto-healing browser clipping anomalies (`uirig break`, `bleed`, `flex`) locally before pushing broken layouts into live production tracking code.
-
-### 13.2 The Ultimate CI/CD Plug-and-Play Footprint
-By maintaining a strict **150ms unit execution budget**, `uirig` functions as an invisible visual gatekeeper sitting directly beside Playwright workflows inside GitHub Actions runners to strip out layout regressions flawlessly without inflating infrastructure SaaS budgets:
+### 8.1 The Ultimate CI/CD Plug-and-Play Footprint
+By maintaining a strict framework-blind execution strategy, `uirig` functions as an invisible visual gatekeeper sitting directly beside standard automation tools inside GitHub Actions runners to strip out layout regressions flawlessly:
 
 ```yaml
 name: uirig Defensive Hardening Core Gate
@@ -423,11 +224,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Boot Sandbox Environment
         run: npm ci && npx playwright install chromium
-      - name: Verify Typography Contrast (WCAG 4.5:1)
-        run: uirig contrast --target ./src/components/
+      - name: Verify Rendered Typography Contrast (WCAG 4.5:1)
+        run: uirig contrast --target ./dist/
       - name: Fuzz Layout Container Grid Bleed Bounds
-        run: uirig bleed --target ./src/components/ --steps 5
-      - name: Audit Dynamic Row Element Flex Accumulations
-        run: uirig flex --target ./src/components/ --count-range "1-12"
+        run: uirig bleed --target ./dist/ --steps 5
 ```
-
