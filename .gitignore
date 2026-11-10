@@ -5,8 +5,8 @@ build/
 .env
 
 # Local Workspace State Logs & Artifacts
-.uipipe/snapshots/
-.uipipe/copy_paste_pack.md
+.uirig/snapshots/
+.uirig/copy_paste_pack.md
 
 # OS/IDE Artifacts
 .DS_Store

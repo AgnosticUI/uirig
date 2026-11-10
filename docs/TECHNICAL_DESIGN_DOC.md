@@ -1,23 +1,23 @@
-# Technical Design Document (TDD): uipipe System Architecture
+# Technical Design Document (TDD): uirig System Architecture
 
 ---
 
 ## 1. Complete Software File Architecture
 
-The following tree represents the exact file system blueprint for the `uipipe` open-source codebase. It decouples the core domain logic from specific execution environments, enabling complete offline functionality for the Free-Tier Alchemist while exposing native APIs for orchestrators.
+The following tree represents the exact file system blueprint for the `uirig` open-source codebase. It decouples the core domain logic from specific execution environments, enabling complete offline functionality for the Free-Tier Alchemist while exposing native APIs for orchestrators.
 
 ```text
-uipipe/
+uirig/
 ├── .github/
 │   └── workflows/
 │       └── release.yml
-├── .uipipe/                         # Local workspace template (created by init)
+├── .uirig/                         # Local workspace template (created by init)
 │   ├── snapshots/
 │   │   ├── .gitkeep
 │   ├── copy_paste_pack.md
 │   └── session.json
 ├── bin/
-│   └── uipipe                       # Global CLI executable entrypoint script
+│   └── uirig                       # Global CLI executable entrypoint script
 ├── config/
 │   ├── default_tokens.json          # Enforces relational matrix and WCAG contrast rules
 │   └── templates/
@@ -27,21 +27,22 @@ uipipe/
 ├── package.json                     # Project manifest and distribution config
 ├── src/
 │   ├── index.ts                     # Core routing and entry orchestration
-│   ├── commands/                    # CLI user interaction handlers (14 Tools Suite Layer)
-│   │   ├── bleed.ts                 # Handles uipipe bleed padding fuzzer command
-│   │   ├── blueprint.ts             # Handles uipipe blueprint matrix command
-│   │   ├── break.ts                 # Handles uipipe break | breakit | uibreakit aliases
-│   │   ├── checkout.ts              # Handles uipipe checkout step restorations
-│   │   ├── contrast.ts              # Handles uipipe contrast verification command
-│   │   ├── dev.ts                   # Inits local hot-reloaded watcher orchestration
-│   │   ├── flex.ts                  # Handles uipipe flex wrap structural auditor command
-│   │   ├── handoff.ts               # Handles uipipe handoff session capsule pack command
-│   │   ├── init.ts                  # Handles uipipe init workspace directory command
-│   │   ├── layout.ts                # Handles uipipe layout structural prompt command
-│   │   ├── manifest.ts              # Handles uipipe manifest repository crawler command
-│   │   ├── pack.ts                  # Handles uipipe pack text compression utility command
-│   │   ├── paint.ts                 # Handles uipipe paint design token mixer command
-│   │   └── trace.ts                 # Handles uipipe trace console ascii visualizer command
+│   ├── commands/                    # CLI user interaction handlers (15 Tools Suite Layer)
+│   │   ├── bleed.ts                 # Handles uirig bleed padding fuzzer command
+│   │   ├── blueprint.ts             # Handles uirig blueprint matrix command
+│   │   ├── break.ts                 # [MVP] Handles uirig break | breakit | uibreakit aliases
+│   │   ├── checkout.ts              # [MVP] Handles uirig checkout step restorations
+│   │   ├── contrast.ts              # Handles uirig contrast verification command
+│   │   ├── dev.ts                   # [MVP] Inits local hot-reloaded watcher orchestration
+│   │   ├── flex.ts                  # Handles uirig flex wrap structural auditor command
+│   │   ├── handoff.ts               # Handles uirig handoff session capsule pack command
+│   │   ├── init.ts                  # [MVP] Handles uirig init workspace directory command
+│   │   ├── layout.ts                # Handles uirig layout structural prompt command
+│   │   ├── manifest.ts              # Handles uirig manifest repository crawler command
+│   │   ├── pack.ts                  # [MVP] Handles uirig pack text compression utility command
+│   │   ├── paint.ts                 # [MVP] Handles uirig paint design token mixer command
+│   │   ├── session-sync.ts          # [MVP] Handles uirig session:sync SHA-256 reconciliation
+│   │   └── trace.ts                 # Handles uirig trace console ascii visualizer command
 │   ├── core/                        # Pure domain logic (Platform & Framework Agnostic)
 │   │   ├── adapters/                # Framework transpilation strategies
 │   │   │   ├── html.ts              # Maps standard class structures via PostHTML
@@ -54,6 +55,7 @@ uipipe/
 │   │   ├── orchestrator.ts          # File watcher, web sockets, & dev state runtime engine
 │   │   └── session.ts               # Local state lifecycle ledger & reconciliation manager
 │   ├── interfaces/                  # Shared data shapes and type declarations
+│   │   ├── browser.ts
 │   │   ├── config.ts
 │   │   ├── schema.ts
 │   │   └── tokens.ts
@@ -82,7 +84,7 @@ The system operates as a **unidirectional processing pipeline** anchored by an i
 
 ```mermaid
 graph TD
-    User([User command: uipipe dev]) --> Entry[src/index.ts Entry Router]
+    User([User command: uirig dev]) --> Entry[src/index.ts Entry Router]
     Entry --> DevCmd[src/commands/dev.ts Continuous Watcher]
     
     subgraph Dev Orchestration Loop [Hot-Reloaded Workspace Runtime]
@@ -90,14 +92,14 @@ graph TD
         Orch -->|Watches modifications| FSWatch[Filesystem Event Monitor]
         FSWatch -->|Triggers re-compile| Compiler[src/core/compiler.ts]
         Compiler -->|Filters through contrast checks| Matrix[src/core/matrix.ts]
-        Matrix -->|Emits painted output| Snapshots[(.uipipe/snapshots/)]
+        Matrix -->|Emits painted output| Snapshots[(.uirig/snapshots/)]
         Snapshots -->|Loads canvas to test bounds| Adversary[src/core/adversary.ts]
         Adversary -->|On failure: runs patches| Healer[src/core/healer.ts]
         Healer -->|Pushes safe layout updates| Snapshots
         Snapshots -->|Hot-reloads local screen over WebSockets| CanvasApp[Local Development Canvas UI]
     end
 
-    Session[src/core/session.ts] <-->|Reads/Writes Ledger| DiskJson[(.uipipe/session.json)]
+    Session[src/core/session.ts] <-->|Reads/Writes Ledger| DiskJson[(.uirig/session.json)]
 ```
 
 ### 2.1 In-Memory Architecture Flow Mapping
@@ -117,15 +119,15 @@ When a transaction or filesystem mutation event runs through the toolchain, exec
    The styled layout component string is loaded into a local headless Playwright browser thread. For framework targets, it is injected directly into a sandboxed mounting canvas (`config/templates/react_canvas.html`) loaded with zero-dependency framework bundles. The adversarial engine triggers a custom, blocking `page.waitForFunction()` hook that loops until client-side state hydration markers are active. Once hydrated, the engine executes targeted tracking text expansions (+30% characters for `break`), incremental step padding modifiers (`bleed`), or dynamic sub-element population arrays (`flex`). Element boundaries are validated via native browser evaluation channels testing node bounding boxes using precise `getBoundingClientRect` metrics. On boundary collapse or container breach, the selector tree path is passed back to `src/core/healer.ts` to execute automated AST structural repair overrides before final compilation strings hit the snapshot cache.
 ## 3. Exact Data Model & Schema Definitions
 
-All operations inside `uipipe` track modifications inside `.uipipe/session.json`. The application relies entirely on deterministic data schemas to guarantee time-travel stability and cross-session reproducibility.
+All operations inside `uirig` track modifications inside `.uirig/session.json`. The application relies entirely on deterministic data schemas to guarantee time-travel stability and cross-session reproducibility.
 
-### 3.1 Session Tracking Schema (`.uipipe/session.json`)
-The fundamental architectural state log ledger tracking execution chronology across all 14 tools.
+### 3.1 Session Tracking Schema (`.uirig/session.json`)
+The fundamental architectural state log ledger tracking execution chronology across all 15 tools.
 
 ```json
 {
   "\$schema": "http://json-schema.org",
-  "title": "UiPipeSessionManifest",
+  "title": "uirigSessionManifest",
   "type": "object",
   "properties": {
     "sessionId": { "type": "string", "format": "uuid" },
@@ -147,7 +149,7 @@ The fundamental architectural state log ledger tracking execution chronology acr
           "step": { "type": "integer", "minimum": 1 },
           "command": { 
             "type": "string", 
-            "enum": ["layout", "paint", "trace", "blueprint", "break", "contrast", "bleed", "flex", "init", "manifest", "dev", "handoff", "pack"] 
+            "enum": ["layout", "paint", "trace", "blueprint", "break", "contrast", "bleed", "flex", "init", "manifest", "dev", "session:sync", "checkout", "handoff", "pack"] 
           },
           "variantName": { "type": "string" },
           "filePointer": { "type": "string" },
@@ -232,12 +234,12 @@ The system schema expanded to map strict structural contrast dependencies, light
 ```
 
 ### 3.3 Dynamic QA Fuzz Analysis & Layout Diagnostic Schema
-When running adversarial pipeline fuzzing (`uipipe break`, `bleed`, `flex`), the engine outputs reports matching this formal validation schema.
+When running adversarial pipeline fuzzing (`uirig break`, `bleed`, `flex`), the engine outputs reports matching this formal validation schema.
 
 ```json
 {
   "\$schema": "http://json-schema.org",
-  "title": "UiPipeFuzzDiagnosticReport",
+  "title": "uirigFuzzDiagnosticReport",
   "type": "object",
   "properties": {
     "targetFilePath": { "type": "string" },
@@ -386,7 +388,7 @@ export interface IAdversarialCore {
 ```typescript
 export interface ILayoutPatchPayload {
   elementSelector: string;
-  violationType: 'overflow' | 'clipping';
+  violationType: 'overflow' | 'clipping' | 'wrapping_overlap';
   suggestedInjections: string[]; // array of corrective classes e.g. ['flex-wrap', 'break-all']
   targetFilePath: string;
 }
@@ -460,6 +462,7 @@ export interface ICLIArgumentPayload {
     steps?: number;
     countRange?: string;
     matrix?: string;
+    port?: number;
   };
 }
 
@@ -613,23 +616,25 @@ export interface IHeadlessBrowserDriver {
 }
 ```
 
+---
+
 ## 5. Component-by-Component Breakdown
 
 ### 5.1 Root Architecture & Configuration Paths
-* **`bin/uipipe`**
+* **`bin/uirig`**
   Global entry executable bridge wrapper. Verifies the host local environment satisfies system boundaries (Node.js runtime engine level checkpoints) and dispatches processing arguments directly down to the primary compiler entry point. It handles mapping fallback routes to the primary executable script.
 * **`config/default_tokens.json`**
   The global architectural system style baseline file, expanded to hold relational parameter metrics, luminosity ratios, and Light/Dark Mode structural lock definitions.
 * **`config/templates/layout_base.html`**
   Contains structural base configurations and base responsive constraints template fragments used to initialize new grayscale view constructions.
 * **`config/templates/react_canvas.html`**
-  Isolated browser DOM shell template framework, loaded with runtime injection logic to accept WebSocket sync alerts during `uipipe dev` workflows.
+  Isolated browser DOM shell template framework, loaded with runtime injection logic to accept WebSocket sync alerts during `uirig dev` workflows.
 * **`config/templates/handoff_capsule.md`**
   Structural markdown boilerplate frame containing targeted token optimization framing instructions used to assemble context container strings for external browser text input interfaces.
 
 ### 5.2 System Operational Orchestration (`src/commands/`)
 * **`init.ts`**
-  Responsible for scaffolding directories. Safely initializes isolated `.uipipe/` layout bounds, creates sub-folders, checks user write boundaries, and drops a base `session.json` state log structure onto the path.
+  Responsible for scaffolding directories. Safely initializes isolated `.uirig/` layout bounds, creates sub-folders, checks user write boundaries, and drops a base `session.json` state log structure onto the path.
 * **`layout.ts`**
   Acts as the pipeline input bridge step. It receives spatial descriptive instructions, maps structural context dependencies, and writes the invariant grayscale structural markup snapshot onto the local path file tracker.
 * **`paint.ts`**
@@ -650,6 +655,8 @@ export interface IHeadlessBrowserDriver {
   Unified orchestration sub-command. Instantiates the continuous hot-reloaded development routine. It sets up file watchers on code layouts and token catalogs, coordinates processing pipelines silently in the background, and dynamically boots local visual review views.
 * **`manifest.ts`**
   Calculates project map parameters. Runs crawler loops across adjacent local files, constructs an active context file blueprint list, and writes state mapping structures without scanning large dependency blackholes.
+* **`session-sync.ts`**
+  Resolves SIRP drift halts by computing the active SHA-256 checksum of manually modified workspace files, updating `.uirig/session.json`, and recording a clean incremental milestone snapshot.
 * **`checkout.ts`**
   Restores specified system snapshots tracked within the ledger array, forcefully overwriting local file drifts to cleanly recover from layout corruption loops.
 * **`handoff.ts`**
@@ -665,7 +672,7 @@ export interface IHeadlessBrowserDriver {
 * **`session.ts`**
   The transaction manager for session state. Reads state logs, calculates checksum validations, detects developer IDE modifications, coordinates the State Invariant Reconciliation Protocol, pushes structural record updates, and executes snapshot checkpoint restorations when time-travel commands are fired.
 * **`compiler.ts`**
-  The central stylistic layout class processor core. Houses a dual-engine architecture: compiles raw standard HTML structures using PostHTML, while routing framework-bound targets (React/JSX) through an ultra-fast native Rust `oxc-parser` ESTree compilation node loop. This fully prevents syntax corruption on expression statements or custom tags without adding JavaScript compilation weight. This module additionally handles parsing standard display tokens to extract layout nodes for the `uipipe trace` ascii visual generation routines.
+  The central stylistic layout class processor core. Houses a dual-engine architecture: compiles raw standard HTML structures using PostHTML, while routing framework-bound targets (React/JSX) through an ultra-fast native Rust `oxc-parser` ESTree compilation node loop. This fully prevents syntax corruption on expression statements or custom tags without adding JavaScript compilation weight. This module additionally handles parsing standard display tokens to extract layout nodes for the `uirig trace` ascii visual generation routines.
 * **`adversary.ts`**
   The structural code resilience engine. Injects un-networked serverless text-growth constraints, triggers a fast headless Playwright container audit, measures layout parameters utilizing native browser bounding client rects via web-first `page.locator()` evaluations, logs element leaks, and attaches structural code adjustments. This core handles multi-phase fuzzer evaluation vectors for both padding stress limits (`bleed`) and layout element injection tolerances (`flex`).
 * **`matrix.ts`**

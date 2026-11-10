@@ -1,5 +1,5 @@
 ================================================================================
-          uipipe : Chronological Session Continuity Bridge Capsule              
+          uirig : Chronological Session Continuity Bridge Capsule              
 ================================================================================
  TIMESTAMP BASELINE : 2026-11-09T22:00:00Z (Anchored to Nov 9, 2026 Timeline)
  ACTIVE WORKSPACE   : Root Configuration Setup Boundaries
@@ -16,7 +16,7 @@ following local filesystem specification assets MUST be supplied concurrently:
   1. docs/MVP.md                     [6-Tool High-Signal Core Specifications]
   2. config/default_tokens.json      [Relational Contrast Constraint Dictionary]
   3. LICENSE                         [MIT Permissive Open Source License Text]
-  4. .uipipe/NEXT_PROMPT.md          [Active Continuity Bridge Capsule State]
+  4. .uirig/NEXT_PROMPT.md          [Active Continuity Bridge Capsule State]
 
 --- TARGET RUNTIME DELTA ---
  EXACT NEXT TASK    : Phase 2: Core Workspace Engine & Manifest System

@@ -1,6 +1,6 @@
-# Implementation Plan: `uipipe`
+# Implementation Plan: `uirig`
 
-This document details the engineering blueprint, technical choices, and incremental build tasks required to implement `uipipe` safely from a local system workspace.
+This document details the engineering blueprint, technical choices, and incremental build tasks required to implement `uirig` safely from a local system workspace.
 
 ## Inter-Session Continuity & Context Hardening Protocol
 
@@ -11,14 +11,14 @@ When initializing a brand-new session context window, the developer must feed th
 1.  **`docs/PRD.md`**: Provides the structural product architecture, 14-tool matrix scope, and non-emoji terminal anchor specifications.
 2.  **`docs/TECHNICAL_DESIGN_DOC.md`**: Provides the absolute database schemas (`session.json`, `default_tokens.json`), data model topologies, and programmatic interface contracts.
 3.  **`docs/IMPLEMENTATION_PLAN.md`**: Provides the current task checklist, project phase matrices, and foundational workflow guardrails.
-4.  **`.uipipe/NEXT_PROMPT.md`**: A volatile, single-purpose tracking bridge document populated at the immediate end of the prior session.
+4.  **`.uirig/NEXT_PROMPT.md`**: A volatile, single-purpose tracking bridge document populated at the immediate end of the prior session.
 
 ### 2. The `NEXT_PROMPT.md` Generation Schema
-Every session-closing handoff pass must generate a fresh `.uipipe/NEXT_PROMPT.md` mapping block containing the exact following structural text elements with zero truncation:
+Every session-closing handoff pass must generate a fresh `.uirig/NEXT_PROMPT.md` mapping block containing the exact following structural text elements with zero truncation:
 
 ```text
 ================================================================================
-          uipipe : Chronological Session Continuity Bridge Capsule              
+          uirig : Chronological Session Continuity Bridge Capsule              
 ================================================================================
  TIMESTAMP BASELINE : [YYYY-MM-DD THH:MM:SSZ] (Anchored to Nov 9, 2026 Timeline)
  ACTIVE WORKSPACE   : [Active Target File Target Path, e.g., src/core/crawler.ts]
@@ -48,8 +48,8 @@ To ensure **The Free-Tier Alchemist** execution property is strictly honored, th
 *   **Core Compiler Engine:** Executable TypeScript 5.x ESM Engine
 *   **AST & Parser Layers:** `oxc-parser`, `posthtml`, `chokidar` (watcher)
 *   **Testing Harness Framework:** Vitest integrated natively into a Vite processing configuration, paired with Playwright v1.64+ headless execution packages
-*   **Local State Data:** Isolated JSON file structures (`.uipipe/session.json`)
-*   **Local Layout Intermediaries:** Plain-text Markdown (`.uipipe/copy_paste_pack.md`) and raw static HTML/JSX structures.
+*   **Local State Data:** Isolated JSON file structures (`.uirig/session.json`)
+*   **Local Layout Intermediaries:** Plain-text Markdown (`.uirig/copy_paste_pack.md`) and raw static HTML/JSX structures.
 
 ---
 
@@ -70,21 +70,21 @@ To ensure **The Free-Tier Alchemist** execution property is strictly honored, th
 - [ ] **Task 2.3: Configuration Profile Matrix**
   * **Motive:** Enforce strict ESM compilation constraints, path mappings, and testing isolation rules.
   * **Action:** Generate complete definitions for `tsconfig.json`, `vite.config.ts`, and `vitest.config.ts`.
-- [ ] **Task 2.4: Workspace Initializer (`uipipe init`)**
+- [ ] **Task 2.4: Workspace Initializer (`uirig init`)**
   * **Motive:** Establish the localized filesystem sandbox boundaries and tracking directory topologies.
-  * **Action:** Program `src/commands/init.ts` to scaffold `.uipipe/`, `.uipipe/snapshots/`, and local server baseline layouts (`react_canvas.html`).
-- [ ] **Task 2.5: Framework Blackhole Crawler (`uipipe manifest`)**
+  * **Action:** Program `src/commands/init.ts` to scaffold `.uirig/`, `.uirig/snapshots/`, and local server baseline layouts (`react_canvas.html`).
+- [ ] **Task 2.5: Framework Blackhole Crawler (`uirig manifest`)**
   * **Motive:** Deep-scan the developer's working directory to map out structural context assets while explicitly filtering out environment overhead.
   * **Action:** Code `src/core/crawler.ts` and `src/commands/manifest.ts` to filter out `node_modules/`, `.git/`, and build paths depth-first.
 - [ ] **Task 2.6: State Ledger Schema Validation**
   * **Motive:** Lock down state entry parameters to protect historical generation trees from runtime corruption.
-  * **Action:** Code the baseline session mapping and tracking models inside `src/core/session.ts` to read/write `.uipipe/session.json`.
+  * **Action:** Code the baseline session mapping and tracking models inside `src/core/session.ts` to read/write `.uirig/session.json`.
 
 ### Phase 3: Token Injection & Mutation Utilities (Local Engine)
-- [ ] **Task 3.1: Visual Blueprint Generator (`uipipe blueprint`)**
+- [ ] **Task 3.1: Visual Blueprint Generator (`uirig blueprint`)**
   * **Motive:** Allow high-discipline layout engineers to instantly synthesize raw, unstyled grid matrices without consuming cloud API budgets.
   * **Action:** Code `src/commands/blueprint.ts` to map cell arrays directly into static framework grids.
-- [ ] **Task 3.2: Structural Intent Transformer (`uipipe layout`)**
+- [ ] **Task 3.2: Structural Intent Transformer (`uirig layout`)**
   * **Motive:** Isolate structural document containment rules completely from downstream visual style properties.
   * **Action:** Code `src/commands/layout.ts` to translate structural layout strings into pure grayscale CSS Flexbox and Grid frames.
 - [ ] **Task 3.3: Dual-Engine Abstract Syntax Tree Core**
@@ -96,19 +96,19 @@ To ensure **The Free-Tier Alchemist** execution property is strictly honored, th
 - [ ] **Task 3.5: Contrast Matrix & Relative Luminance Core**
   * **Motive:** Automate accessibility checks directly inside compiler stages using exact color luma equations.
   * **Action:** Build `src/core/matrix.ts` to perform mathematical color contrast checks.
-- [ ] **Task 3.6: Palette Harmony Auditor (`uipipe contrast`)**
+- [ ] **Task 3.6: Palette Harmony Auditor (`uirig contrast`)**
   * **Motive:** Provide a standalone verification rig to explicitly intercept and block low-contrast paint operations.
   * **Action:** Build `src/commands/contrast.ts` to audit static files and exit with POSIX code `1` upon WCAG ratio failures.
-- [ ] **Task 3.7: Token Mixer Pipeline & Alternative Shuffle (`uipipe paint`)**
+- [ ] **Task 3.7: Token Mixer Pipeline & Alternative Shuffle (`uirig paint`)**
   * **Motive:** Fuse unstyled wireframe layouts with design token system dictionaries safely.
   * **Action:** Code `src/commands/paint.ts` to combine token variables into DOM structures, incorporating randomized harmony palette shifts when `--shuffle` is flagged.
-- [ ] **Task 3.8: Spatial Layout Console Wireframer (`uipipe trace`)**
+- [ ] **Task 3.8: Spatial Layout Console Wireframer (`uirig trace`)**
   * **Motive:** Provide immediate, text-based debugging grids to visualize element nesting directly in standard shells.
   * **Action:** Implement `src/commands/trace.ts` to parse structural display parameters into a console ASCII map diagram.
 - [ ] **Task 3.9: State Invariant Reconciliation Protocol (SIRP)**
   * **Motive:** Secure user IDE edits from accidental pipeline overwrites.
   * **Action:** Build `src/core/session.ts` to trap checksum drifts via SHA-256 byte-hash routines.
-- [ ] **Task 3.10: Time-Travel Chronological Checkpoint Engine (`uipipe checkout`)**
+- [ ] **Task 3.10: Time-Travel Chronological Checkpoint Engine (`uirig checkout`)**
   * **Motive:** Decouple development from linear generation errors, allowing instant rollbacks to stable underlying structures.
   * **Action:** Implement `src/commands/checkout.ts` to match state log history array indices and safely restore cached snapshots.
 
@@ -116,13 +116,13 @@ To ensure **The Free-Tier Alchemist** execution property is strictly honored, th
 - [ ] **Task 4.1: Continuous Hot-Reloading Monitor**
   * **Motive:** Drive an active local preview loop tracking both filesystem transformations and visual token updates in real time.
   * **Action:** Code `src/core/orchestrator.ts` using `chokidar` file system monitors paired with local WebSocket connections.
-- [ ] **Task 4.2: Development Workspace Orchestration (`uipipe dev`)**
+- [ ] **Task 4.2: Development Workspace Orchestration (`uirig dev`)**
   * **Motive:** Manage continuous automated compilation processes silently in background threads.
   * **Action:** Program `src/commands/dev.ts` to boot local servers and sync modifications over runtime connections.
 - [ ] **Task 4.3: Headless Sandbox Intercept Scaffold**
   * **Motive:** Set up an isolated serverless automated validation layer completely clear of third-party telemetry networks.
   * **Action:** Implement the headless browser initialization logic inside `src/core/adversary.ts` utilizing local Playwright configurations.
-- [ ] **Task 4.4: Local Tracking Expansion Stressor (`uipipe break`)**
+- [ ] **Task 4.4: Local Tracking Expansion Stressor (`uirig break`)**
   * **Motive:** Adversarially stress container properties by testing text growth limits under rapid locale reflow conditions.
   * **Action:** Code `src/commands/break.ts` to inject text growth vectors (+30% tracking characters) into web-first browser frames.
 - [ ] **Task 4.5: Geometric Bounding & Reflow Monitor**
@@ -131,36 +131,36 @@ To ensure **The Free-Tier Alchemist** execution property is strictly honored, th
 - [ ] **Task 4.6: Automated Component Healing Synthesizer**
   * **Motive:** Dynamically patch broken responsive layouts by executing target AST repairs inline.
   * **Action:** Code `src/core/healer.ts` to intercept layout violations and inject defensive class structures (`flex-wrap`, `break-all`).
-- [ ] **Task 4.7: Grid Margin Strain Fuzzer (`uipipe bleed`)**
+- [ ] **Task 4.7: Grid Margin Strain Fuzzer (`uirig bleed`)**
   * **Motive:** Map the exact limits where structural containers shatter by testing incremental padding expansions.
   * **Action:** Implement `src/commands/bleed.ts` to track canvas padding stress tolerances over step intervals.
-- [ ] **Task 4.8: Sub-Element Injection Row Auditor (`uipipe flex`)**
+- [ ] **Task 4.8: Sub-Element Injection Row Auditor (`uirig flex`)**
   * **Motive:** Verify that responsive grids handle dynamic layout updates gracefully without provoking box overlapping collisions.
   * **Action:** Build `src/commands/flex.ts` to audit flex wrapping behaviors under fluid node populations.
 
 ### Phase 5: Handoff Compilations & Release Setup
-- [ ] **Task 5.1: Lexical Text Context Packer (`uipipe pack`)**
+- [ ] **Task 5.1: Lexical Text Context Packer (`uirig pack`)**
   * **Motive:** Strip structural layout templates of white space and comment bulk to maximize efficiency for low-tier AI prompt contexts.
   * **Action:** Program `src/commands/pack.ts` to provide highly optimized component string compressions.
-- [ ] **Task 5.2: Portable Context Portability Capsule (`uipipe handoff`)**
+- [ ] **Task 5.2: Portable Context Portability Capsule (`uirig handoff`)**
   * **Motive:** Compile repository blueprints, token sets, and steps into an isolated Markdown block optimized for web-tab copy-pasting.
-  * **Action:** Implement `src/commands/handoff.ts` to write data structures out to `.uipipe/copy_paste_pack.md`.
+  * **Action:** Implement `src/commands/handoff.ts` to write data structures out to `.uirig/copy_paste_pack.md`.
 - [ ] **Task 5.3: Baseline Integration & Testing Manifest**
   * **Motive:** Enforce absolute tool stability via isolated, hermetic mock evaluations.
   * **Action:** Write integration verification test matrices inside `tests/integration/workflow.test.ts`.
 - [ ] **Task 5.4: CLI Executable Global Package Distribution**
   * **Motive:** Build a lightweight global binary configuration node to deploy the executable tool.
-  * **Action:** Set up `bin/uipipe` global executable parameters and release routines.
+  * **Action:** Set up `bin/uirig` global executable parameters and release routines.
 
 ---
 
 ## Session State Machine Constraints
 
-Every functional step modifies state inside `.uipipe/session.json`. The programmatic loop must balance historical verification parameters before modifying downstream assets:
+Every functional step modifies state inside `.uirig/session.json`. The programmatic loop must balance historical verification parameters before modifying downstream assets:
 
 ```text
  [State State Loop]
- Check existing .uipipe/session.json  ==> Run SIRP Checksum Validation  ==> Execute Next Pipeline Step
+ Check existing .uirig/session.json  ==> Run SIRP Checksum Validation  ==> Execute Next Pipeline Step
 ```
 
 If an error configuration is applied during any single generation block, the tracking manifest must cleanly permit rollbacks to pristine, immutable structural state data blocks without forcing project state resets.
