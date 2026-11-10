@@ -4,7 +4,7 @@
 
 ## 1. Complete Software File Architecture
 
-The following tree represents the exact, framework-agnostic file system blueprint for the `uirig` open-source codebase. By evaluating living runtime layout geometries directly inside an isolated browser environment, the codebase requires zero framework-specific AST compilers or transpilation wrappers.
+The following tree represents the framework-blind file system blueprint for the `uirig` open-source codebase. By executing all validation routines inside isolated browser contexts, it requires zero heavy file generation pipelines or language compilation weights.
 
 ```text
 uirig/
@@ -12,101 +12,76 @@ uirig/
 │   └── workflows/
 │       └── release.yml
 ├── .uirig/                         # Local workspace tracking directory
+│   ├── docs/
+│   │   └── NEXT_PROMPT.md          # Volatile continuation capsule block
 │   ├── snapshots/
 │   │   ├── .gitkeep
-│   ├── copy_paste_pack.md
-│   └── session.json
+│   ├── github_pr_comment.md        # Clean Markdown comment export artifact
+│   └── session.json                # Immutable history tracking ledger
 ├── bin/
-│   └── uirig                       # Global CLI executable entrypoint script
-├── config/
-│   ├── default_tokens.json         # Enforces relational matrix parameters
-│   └── templates/
-│       ├── layout_base.html        # Wireframe base skeleton template file
-│       └── handoff_capsule.md      # Portable markdown clipboard wrapper
+│   └── uirig                       # Global CLI executable shell router
+├── uirig.config.json               # Unified single configuration file footprint
 ├── package.json                    # Project configuration manifest
 ├── src/
-│   ├── index.ts                    # Main system entry and command router
-│   ├── commands/                   # 15 Tools CLI interaction handlers
-│   │   ├── bleed.ts                # Padding stress fuzzer command
-│   │   ├── blueprint.ts            # Structural boilerplate generator command
-│   │   ├── break.ts                # [MVP] Text growth expansion fuzzer command
-│   │   ├── checkout.ts             # [MVP] Snapshot time-travel controller command
-│   │   ├── contrast.ts             # Rendered pixel contrast auditor command
-│   │   ├── dev.ts                  # [MVP] Continuous live canvas monitor command
-│   │   ├── flex.ts                 # Row overflow flex auditor command
-│   │   ├── handoff.ts              # Portability context capsule builder command
-│   │   ├── init.ts                 # [MVP] Workspace path initializer command
-│   │   ├── layout.ts               # Grayscale blueprint generator command
-│   │   ├── manifest.ts             # Blackhole-safe repository crawler command
-│   │   ├── pack.ts                 # [MVP] Prompt text context compressor command
-│   │   ├── paint.ts                # [MVP] JSON token styling controller command
-│   │   ├── session-sync.ts         # [MVP] SIRP manual-edit ledger sync command
-│   │   └── trace.ts                # Console wireframe ASCII trace command
-│   ├── core/                       # Agnostic core domain logic
-│   │   ├── adversary.ts            # Playwright browser evaluation manager
-│   │   ├── compiler.ts             # Local JSON visual token palette mixer
-│   │   ├── crawler.ts              # Blackhole-safe folder tree crawler
-│   │   ├── matrix.ts               # Rendered text contrast math calculator
-│   │   ├── orchestrator.ts         # WebSocket and file watcher runtime monitor
-│   │   └── session.ts              # Transaction manager and checksum verifier
+│   ├── index.ts                    # Main system entry and argument parser
+│   ├── commands/                   # CLI command wrapper interaction layers
+│   │   ├── check.ts                # [MVP] Orchestrates parallel tool checks
+│   │   ├── init.ts                 # [MVP] Workspace initializer command
+│   │   └── manifest.ts             # Repository file indexing crawler command
+│   ├── core/                       # Agnostic core domain evaluation logic
+│   │   ├── adversary.ts            # [MVP] Playwright geometric stress execution core
+│   │   ├── cls.ts                  # [MVP] Performance observer monitoring core
+│   │   ├── matrix.ts               # [MVP] Rendered luminance contrast core
+│   │   ├── tokens.ts               # [MVP] Shadow-piercing runtime computed style crawler
+│   │   └── session.ts              # Transaction ledger manager and tracker
 │   ├── interfaces/                 # Shared data model contracts
-│   │   ├── browser.ts              # Headless telemetry layer
-│   │   ├── config.ts               
-│   │   ├── locator.ts              # [MVP] Agnostic telemetry tracking contracts
-│   │   └── schema.ts               
-│   └── utils/                      # Common tool primitives
-│       ├── crypto.ts               # SHA-256 byte-hash calculators
-│       ├── formatter.ts            # Alphanumeric console text stylers
-│       └── fs.ts                   # Atomic filesystem file writers
+│   │   ├── browser.ts              # Headless driver token contracts
+│   │   └── config.ts               # Configuration mapping boundaries
+│   └── utils/
+│       ├── formatter.ts            # Typographic console text formatting utilities
+│       └── fs.ts                   # Atomic markdown and ledger file writers
 ├── tsconfig.json                   # ESM compilation settings
-└── tests/                          # Automated local test suite manifest
-    ├── mocks/
-    │   ├── dummy_project/
-    │   └── invalid_tokens.json
+└── tests/                          # Automated local validation test suite
     ├── unit/
-    │   ├── adversary.test.ts
-    │   ├── locator.test.ts         # [MVP] Verification unit checks
-    │   └── crawler.test.ts
+    │   ├── matrix.test.ts          # Contrast luminance math unit tests
+    │   └── tokens.test.ts          # Shadow-piercing crawler unit tests
     └── integration/
-        └── workflow.test.ts
+        └── workflow.test.ts        # End-to-end parallel run workflow check
 ```
 
 ---
 
-## 2. System Architecture & Runtime Data Flows
+## 2. Technical System Execution Data Flow
 
-The toolchain functions as a **framework-blind inspection pipeline**. High-level tasks route down to standard browser validation environments via Playwright, communicating completely through decoupled metadata schemas to isolate processing burdens.
+The architecture decouples individual quality tools into clean processing tracks. It routes calls through isolated browser contexts using a single running browser core binary to eliminate resource overhead.
 
 ```text
-  [ User Runs CLI Command ] ──► src/index.ts (Router Dispatch)
-                                         │
-                                         ▼
-                             src/core/session.ts
-                     (Verifies SHA-256 Checksum Matrix)
-                                         │
-                                         ▼
-                             src/core/adversary.ts
-                  (Spawns Headless Playwright Chrome Runner)
-                                         │
-                         ┌───────────────┴───────────────┐
-                         ▼                               ▼
-              [ Telemetry Read Phase ]        [ Diagnostic Phase ]
-               - page.locator() scans DOM      - adversary.ts traps error
-               - window.getComputedStyle()     - Extracts data-uirig-id
-               - el.getBoundingClientRect()    - Prints stdout trace tables
+   [ uirig check ] ──► Ingests uirig.config.json parameters
+                             │
+                             ▼
+                 Spawns Playwright Browser Instance
+                             │
+         ┌───────────────────┼───────────────────┐
+         ▼                   ▼                   ▼
+  [ Context 1 ]       [ Context 2 ]       [ Context 3 ]
+  - Read-Only Audits   - Mutated Fuzzing   - Performance Monitor
+  - tokens.ts          - adversary.ts      - cls.ts
+  - matrix.ts          (Text Expansion)    (PerformanceObserver)
+         │                   │                   │
+         └───────────────────┼───────────────────┘
+                             ▼
+         Compiles results array & writes to disk at:
+                .uirig/github_pr_comment.md
 ```
 
-### 2.1 In-Memory Architecture Flow Mapping
+---
 
-When a filesystem monitoring transaction or validation routine initiates, data shifts dynamically across three internal lifecycle structures:
-
-1. **The Core Blueprint Initialization Stream:** Prompt strings or cell mapping distributions are parsed by the router and passed down to `src/core/compiler.ts`. The utility constructs an unstyled layout markup array containing base CSS Flexbox and Grid utility templates. Unique `data-uirig-id` structural tracking attributes are injected inline into all generated layout primitives to enable downstream element identification.
-2. **The Swappable Token Engine Update Phase:** The working directory state ledger is cross-examined against recorded file history byte-hashes via `src/core/session.ts`. If no manual drift is found, visual variables inside `config/default_tokens.json` are overwritten or combined with style overrides, leaving the underlying component codes completely un-mutated.
-3. **The Un-Networked Playwright Telemetry Pass:** Component instances are loaded into a serverless, headless Chromium instance. Once client hydration and rendering complete, testing vectors are fired inline. Element bounds are audited via browser computed styles and exact geometric layout checks (`getBoundingClientRect()`). On failure, the raw selector chain and tracking token parameters are passed instantly to stdout.
 ## 3. Exact Data Model & Schema Definitions
 
+All operations inside `uirig` track modifications inside `.uirig/session.json` and validate execution criteria directly against single configuration layers.
+
 ### 3.1 Session Tracking Schema (`.uirig/session.json`)
-The fundamental state tracking ledger enforcing chronological synchronization integrity across all 15 system tools.
+The fundamental state tracking ledger enforcing chronological synchronization integrity across the system.
 
 ```json
 {
@@ -151,74 +126,51 @@ The fundamental state tracking ledger enforcing chronological synchronization in
 }
 ```
 
-### 3.2 Design Token System Dictionary Schema (`config/default_tokens.json`)
-Defines the style bounds, typography proportions, and absolute luminance color boundaries.
+### 3.2 Unified Configuration Schema (`uirig.config.json`)
+Maps out target routes, design systems references, active viewports, and anti-flakiness tolerance filters.
 
 ```json
 {
   "\$schema": "http://json-schema.org",
-  "title": "RelationalTokenMatrixDefinition",
+  "title": "uirigConfigurationProfile",
   "type": "object",
   "properties": {
-    "matrixConstraints": {
-      "type": "object",
-      "properties": {
-        "minWcagContrastRatio": { "type": "number", "minimum": 4.5 },
-        "enforceScaleLock": { "type": "boolean" },
-        "harmonyMappings": {
-          "type": "object",
-          "properties": {
-            "lightModeLock": { "type": "array", "items": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" } },
-            "darkModeLock": { "type": "array", "items": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" } }
-          },
-          "required": ["lightModeLock", "darkModeLock"],
-          "additionalProperties": false
-        }
-      },
-      "required": ["minWcagContrastRatio", "enforceScaleLock", "harmonyMappings"],
-      "additionalProperties": false
+    "targetUrls": {
+      "type": "array",
+      "items": { "type": "string", "format": "uri" }
     },
-    "density": { "type": "string", "enum": ["compact", "normal", "roomy"] },
-    "colors": {
+    "tokensPath": { "type": "string" },
+    "thresholdBudgets": {
       "type": "object",
       "properties": {
-        "canvas": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
-        "surface": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
-        "primary": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
-        "accent": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
-        "border": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" }
+        "clsMaxLimit": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.1 },
+        "overflowPixelTolerance": { "type": "integer", "minimum": 0, "default": 2 },
+        "touchTargetMinSpacingPx": { "type": "integer", "minimum": 0, "default": 24 }
       },
-      "required": ["canvas", "surface", "primary", "accent", "border"],
-      "additionalProperties": false
+      "required": ["clsMaxLimit", "overflowPixelTolerance", "touchTargetMinSpacingPx"]
     },
-    "typography": {
-      "type": "object",
-      "properties": {
-        "baseFamily": { "type": "string" },
-        "headingFamily": { "type": "string" },
-        "scale": { "type": "string", "enum": ["minor-third", "perfect-fourth", "golden-ratio"] }
-      },
-      "required": ["baseFamily", "headingFamily", "scale"],
-      "additionalProperties": false
-    },
-    "geometry": {
-      "type": "object",
-      "properties": {
-        "radiusBase": { "type": "string" },
-        "borderWidthBase": { "type": "string" },
-        "shadowBase": { "type": "string" }
-      },
-      "required": ["radiusBase", "borderWidthBase", "shadowBase"],
-      "additionalProperties": false
+    "viewports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "width": { "type": "integer", "minimum": 320 },
+          "height": { "type": "integer", "minimum": 480 }
+        },
+        "required": ["name", "width", "height"]
+      }
     }
   },
-  "required": ["matrixConstraints", "density", "colors", "typography", "geometry"],
-  "additionalProperties": false
+  "required": ["targetUrls", "tokensPath", "thresholdBudgets", "viewports"]
 }
 ```
+
+---
+
 ## 4. Interface, API, & Pipeline Exit Contracts
 
-### 4.1 Interchangeable Browser Telemetry Driver contract
+### 4.1 Headless Browser Automation Contract
 * **Path:** `src/interfaces/browser.ts`
 
 ```typescript
@@ -238,39 +190,12 @@ export interface IComputedContrastPair {
 }
 
 export interface IHeadlessBrowserDriver {
-  /**
-   * Spawns the underlying un-networked browser thread instance.
-   */
   init(headless: boolean): Promise<void>;
-
-  /**
-   * Mounts a local component or viewport directory URL into window spaces.
-   */
   loadLocalUrl(url: string): Promise<void>;
-
-  /**
-   * Inject high-length string fuzzing variables directly into the document context.
-   */
   injectTextFuzzing(selector: string, longString: string): Promise<void>;
-
-  /**
-   * Progressively modifies local component padding properties.
-   */
   injectPaddingFuzzing(selector: string, paddingPx: number): Promise<void>;
-
-  /**
-   * Measures running layout elements via native bounding clients.
-   */
   measureBoundingRects(childSelector: string, parentSelector: string): Promise<IElementGeometryNode>;
-
-  /**
-   * Walks text nodes to check foreground and opaque background color rendering parameters.
-   */
   inspectDOMRenderedContrast(): Promise<IComputedContrastPair[]>;
-
-  /**
-   * Terminate open runner processing buckets securely to prevent resource leakage.
-   */
   terminate(): Promise<void>;
 }
 ```
@@ -284,14 +209,10 @@ export interface ILayoutViolation {
   violationType: 'overflow' | 'clipping' | 'contrast_drop' | 'wrapping_overlap';
   offendingSelectorPath: string;
   measuredLeakPixels: number;
-  reremediationAdvice: string;
+  remediationAdvice: string;
 }
 
 export interface IFuzzDiagnosticReporter {
-  /**
-   * Receives violation arrays from browser monitors, maps parameters to the console
-   * via clean typographic symbols, and triggers POSIX code 2 exit overrides.
-   */
   emitDiagnosticReport(violations: ILayoutViolation[]): void;
 }
 ```
@@ -301,7 +222,7 @@ export interface IFuzzDiagnosticReporter {
 ## 5. Technical Environment Boundaries
 
 ### 5.1 System POSIX Exit Code Specifications
-All CLI processing scripts pass exact exit diagnostics back to hosting continuous integration or shell environment runtimes:
-*   `0`: Operational Success (All telemetry parameters, relative contrast balances, and ledger states hold perfect alignment).
-*   `1`: General Operational Crash (Syntax error occurrences, invalid design tokens catalog schema configurations, or WCAG accessibility contrast drop failures).
-*   `2`: Adversarial Execution Break (Playwright telemetry calculations discover container breaches, content clipping, or layout grid collapse).
+All CLI engines return clean, non-ambiguous process diagnostics instantly to shell environments:
+*   `0`: Success (All browser bounds, pixel metrics, and state ledger logs are valid).
+*   `1`: Failure (Contrast failures below 4.5:1 ratio, bad code files, or SHA-256 checksum drifts).
+*   `2`: Structural Break (Headless Playwright monitor detects elements breaching grid encapsulation boundaries).

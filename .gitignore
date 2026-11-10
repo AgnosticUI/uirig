@@ -13,3 +13,7 @@ build/
 .vscode/
 .idea/
 *.log
+
+# uirig Project Transition Overhead
+README.OLD.md
+docs_old/

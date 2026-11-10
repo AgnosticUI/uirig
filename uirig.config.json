@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org",
+  "targetUrls": [
+    "http://localhost:3000",
+    "http://localhost:3000/dashboard"
+  ],
+  "tokensPath": "./config/default_tokens.json",
+  "thresholdBudgets": {
+    "clsMaxLimit": 0.1,
+    "overflowPixelTolerance": 2,
+    "touchTargetMinSpacingPx": 24
+  },
+  "viewports": [
+    {
+      "name": "mobile",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "name": "tablet",
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    }
+  ]
+}
