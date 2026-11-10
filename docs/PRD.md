@@ -31,8 +31,8 @@ Everything runs locally on the user's filesystem with zero required cloud servic
 | Persona Name | Economic Reality | Core Tool Interaction |
 | :--- | :--- | :--- |
 | **The Enterprise Sovereign** | Unlimited token budget; corporate infrastructure access. | Uses `uirig` fully automated inside CLI agent loops (e.g., automated scripts running Claude Code or Cursor tools via `--agent` flags). |
-| **The Metered Pragmatist** | \$20/month subscription cap. Constantly managing mid-week token exhaustion or throttles. | Uses `uirig` locally to prune context, compress layouts, and strip fluff *before* piping streams to paid APIs. |
-| **The Free-Tier Alchemist** | \$0 AI budget. Cobbles free web tabs (Google AI Studio, ChatGPT free, Grok) via browser copy-paste. | Uses `uirig` entirely in `--local-only` mode to generate ultra-dense, text-based project maps and clipboard injection bundles. |
+| **The Metered Pragmatist** | $20/month subscription cap. Constantly managing mid-week token exhaustion or throttles. | Uses `uirig` locally to prune context, compress layouts, and strip fluff *before* piping streams to paid APIs. |
+| **The Free-Tier Alchemist** | $0 AI budget. Cobbles free web tabs (Google AI Studio, ChatGPT free, Grok) via browser copy-paste. | Uses `uirig` entirely in `--local-only` mode to generate ultra-dense, text-based project maps and clipboard injection bundles. |
 
 > **Development Mandate:** The `uirig` runtime and tooling matrix must remain entirely compilable and verifiable using only the free resources available to **The Free-Tier Alchemist**. The core toolchain requires zero paid runtime dependencies; local testing relies strictly on offline template synthesis, deterministic structural validation, and structured prompt generation templates.
 

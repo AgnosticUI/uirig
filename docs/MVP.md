@@ -10,15 +10,15 @@ To deliver immediate end-to-end value with zero framework lock-in, the MVP imple
                   [uirig MVP Stage-Gate Pipeline]
                   
                  1. INITIALIZATION & LEDGER MANAGEMENT
-                           \$ uirig init
+                           $ uirig init
                                  │
                                  ▼
                  2. CONTINUOUS WORKSPACE RUNTIME MONITOR
-                           \$ uirig dev
+                           $ uirig dev
                                  │
                                  ▼
                  3. DESIGN TOKEN PARITY CONTROLLER
-                           \$ uirig paint --tokens config/default_tokens.json
+                           $ uirig paint --tokens config/default_tokens.json
                                  │
                                  ▼
                  4. STATE RECONCILIATION & TIME-TRAVEL
@@ -26,14 +26,14 @@ To deliver immediate end-to-end value with zero framework lock-in, the MVP imple
                                  │
                                  ▼
                  5. ADVERSARIAL HEADLESS LAYOUT FUZZING
-                           \$ uirig break --target component.html --fix
+                           $ uirig break --target component.html --fix
                                  │
                                  ├──► [adversary.ts] runs Playwright rect telemetry via Web APIs
                                  └───► [healer.ts] updates file line strings via data-uirig-id
                                  │
                                  ▼
                  6. CONTEXT COMPRESSION & EXPORT
-                           \$ uirig pack --target component.html
+                           $ uirig pack --target component.html
 ```
 
 ---

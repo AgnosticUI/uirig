@@ -107,7 +107,7 @@ Tracks execution checkpoints and handles chronological snapshot history state ma
 
 ```json
 {
-  "\$schema": "http://json-schema.org",
+  "$schema": "http://json-schema.org",
   "title": "uirigSessionManifest",
   "type": "object",
   "properties": {
@@ -130,7 +130,7 @@ Tracks execution checkpoints and handles chronological snapshot history state ma
           "command": { "type": "string" },
           "variantName": { "type": "string" },
           "filePointer": { "type": "string" },
-          "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}\$" },
+          "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "timestamp": { "type": "string", "format": "date-time" },
           "status": { "type": "string", "enum": ["stable", "active", "drifting"] }
         },
@@ -147,7 +147,7 @@ The central style configuration definition file managing theme variables.
 
 ```json
 {
-  "\$schema": "http://json-schema.org",
+  "$schema": "http://json-schema.org",
   "title": "RelationalTokenMatrixDefinition",
   "type": "object",
   "properties": {
@@ -162,10 +162,10 @@ The central style configuration definition file managing theme variables.
     "colors": {
       "type": "object",
       "properties": {
-        "canvas": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
-        "surface": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
-        "primary": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" },
-        "accent": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})\$" }
+        "canvas": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})$" },
+        "surface": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})$" },
+        "primary": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})$" },
+        "accent": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})$" }
       },
       "required": ["canvas", "surface", "primary", "accent"]
     }

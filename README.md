@@ -231,8 +231,8 @@ uirig checkout 1
 `uirig` considers computational resource profiles and context limits as critical front-end compilation constraints, offering native strategies across 3 economic tiers:
 
 *   **The Enterprise Sovereign (`--agent`):** Uncapped token resources. Integrates `uirig` automated workflows into autonomous CLI agents (e.g., Cursor or Claude Code) via execution flags.
-*   **The Metered Pragmatist (`--api`):** Standard subscription limits (\$20/month caps). Leverages `uirig pack` to lexically compress template assets locally, eliminating prompt overhead before streams run through paid commercial APIs.
-*   **The Free-Tier Alchemist (`--local-only`):** \$0 AI budget. Runs `uirig handoff` locally to generate ultra-dense prompt portability blocks, completely avoiding progressive context degradation across free browser tabs.
+*   **The Metered Pragmatist (`--api`):** Standard subscription limits ($20/month caps). Leverages `uirig pack` to lexically compress template assets locally, eliminating prompt overhead before streams run through paid commercial APIs.
+*   **The Free-Tier Alchemist (`--local-only`):** $0 AI budget. Runs `uirig handoff` locally to generate ultra-dense prompt portability blocks, completely avoiding progressive context degradation across free browser tabs.
 
 ---
 
