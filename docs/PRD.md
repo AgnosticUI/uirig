@@ -1,23 +1,26 @@
 # Product Requirement Document (PRD)
 
 ## Project: `uirig`
-### Subtitle: The Composable Unix Pipeline for Token-Aware AI Design Engineering
-**Status:** Approved | **Target:** 100k GitHub Stars Open-Source Launch
+### Subtitle: A Deterministic Stage-Gate Compiler and Layout Fuzzing Rig for Safe, Accessible, Unbreakable UI
+**Status:** Approved | **Target:** Open-Source Release
 
 ---
 
 ## 1. Executive Summary & Core Philosophy
 
 ### 1.1 The Problem
-Current AI design generation toolchains are monolithic, fragile, and bound to an archaic "one-shot" paradigm. Passing massive instructions or multi-thousand-line global design sheets to an LLM context window simultaneously forces it to approximate document structure, styling, accessibility, and edge-case resilience all at once. This results in **AI Slop**—visually uninspired layouts that instantly collapse under real-world production stress (e.g., text reflow overflows, non-semantic DOM trees, layout collisions, broken event listeners, or missing native keyboard focus states).
+Current AI design workflows rely on a fragile "one-shot" paradigm. Asking an LLM to simultaneously invent layout structure, apply design tokens, maintain accessibility contrast, and anticipate edge-case text overflow inside a single prompt produces **AI Slop**: interfaces that look passable in a demo screenshot but break under real production conditions. Teams suffer from silent logic regressions during restyling, inaccessible low-contrast text, clipped layouts under real data, overwritten manual IDE edits, and zero automated guardrails in CI/CD.
 
 ### 1.2 The Solution
-`uirig` breaks down the front-end layout engineering process into a deterministic sequence of single-purpose steps, directly honoring the **Unix Tools Philosophy**:
-1. **Do One Thing and Do It Well (DOTADIW):** Isolate structural layout architecture completely from aesthetic visual skinning.
-2. **Universal Interface:** Rely on plain-text streams (Semantic HTML/JSX structures and structured JSON tokens).
-3. **Composability:** Pipe the immutable output of a structural wireframe generation directly into token paint operations, followed by automated web-first hardening loops.
+`uirig` turns AI front-end generation into a deterministic, multi-stage local CLI compiler inspired by **Unix modularity** and **`git`-style state management**, delivering five concrete outcomes:
 
-`uirig` addresses the massive cognitive load of managing these iterative passes by hosting a localized **Session State Director** that handles state tracking, time-travel history rollbacks, and text-based token optimization natively on the user's filesystem—democratizing elite design engineering for everyone from enterprise professionals to resource-strapped indie hackers.
+1. **Visual Safety & Confidence:** Syntax-safe AST token injection (`uirig paint`) updates visual styles without risking broken JSX or altered component logic.
+2. **Compliance & Broader Usability:** Compile-time WCAG 4.5:1 luminance gates (`uirig contrast`) ensure every shipped screen is legible to more users while lowering accessibility compliance and legal risk.
+3. **Stress-Tested, Unbreakable Resilience:** Headless Playwright overflow fuzzing and automated patching (`uirig break --fix`) mitigate production risk by catching and healing layout breaks under +30% text expansion and 200% zoom.
+4. **Faster, Safer Developer Experience (DX):** A local **Session State Director** (`.uirig/session.json`) protects manual IDE changes via SHA-256 checksums, enables instant snapshot rollbacks (`uirig checkout`), and compresses context packs (`uirig pack`) for faster iteration across any AI budget tier.
+5. **Automated CI/CD Enforcement:** Fast headless execution and strict POSIX exit codes (`0`, `1`, `2`) let teams drop `uirig` directly into pull-request pipelines to block regressions before merge.
+
+Everything runs locally on the user's filesystem with zero required cloud services, making deterministic design engineering practical for enterprise teams and resource-strapped indie hackers alike.
 
 ---
 
@@ -55,6 +58,7 @@ Current AI design generation toolchains are monolithic, fragile, and bound to an
  
  ::: Dev Orchestration, Workspace, & Session Lifecycle
  ::: uirig init           ==>  Scaffolds workspace pathing and initializes session tracker ledger
+ ::: uirig dev            ==>  Starts continuous hot-reload watcher and local WebSocket canvas
  ::: uirig manifest       ==>  Compiles a clean project file tree map blocking system blackholes
  ::: uirig session:sync   ==>  Captures out-of-band developer optimizations via SHA-256 byte-hash
  ::: uirig checkout       ==>  Forcefully rewinds local files back to a pristine snapshot step
@@ -67,7 +71,7 @@ Current AI design generation toolchains are monolithic, fragile, and bound to an
 ### 3.1 Non-Emoji Visual Anchor Language
 To project a professional toolchain aesthetic, `uirig` explicitly and completely bans standard graphical emojis from terminal outputs. It uses strict typographic character structures to retain scannability:
 * `::: ` - System State Boundaries / Invariant Markers
-* `==> ` - Piping Operations / Successful Transformations
+* `==> ` - Stage Transformations / Successful Passes
 * `[+] ` - Injected Node / Appended Class Modifier
 * `[!] ` - System Warnings / Adversarial Stress Failures
 * `_ \ | /` - Multi-frame text rotation spinner indicators for background processing.
@@ -129,18 +133,23 @@ To project a professional toolchain aesthetic, `uirig` explicitly and completely
 * **Description:** Scaffolds the workspace directory paths, layout baselines, template mounting targets, and initializes the `.uirig/session.json` state tracking ledger.
 * **Output Artifact:** Standardized `.uirig/` structural workspace ecosystem directory.
 
-#### 4.3.2 `uirig manifest`
+#### 4.3.2 `uirig dev`
+* **Description:** Instantiates the continuous workspace live orchestrator, watching layout components and design token files for changes and broadcasting live hot-reload updates over local WebSockets.
+* **Input Parameters:** `--port` (integer, optional).
+* **Output Artifact:** Establishes real-time background compilation logs and local WebSocket synchronization channels.
+
+#### 4.3.3 `uirig manifest`
 * **Description:** Compiles a full project file tree map while cleanly filtering out system blackholes (`node_modules/`, `.git/`, `dist/`).
 * **Output Artifact:** Updated file indexing schema maps.
 
-#### 4.3.3 `uirig session:sync`
+#### 4.3.4 `uirig session:sync`
 * **Description:** Forces an immediate reconciliation loop between the local developer filesystem and the session ledger, computing current SHA-256 hashes to absorb out-of-band manual IDE changes cleanly.
 * **Input Parameters:** None.
 * **In-Memory Transformation:** Reads the working directory code files, generates an active SHA-256 byte-hash, compares it against the last state journaled in `.uirig/session.json`, and updates the current historical sequence block to `status: stable` without incrementing the step counter.
 * **Output Artifact:** Updates `.uirig/session.json` state inline.
 * **Failure Matrix:** Throws exit code `1` if the current files contain catastrophic structural syntax parsing errors (e.g., unclosed tags, invalid JSX) that prevent standard DOM/AST compilation.
 
-#### 4.3.4 `uirig checkout <step>`
+#### 4.3.5 `uirig checkout <step>`
 * **Description:** Performs a local workspace chronological rollback or roll-forward to restore files to a pristine historical file state snapshot.
 * **Input Parameters:** `step` (integer target matching a recorded step index or string alias like `step-1`).
 * **In-Memory Transformation:** Locates the specified step array item within the local ledger, validates its recorded file checksum against the immutable snapshot artifact cache stored inside `.uirig/snapshots/`, and overwrites the active project working file pointer.
@@ -192,7 +201,8 @@ The QA tools suite (`break`, `bleed`, `flex`) uses localized, sandboxed browser 
 ## 6. Execution Lifecycle Scenarios
 
 ### 6.1 Standard Workflow Sequence
-The following chronological terminal sequence highlights how the 14 core tools combine to handle layout generation, code hardening, and context-aware external handoffs without suffering from architectural design degradation:
+The following chronological terminal sequence highlights how the 15 core tools combine to handle layout generation, code hardening, and context-aware external handoffs without suffering from architectural design degradation:
+
 
 ```bash
 # Step 1: Initialize local workspace boundaries
@@ -387,18 +397,18 @@ To protect a developer's manual IDE optimizations from being overwritten during 
 
 ## 13. Community Viral Growth Strategy
 
-To hit **100k GitHub stars within 2 weeks of release**, `uirig` addresses these core demand vectors directly:
+To build strong open-source adoption upon release, `uirig` addresses these core demand vectors directly:
 
 1. **Zero-Lock-In Exit Strategy:** The presence of `uirig handoff` means the tool openly advertises itself as a launchpad. It explicitly encourages users to take their clean, packed context capsules out to Cursor, Claude Code, or browser tabs whenever they want, building massive open-source goodwill.
 2. **Aggressive Financial Accessibility:** The README leads with a proud manifesto: *"Built for Enterprise Sovereigns, Metered Pragmatists, and Free-Tier Alchemists alike. Zero token waste. 100% functional with raw clipboard copy-pasting via local context encapsulation."*
-3. **The Developer Pride Factor:** By framing UI generation through the lenses of compilers, linters, and classic Unix pipelines (`uirig layout "intent" | uirig paint --shuffle | uirig trace`), it elevates the vibe coding lifestyle into a respected, high-discipline software engineering methodology.
+3. **The Developer Pride Factor:** By framing UI generation through the lenses of compilers, linters, and stage-gate verification (`uirig layout` -> `uirig paint --shuffle` -> `uirig break --fix`), it elevates AI-assisted front-end work into a high-discipline software engineering methodology.
 
 ### 13.1 The Universal Boundary Tool Persona Matrix
 `uirig` unifies completely different personas across the AI design engineering spectrum by delivering specific, role-targeted value:
 
-*   **📐 Design & UI Engineers / Technologists:** Gains deterministic layout architecture enforcement and type-safe linting primitives (`uirig contrast`, `trace`, `blueprint`) to replace fragile visual regression suites inside team workflows.
-*   **📋 Technical PMs & Technical Designers:** Protects visual product governance. Allows instant iteration across fluid design tokens, dark/light themes, and layout densities (`uirig paint --shuffle`) over an invariant, production-safe frame.
-*   **🔮 Vibe Coders & AI Builders:** Eliminates repetitive engineering loops by trapping and auto-healing browser clipping anomalies (`uirig break`, `bleed`, `flex`) locally before pushing broken layouts into live production tracking code.
+* **[Design & UI Engineers / Technologists]:** Gains deterministic layout architecture enforcement and type-safe linting primitives (`uirig contrast`, `trace`, `blueprint`) to replace fragile visual regression suites inside team workflows.
+* **[Technical PMs & Technical Designers]:** Protects visual product governance. Allows instant iteration across fluid design tokens, dark/light themes, and layout densities (`uirig paint --shuffle`) over an invariant, production-safe frame.
+* **[Vibe Coders & AI Builders]:** Eliminates repetitive engineering loops by trapping and auto-healing browser clipping anomalies (`uirig break`, `bleed`, `flex`) locally before pushing broken layouts into live production tracking code.
 
 ### 13.2 The Ultimate CI/CD Plug-and-Play Footprint
 By maintaining a strict **150ms unit execution budget**, `uirig` functions as an invisible visual gatekeeper sitting directly beside Playwright workflows inside GitHub Actions runners to strip out layout regressions flawlessly without inflating infrastructure SaaS budgets:

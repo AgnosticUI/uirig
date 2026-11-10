@@ -1,36 +1,39 @@
 # uirig
 
-### Invariant Semantic Structure meets Composable Style Vectors.
+**Ship AI-generated UI with confidence: visually safe, accessible, stress-tested, and CI/CD ready.**
 
-`uirig` is a modular command-line toolchain built explicitly to destroy **AI Slop**—those fragile, bloated interfaces generated in a single prompt turn that collapse the second real text overflows, layout viewports scale, or input containers are dynamically populated.
+AI-generated interfaces look great with placeholder text until you ask a model to tweak a theme (and it breaks your component logic), load a long username (and your layout overflows), or check accessibility (and half your text fails contrast).
 
-By adapting the **Unix Tools Philosophy** directly to AI-driven front-end engineering, `uirig` splits the structural architecture from the visual skin. It allows you to pipe unstyled layout logic into variant token systems, run local adversarial fuzz tests to harden code resilience, and bundle clean context environments regardless of your AI platform tier.
+`uirig` is a local CLI workbench that wraps AI-assisted React + Tailwind development in deterministic engineering guardrails. Instead of re-prompting an LLM and hoping nothing breaks, `uirig` compiles, verifies, and hardens your UI in isolated, reversible stages:
+
+* **Visual safety & confidence (`uirig paint`):** Restyle colors, spacing, and tokens through syntax-safe AST mutations, never risking broken JSX or lost component logic.
+* **Accessibility compliance & broader reach (`uirig contrast`):** Enforce WCAG 4.5:1 contrast math at compile time to improve usability, serve more users, and reduce compliance and legal risk.
+* **Stress-tested, unbreakable layouts (`uirig break --fix`):** Mitigate production risk by fuzzing components in a headless browser with +30% longer text and 200% zoom, then auto-patching overflows so your UI stays rock solid.
+* **Faster, safer DX (`uirig session:sync` / `checkout` / `pack`):** Move fast without losing manual IDE edits thanks to SHA-256 drift checks, one-command snapshot rollbacks, and up to 75% smaller context packs.
+* **Drop-in CI/CD quality gates:** Returns standard POSIX exit codes (`0`, `1`, `2`) in milliseconds so you can block contrast failures and layout regressions on every pull request in GitHub Actions.
 
 ```text
-       [Prompt Intent]
-              │
-              ▼
-   :::   uirig layout     ==>  [01_layout.html] (Grayscale, Rigid DOM Tree Grid Core)
-              │
-              ▼
-   :::   uirig paint      ==>  [02_painted.html] (Token-Injected Skin, Contrast Locked)
-              │
-              ▼
-   :::   uirig break      ==>  [03_hardened.html] (Defensive DOM Overflows Sealed)
-              │
-              ▼
-   :::   uirig handoff    ==>  [.uirig/copy_paste_pack.md] (Context Capsule Proxy)
+       [Unstyled Structure]
+                │
+                ▼
+   :::   uirig paint      ==>  [02_painted.tsx]  (Visual Safety: AST Styling + WCAG 4.5:1)
+                │
+                ▼
+   :::   uirig break      ==>  [03_hardened.tsx] (Stress-Tested: Overflow Fuzzing + Auto-Heal)
+                │
+                ▼
+   :::   uirig pack       ==>  [stdout / clip]   (Faster DX: Token-Compressed Context Capsule)
 ```
 
 ---
 
 ## 1. Core Philosophy
 
-`uirig` breaks down the front-end layout engineering process into a deterministic sequence of single-purpose steps, directly honoring the **Unix Tools Philosophy**:
+`uirig` replaces fragile, one-shot AI prompting with a deterministic, `git`-style stage-gate workflow built on three principles:
 
-1. **Do One Thing and Do It Well (DOTADIW):** Isolate structural layout architecture completely from aesthetic visual skinning.
-2. **Universal Interface:** Rely on plain-text streams (Semantic HTML/JSX structures and structured JSON tokens).
-3. **Composability:** Pipe the immutable output of a structural wireframe generation directly into token paint operations, followed by automated web-first hardening loops.
+1. **Single-Responsibility Passes (DOTADIW):** Separate structural layout from AST token styling (`paint`), accessibility compliance (`contrast`), and browser stress-testing (`break`).
+2. **Plain-Text Artifact Sovereignty:** Every stage reads and writes standard, version-controllable plain-text files (`.tsx`, `.html`, `.json`, `.md`) without proprietary formats or cloud lock-in.
+3. **Deterministic Stage Gates:** Each command validates and transforms a verified snapshot from Stage N into Stage N+1, governed by a local ledger (`.uirig/session.json`) with SHA-256 manual-edit protection, instant rollbacks, and CI/CD exit codes.
 
 ---
 
