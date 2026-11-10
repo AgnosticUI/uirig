@@ -1,15 +1,16 @@
 ================================================================================
           uirig : Chronological Session Continuity Bridge Capsule              
 ================================================================================
- TIMESTAMP BASELINE : 2026-11-09T19:25:00-06:00 (Nov 9, 2026 CST)
+ TIMESTAMP BASELINE : 2026-11-09T19:43:00-06:00 (Nov 9, 2026 CST)
  ACTIVE WORKSPACE   : Root Configuration Setup Boundaries (package.json)
  PREVIOUS SNAPSHOT  : Renamed project from uipipe to uirig, updated GitHub
                       remote (AgnosticUI/uirig), aligned all docs around the
-                      git-style stage-gate compiler model and 5 core value
-                      pillars (visual safety, WCAG compliance, stress-tested
-                      resilience, faster/safer DX, and CI/CD exit gates), and
-                      tagged all (MVP) tasks for the 7-tool Phase 1 core
-                      (init, dev, paint, break, pack, checkout, session:sync).
+                      git-style stage-gate compiler model, 5 core value pillars
+                      (visual safety, WCAG compliance, stress-tested resilience,
+                      faster/safer DX, and CI/CD exit gates), tagged all (MVP)
+                      tasks for the 7-tool Phase 1 core, and locked in flat
+                      token file support + Playwright getComputedStyle() WCAG
+                      contrast gating during uirig paint.
  METRIC HASH GAIN   : Phase 1 Documentation Complete [Ready for Phase 2 Build]
 
 --- BOOTSTRAP CONTEXT REQUIREMENT CHANNELS ---

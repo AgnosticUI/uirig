@@ -47,14 +47,14 @@ To prevent configuration scope creep while delivering immediate end-to-end value
 * **Description:** Scaffolds the localized workspace directory path, drops the baseline design token configuration, and initializes the local `session.json` state log ledger.
 * **Output Artifact:** Generates `.uirig/`, `.uirig/snapshots/`, `.uirig/session.json`, and `config/default_tokens.json`.
 
-### 2.2 `uirig paint` (The Token-to-AST Core)
-* **Description:** Fuses an unstyled React/JSX component file with a design system token configuration using a native Rust-bound syntax tree loop to mutate visual properties without touching component logic.
+### 2.2 `uirig paint` (The Token-to-AST & Rendered Contrast Core)
+* **Description:** Fuses a React/JSX component file with a flat design system token configuration (`--tokens config/default_tokens.json`) via Rust-bound AST mutations, then verifies real rendered contrast in Playwright before finalizing the build.
 * **In-Memory Transformation:** 
-  1. Computes a SHA-256 byte-hash of the input layout file to verify it matches the ledger history.
-  2. Runs incoming colors through `matrix.ts` to enforce a **4.5:1 WCAG relative luminance contrast minimum**. If a pair fails, execution halts immediately with exit code `1`.
-  3. Routes the JSX markup string into **`oxc-parser`** to generate an ESTree-compliant Abstract Syntax Tree graph in memory. 
-  4. Traverses `JSXOpeningElement` nodes and mutates `JSXAttribute` objects to swap design system tokens cleanly.
-* **Output Artifact:** Emits a compiled, styled React component file alongside a static HTML snapshot (`.uirig/snapshots/02_painted.html`) for downstream headless testing.
+  1. **SIRP Check (`session.ts`):** Computes a SHA-256 byte-hash of the input component to verify it matches the ledger history.
+  2. **AST Token Injection (`compiler.ts` + `oxc-parser`):** Parses the JSX into an ESTree AST, mutates `JSXAttribute` nodes cleanly without touching component logic, and emits `[!]` warnings for any referenced token keys missing from `--tokens`.
+  3. **Rendered DOM Contrast Gate (`adversary.ts` + `matrix.ts`):** Mounts the painted HTML snapshot (`.uirig/snapshots/02_painted.html`) in headless Playwright, walks visible text elements via `window.getComputedStyle()`, resolves each element's effective non-transparent ancestor background, and runs WCAG 4.5:1 luminance math on every foreground/background pair. If any element fails 4.5:1, execution halts with a hard error (POSIX exit code `1`) and prints the failing selector.
+* **Output Artifact:** Emits the styled React component file and verified `.uirig/snapshots/02_painted.html` snapshot on pass, or exits with code `1` on contrast failure.
+
 
 ### 2.3 `uirig break` (The Adversarial Fuzzing Rig)
 * **Description:** A local layout linter and CI/CD gate that launches an isolated browser thread to evaluate layout durability under real-world text expansion and zoom constraints.

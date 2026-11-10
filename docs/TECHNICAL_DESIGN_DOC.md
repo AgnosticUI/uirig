@@ -109,11 +109,11 @@ When a transaction or filesystem mutation event runs through the toolchain, exec
 1. **The Structural Token Stream (Layout & Blueprint Phase):**
    The prompt string or layout matrix payload is handled by the entry router and passed down to `src/core/compiler.ts`. The blueprint engine assembles a pure, unstyled layout array. This array represents raw semantic DOM nodes containing layout constraints but absolutely zero visual embellishments. In-memory, this is held as a flat UTF-8 encoded string buffer containing structural primitive layouts (e.g., standard CSS Grid and Flexbox container utility frames). Fallback layout anchor indices are injected into elements to serve as targets for downstream compiler steps.
 
-2. **The Dual-Engine Tree Graph Synthesis (Paint, Contrast, & Trace Phase):**
+2. **The Dual-Engine Tree Graph Synthesis & Rendered Contrast Gate (Paint, Contrast, & Trace Phase):**
    Upon entry, `src/core/session.ts` runs a SHA-256 byte-hash computation against the targeted layout file to verify it hasn't drifted from the state log tracking ledger. If validated, the compiler core branches execution based on the active ecosystem profile:
-   * **PostHTML Core (`html-tailwind`):** The raw HTML string buffer is compiled into a virtual tree node graph using a strict PostHTML plugin array interface. The algorithm traverses the tree, matches the injected layout anchor indices, maps target node attributes, and fuses style variables directly out of `config/default_tokens.json`.
-   * **Oxc ESTree Core (`react-tailwindcss`):** The JSX/TSX string buffer is processed by `oxc-parser` using low-overhead native bindings. It bypasses heavy JavaScript runtimes and instantly generates a standard ESTree-compliant Abstract Syntax Tree object graph in Node memory. The `src/core/adapters/jsx.ts` module traverses this syntax graph, identifies hybrid tag expressions, and directly mutates `JSXAttribute` node objects to swap raw design properties without risk of string interpolation corruption.
-   Before the tree is stringified back to storage, the `src/core/matrix.ts` layer runs relative luminance computations on proposed color tokens, ensuring a mathematical minimum 4.5:1 text-to-background contrast ratio is held.
+   * **PostHTML Core (`html-tailwind`):** Compiles raw HTML into a virtual tree node graph, matches layout anchor indices, and maps style variables out of `--tokens` (`config/default_tokens.json`), logging `[!]` warnings if referenced token keys are missing.
+   * **Oxc ESTree Core (`react-tailwindcss`):** Processes JSX/TSX via `oxc-parser` to generate an ESTree-compliant AST in Node memory. `src/core/adapters/jsx.ts` traverses `JSXOpeningElement` nodes and mutates `JSXAttribute` objects directly without risking expression or logic corruption.
+   * **Rendered Computed-Style Contrast Gate (`matrix.ts` + `adversary.ts`):** Rather than forcing rigid `{ bg, fg }` nesting in user token files, `paint` renders the compiled snapshot in headless Playwright, inspects every visible text node via `window.getComputedStyle(el)`, resolves its nearest opaque ancestor `backgroundColor`, and enforces a mathematical minimum **4.5:1 WCAG contrast ratio** across the real rendered DOM. Any failing text element triggers a hard error (`ERR_MAT_CONTRAST_FAIL`, exit code `1`).
 
 3. **The Hydrated Headless Playwright Pipeline (Break, Bleed, & Flex Phase):**
    The styled layout component string is loaded into a local headless Playwright browser thread. For framework targets, it is injected directly into a sandboxed mounting canvas (`config/templates/react_canvas.html`) loaded with zero-dependency framework bundles. The adversarial engine triggers a custom, blocking `page.waitForFunction()` hook that loops until client-side state hydration markers are active. Once hydrated, the engine executes targeted tracking text expansions (+30% characters for `break`), incremental step padding modifiers (`bleed`), or dynamic sub-element population arrays (`flex`). Element boundaries are validated via native browser evaluation channels testing node bounding boxes using precise `getBoundingClientRect` metrics. On boundary collapse or container breach, the selector tree path is passed back to `src/core/healer.ts` to execute automated AST structural repair overrides before final compilation strings hit the snapshot cache.
@@ -583,11 +583,23 @@ export interface IElementBoundingBox {
   selectorPath: string;
 }
 
+export interface IComputedTextContrastNode {
+  selectorPath: string;
+  textPreview: string;
+  foregroundRgb: string;
+  effectiveBackgroundRgb: string;
+}
+
 export interface IHeadlessBrowserDriver {
   /**
    * Initializes the underlying serverless browser runner instance.
    */
   init(options: IBrowserDriverLaunchOptions): Promise<void>;
+
+  /**
+   * Walks visible text elements in the rendered DOM and resolves computed foreground and opaque ancestor background colors.
+   */
+  getComputedTextColors(): Promise<IComputedTextContrastNode[]>;
 
   /**
    * Mounts and loads the target compiled layout markup file safely into a local DOM window context.
