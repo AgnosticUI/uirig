@@ -8,7 +8,7 @@ AI-generated interfaces look great with placeholder text until you change a them
 
 * **Framework-Blind Safety (`uirig paint`):** Tweak design palettes, spacing variations, and layouts framework-blindly. By updating simple JSON design token files instead of modifying live source components, you eliminate the risk of syntax corruption.
 * **Rendered Contrast Gates (`uirig contrast`):** Audit color contrast on rendered pixel channels using exact browser computed styles. Enforce WCAG 4.5:1 math at build time to catch illegible text, improve usability, and lower compliance risk.
-* **Stress-Tested Layouts (`uirig break --fix`):** Fuzz components inside an isolated headless Playwright browser with +30% longer text tracking and 200% zoom. Map overflows instantly and auto-patch components on disk via simple metadata-tracking attributes.
+* **Stress-Tested Layouts (`uirig break`):** Fuzz components inside an isolated headless Playwright browser with +30% longer text tracking and 200% zoom. Map overflows instantly and print structured remediation tables to stdout via unique identifier attributes (`data-uirig-id`).
 * **Faster, Safer DX (`uirig session:sync` / `checkout` / `pack`):** Move fast without losing manual IDE edits thanks to SHA-256 ledger drift checks, single-command snapshot rollbacks, and up to 75% smaller context packs.
 * **Drop-in CI/CD Quality Gates:** Returns standard POSIX exit codes (`0`, `1`, `2`) in milliseconds so you can automatically block contrast failures and layout regressions on every pull request in GitHub Actions.
 
@@ -19,7 +19,7 @@ AI-generated interfaces look great with placeholder text until you change a them
    :::   uirig paint      ==>  [tokens.json]   (Visual Safety: Swaps Themes via Disk JSON)
                │
                ▼
-   :::   uirig break      ==>  [Auto-Heal]     (Stress-Tested: Playwright Fuzz + Line Repair)
+   :::   uirig break      ==>  [Diagnostic]    (Stress-Tested: Playwright Fuzz + Stdout Trace)
                │
                ▼
    :::   uirig pack       ==>  [stdout / clip] (Faster DX: Token-Compressed Context Capsule)
@@ -78,11 +78,10 @@ To preserve optimal console clarity across active terminal viewports, `uirig` co
 *   `_ \ | /` Multi-frame background engine spinners
 ---
 
-### 📐 Part 2: Environment Prerequisites and Standard Workflows
-**File Path Target:** `README.md` (Sections 4 through 5)  
+### 📐 Part 2: Environmental Scope & Pipeline Workflows
+**File Path Target:** `README.md` (Sections 4 through 5.2)  
 **Execution Verification Baseline Date:** **November 9, 2026**
 
-```markdown
 ## 4. Installation & Environment Scope
 
 ### Prerequisites
@@ -112,11 +111,11 @@ Inject identification tracking attributes (`data-uirig-id`) into your components
 # 1. Tweak layout palettes or spacing metrics via safe configuration updates
 uirig paint --tokens config/default_tokens.json --shuffle
 
-# 2. Run adversarial browser fuzzing to locate and patch element container overflows
-uirig break --target ./src/components/Card.html --fix
+# 2. Run adversarial browser fuzzing to locate layout container overflows
+uirig break --target ./dist/index.html
 
 # 3. Compress your layout string parameters to prune lower-tier prompt context windows
-uirig pack --target ./src/components/Card.html
+uirig pack --target ./src/components/Card.vue
 ```
 
 ### 5.2 Deep Adversarial Verification and Perimeter QA Testing
@@ -132,15 +131,13 @@ uirig bleed --target ./dist/index.html --steps 12
 # Audit flex rows to verify element wrapping holds against variable sub-element injection arrays
 uirig flex --target ./dist/index.html --count-range "1-24"
 ```
-```
 
 ---
 
-### 📐 Part 3: Command Reference, State Machine, and Manifesto
+### 📐 Part 3: Command Reference, State Machine, & Ecosystem Profiles
 **File Path Target:** `README.md` (Sections 6 through 10)  
 **Execution Verification Baseline Date:** **November 9, 2026**
 
-```markdown
 ## 6. Command Reference Matrix
 
 ### `uirig layout`
@@ -161,8 +158,8 @@ uirig flex --target ./dist/index.html --count-range "1-24"
 *   **Description:** Directly generates empty structural layout placeholder boilerplate models from explicit dimension matrices completely offline.
 
 ### `uirig break`
-*   **Syntax:** `uirig break --target <path> [--fix]`
-*   **Description:** Launches browser testing tabs to append high-length tracking text extensions (+30% characters) and simulate 200% document zooming. `--fix` maps corrective inline attributes onto file line records via matched `data-uirig-id` values.
+*   **Syntax:** `uirig break --target <path>`
+*   **Description:** Launches browser testing tabs to append high-length tracking text extensions (+30% characters), non-breaking user strings, and 200% zooming, outputting exact structural overflow violations to standard stdout channels.
 
 ### `uirig contrast`
 *   **Syntax:** `uirig contrast --target <path>`
@@ -231,8 +228,8 @@ uirig checkout 1
 `uirig` considers computational resource profiles and context limits as critical front-end compilation constraints, offering native strategies across 3 economic tiers:
 
 *   **The Enterprise Sovereign (`--agent`):** Uncapped token resources. Integrates `uirig` automated workflows into autonomous CLI agents (e.g., Cursor or Claude Code) via execution flags.
-*   **The Metered Pragmatist (`--api`):** Standard subscription limits ($20/month caps). Leverages `uirig pack` to lexically compress template assets locally, eliminating prompt overhead before streams run through paid commercial APIs.
-*   **The Free-Tier Alchemist (`--local-only`):** $0 AI budget. Runs `uirig handoff` locally to generate ultra-dense prompt portability blocks, completely avoiding progressive context degradation across free browser tabs.
+*   **The Metered Pragmatist (`--api`):** Standard subscription limits (\$20/month caps). Leverages `uirig pack` to lexically compress template assets locally, eliminating prompt overhead before streams run through paid commercial APIs.
+*   **The Free-Tier Alchemist (`--local-only`):** \$0 AI budget. Runs `uirig handoff` locally to generate ultra-dense prompt portability blocks, completely avoiding progressive context degradation across free browser tabs.
 
 ---
 
