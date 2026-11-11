@@ -6,15 +6,28 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { resolve } from 'path';
 import { existsSync, unlinkSync } from 'fs';
 import { computeStringHash } from '../../src/utils/crypto.js';
-import { executeInitCommand } from '../../src/commands/init.js';
-import { appendSessionStep, readSessionLedger } from '../../src/core/session.js';
+import { atomicWriteFile } from '../../src/utils/fs.js';
+import { appendSessionStep, readSessionLedger, type ISessionManifest } from '../../src/core/session.js';
 
 describe('::: PHASE 2 TASK 2.6: STATE LEDGER & CRYPTO VALIDATION GATES :::', () => {
-  const testLedgerPath = resolve(process.cwd(), '.uirig/session.json');
+  // Use an isolated ledger path so parallel worker threads running init.test.ts never collide
+  const testLedgerPath = resolve(process.cwd(), '.uirig/session.test.json');
 
-  beforeEach(async () => {
+  beforeEach(() => {
     if (existsSync(testLedgerPath)) unlinkSync(testLedgerPath);
-    await executeInitCommand();
+
+    const seedManifest: ISessionManifest = {
+      $schema: 'http://json-schema.org',
+      sessionId: '00000000-0000-4000-8000-000000000001',
+      meta: {
+        platform: process.platform,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      history: [],
+    };
+
+    atomicWriteFile(testLedgerPath, JSON.stringify(seedManifest, null, 2));
   });
 
   afterEach(() => {
@@ -44,10 +57,12 @@ describe('::: PHASE 2 TASK 2.6: STATE LEDGER & CRYPTO VALIDATION GATES :::', () 
     }, testLedgerPath);
 
     expect(updatedLedger.history).toHaveLength(1);
-    expect(updatedLedger.history[0].step).toBe(1);
-    expect(updatedLedger.history[0].checksum).toBe(sampleHash);
+    const [firstEntry] = updatedLedger.history;
+    expect(firstEntry?.step).toBe(1);
+    expect(firstEntry?.checksum).toBe(sampleHash);
 
     const reloaded = readSessionLedger(testLedgerPath);
-    expect(reloaded.history[0].command).toBe('check');
+    const [reloadedEntry] = reloaded.history;
+    expect(reloadedEntry?.command).toBe('check');
   });
 });

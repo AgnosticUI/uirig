@@ -6,6 +6,7 @@
  */
 
 import Color from 'colorjs.io';
+import type { Page } from 'playwright';
 
 /**
  * WCAG 2.1 Level AA minimum contrast ratio required for standard body text.
@@ -27,6 +28,16 @@ export interface IContrastViolation {
   /** Calculated WCAG 2.1 contrast ratio rounded to 2 decimal places (e.g., 2.84). */
   contrastRatio: number;
   /** True if the offending text element resides inside an open ShadowRoot. */
+  inShadowDom: boolean;
+}
+
+/**
+ * Raw foreground and ancestor background layer snapshot extracted from a live text node.
+ */
+export interface IExtractedTextContrastEntry {
+  selector: string;
+  foregroundColor: string;
+  backgroundLayers: string[];
   inShadowDom: boolean;
 }
 
@@ -103,7 +114,6 @@ export function compositeBackgroundStack(backgroundLayers: string[]): Color {
 
   return accumulated;
 }
-
 /**
  * Evaluates a foreground text color against a stack of ancestor background layers,
  * returning an `IContrastViolation` if the WCAG 2.1 contrast ratio is below `minRatio`.
@@ -149,4 +159,161 @@ export function evaluateContrastEntry(params: {
   }
 
   return null;
+}
+
+/**
+ * Crawls a live Playwright Page across Light DOM and open ShadowRoot boundaries,
+ * extracting foreground text colors and ancestor background layer stacks for all
+ * visible elements that render direct text nodes.
+ *
+ * @param page - An active Playwright Page instance loaded with target HTML/URL.
+ * @returns An array of extracted text contrast snapshots ready for `evaluateContrastEntry`.
+ */
+export async function extractTextContrastSnapshots(
+  page: Page
+): Promise<IExtractedTextContrastEntry[]> {
+  console.log('[matrix:crawler] Dispatching shadow-piercing contrast walker into browser sandbox...');
+
+  const snapshots = await page.evaluate((): IExtractedTextContrastEntry[] => {
+    const results: IExtractedTextContrastEntry[] = [];
+
+    const nonVisualTags = new Set([
+      'HTML',
+      'HEAD',
+      'SCRIPT',
+      'STYLE',
+      'META',
+      'LINK',
+      'NOSCRIPT',
+      'TEMPLATE',
+      'SLOT',
+    ]);
+
+    function formatSelector(el: Element): string {
+      const tagName = el.tagName.toLowerCase();
+      if (el.id) {
+        return `${tagName}#${el.id}`;
+      }
+      if (typeof el.className === 'string' && el.className.trim().length > 0) {
+        const classList = el.className.trim().split(/\s+/).join('.');
+        return `${tagName}.${classList}`;
+      }
+      return tagName;
+    }
+
+    // Check if an element directly owns at least one non-whitespace text node
+    function hasDirectVisibleText(el: Element): boolean {
+      for (const child of Array.from(el.childNodes)) {
+        if (child.nodeType === Node.TEXT_NODE && (child.textContent ?? '').trim().length > 0) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // Walk upward from `el` through `parentElement` and `ShadowRoot.host` boundaries,
+    // collecting background colors ordered from outermost ancestor down to `el`.
+    function collectAncestorBackgroundLayers(el: Element): string[] {
+      const bottomUpLayers: string[] = [];
+      let current: Element | null = el;
+
+      while (current) {
+        const bg = window.getComputedStyle(current).backgroundColor;
+        if (bg) {
+          bottomUpLayers.push(bg);
+        }
+
+        if (current.parentElement) {
+          current = current.parentElement;
+        } else {
+          // If we hit the top of a ShadowRoot, jump out to its host Web Component element
+          const rootNode = current.getRootNode();
+          if (rootNode instanceof ShadowRoot) {
+            current = rootNode.host;
+          } else {
+            current = null;
+          }
+        }
+      }
+
+      // Reverse so layers are ordered from outermost backdrop (<html>) to innermost element
+      return bottomUpLayers.reverse();
+    }
+
+    function traverseRoot(
+      root: Document | ShadowRoot,
+      shadowPrefix: string,
+      insideShadow: boolean
+    ): void {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      let currentNode = walker.nextNode() as Element | null;
+
+      while (currentNode) {
+        if (!nonVisualTags.has(currentNode.tagName)) {
+          const computed = window.getComputedStyle(currentNode);
+          const elementLabel = formatSelector(currentNode);
+          const fullSelector = shadowPrefix ? `${shadowPrefix} >> ${elementLabel}` : elementLabel;
+
+          if (
+            computed.display !== 'none' &&
+            computed.visibility !== 'hidden' &&
+            hasDirectVisibleText(currentNode)
+          ) {
+            results.push({
+              selector: fullSelector,
+              foregroundColor: computed.color,
+              backgroundLayers: collectAncestorBackgroundLayers(currentNode),
+              inShadowDom: insideShadow,
+            });
+          }
+
+          // Pierce open ShadowRoot boundaries recursively (`mode: 'closed'` returns null)
+          if (currentNode.shadowRoot) {
+            const nextShadowPrefix = `${fullSelector} >> shadow-root`;
+            traverseRoot(currentNode.shadowRoot, nextShadowPrefix, true);
+          }
+        }
+
+        currentNode = walker.nextNode() as Element | null;
+      }
+    }
+
+    traverseRoot(document, '', false);
+    return results;
+  });
+
+  console.log(`[matrix:crawler] Extracted ${snapshots.length} visible text elements for contrast audit.`);
+  return snapshots;
+}
+
+/**
+ * High-level runtime contrast auditor that crawls a live Playwright Page across Light DOM
+ * and open ShadowRoot boundaries, compositing ancestor backgrounds and flagging any text
+ * pair whose WCAG 2.1 contrast ratio drops below `minRatio` (default 4.5:1).
+ *
+ * @param page - An active Playwright Page instance pointing to the target viewport.
+ * @param minRatio - Optional custom contrast threshold (defaults to WCAG AA 4.5:1).
+ * @returns An array of detected contrast violations across the viewport.
+ */
+export async function auditPageContrast(
+  page: Page,
+  minRatio: number = MIN_WCAG_AA_CONTRAST
+): Promise<IContrastViolation[]> {
+  console.log(`[matrix:audit] Starting rendered luminance contrast audit (threshold: ${minRatio}:1)...`);
+
+  const entries = await extractTextContrastSnapshots(page);
+  const violations: IContrastViolation[] = [];
+
+  for (const entry of entries) {
+    const violation = evaluateContrastEntry({
+      ...entry,
+      minRatio,
+    });
+    if (violation) {
+      violations.push(violation);
+    }
+  }
+
+  console.log(`[matrix:audit] Contrast audit complete. Violations detected: ${violations.length}`);
+  return violations;
 }
