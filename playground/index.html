@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>uirig — AgnosticUI Local Spot-Checking Sandbox</title>
+    <style>
+      /* Base layout bound strictly to AgnosticUI semantic & spacing tokens (light + dark reactive) */
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: var(--ag-space-0);
+        padding: var(--ag-space-6);
+        font-family: system-ui, -apple-system, sans-serif;
+        background-color: var(--ag-background-primary);
+        color: var(--ag-text-primary);
+        transition: background-color var(--ag-motion-medium) ease, color var(--ag-motion-medium) ease;
+      }
+
+      header.sandbox-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--ag-space-4);
+        margin-bottom: var(--ag-space-6);
+        padding-bottom: var(--ag-space-4);
+        border-bottom: var(--ag-border-width-1) solid var(--ag-border);
+      }
+
+      .header-title {
+        margin: var(--ag-space-0);
+        font-size: var(--ag-font-size-xl);
+      }
+
+      .header-subtitle {
+        margin: var(--ag-space-1) var(--ag-space-0) var(--ag-space-0);
+        font-size: var(--ag-font-size-sm);
+        color: var(--ag-text-secondary);
+      }
+
+      #theme-toggle {
+        padding: var(--ag-space-2) var(--ag-space-4);
+        font-size: var(--ag-font-size-sm);
+        border-radius: var(--ag-radius-md);
+        border: var(--ag-border-width-1) solid var(--ag-border);
+        background-color: var(--ag-background-secondary);
+        color: var(--ag-text-primary);
+        cursor: pointer;
+      }
+
+      main.sandbox-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: var(--ag-space-6);
+      }
+
+      .section-heading {
+        margin-top: var(--ag-space-0);
+        margin-bottom: var(--ag-space-4);
+        font-size: var(--ag-font-size-md);
+      }
+
+      .fixture-stack {
+        display: flex;
+        flex-direction: column;
+        gap: var(--ag-space-4);
+        padding: var(--ag-space-4);
+      }
+
+      .card-title {
+        margin: var(--ag-space-0);
+        font-size: var(--ag-font-size-base);
+      }
+
+      .card-body {
+        margin: var(--ag-space-0);
+        font-size: var(--ag-font-size-sm);
+        color: var(--ag-text-secondary);
+      }
+
+      .button-row {
+        display: flex;
+        gap: var(--ag-space-8);
+      }
+
+      /* Deliberate geometric overflow trap: cramped 90px box with visible overflow */
+      #overflow-trap-box {
+        width: 90px;
+        padding: var(--ag-space-2);
+        border: var(--ag-border-width-1) solid var(--ag-border);
+        overflow: visible;
+      }
+
+      #overflow-trap-label {
+        display: inline-block;
+        white-space: nowrap;
+        font-size: var(--ag-font-size-base);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="sandbox-header">
+      <div>
+        <h1 class="header-title">uirig Spot-Checking Sandbox</h1>
+        <p class="header-subtitle">
+          Live AgnosticUI Lit Web Components (Open Shadow DOM) + Adversarial Verification Fixtures
+        </p>
+      </div>
+      <button id="theme-toggle" type="button">
+        Switch to Dark Mode
+      </button>
+    </header>
+    <!-- Dynamic CLS trap mount point: un-sized banner injected post-paint -->
+    <div id="cls-trap-slot"></div>
+
+    <main class="sandbox-grid">
+      <!-- Section 1: Compliant AgnosticUI Baseline Components -->
+      <section aria-labelledby="baseline-heading">
+        <h2 id="baseline-heading" class="section-heading">
+          1. Compliant AgnosticUI Baseline
+        </h2>
+        <ag-card id="baseline-card">
+          <div class="fixture-stack">
+            <h3 class="card-title">Token-Aligned Card</h3>
+            <p class="card-body">
+              This card renders inside an open ShadowRoot using AgnosticUI semantic CSS variables.
+            </p>
+            <ag-input
+              id="baseline-input"
+              label="Workspace Name"
+              placeholder="Enter project slug"
+            ></ag-input>
+            <div class="button-row">
+              <ag-button id="baseline-primary-btn" variant="primary">Save Changes</ag-button>
+              <ag-button id="baseline-secondary-btn">Cancel</ag-button>
+            </div>
+          </div>
+        </ag-card>
+      </section>
+
+      <!-- Section 2: Deliberate Adversarial Traps for uirig Verification -->
+      <section id="adversarial-traps" aria-labelledby="traps-heading">
+        <h2 id="traps-heading" class="section-heading">
+          2. Deliberate Adversarial Traps
+        </h2>
+
+        <!-- Trap A: Token Drift + Low-Contrast Inline Override (< 4.5:1 WCAG AA) -->
+        <div
+          id="contrast-token-trap"
+          style="
+            background-color: #f3f4f6;
+            color: #9ca3af;
+            font-size: 13px;
+            border-radius: 3px;
+            padding: 11px;
+            margin-bottom: var(--ag-space-4);
+          "
+        >
+          Trap A: Off-scale font/padding/radius tokens and low-contrast muted gray text (2.54:1).
+        </div>
+
+        <!-- Trap B: Cramped Parent Container Overflow under +30% Text Expansion -->
+        <div id="overflow-trap-box">
+          <span id="overflow-trap-label">Long Unbreakable Navigation Label</span>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
