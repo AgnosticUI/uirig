@@ -3,10 +3,6 @@
  * End-to-end live spot-check runner executing all 4 core `uirig` validation engines
  * (`crawlPageTokens`, `auditPageContrast`, `runGeometricStressAudit`, `collectPageCls`)
  * against the live Vite + AgnosticUI Lit sandbox in both Light Mode and Dark Mode.
- *
- * Supports both:
- * - Programmatic calls from Vitest (`headless: true`, ephemeral port)
- * - Direct CLI inspection (`node --experimental-strip-types playground/src/spot-check.ts --headed`)
  */
 
 import { chromium, type Browser } from 'playwright';
@@ -33,9 +29,30 @@ import {
 } from '../../src/core/cls.js';
 
 /**
- * Approved token scale matching AgnosticUI's light/dark design tokens (`ag-tokens.css` &
- * `ag-tokens-dark.css`) so compliant components pass while deliberate traps fail.
+ * Lightweight zero-dependency ANSI terminal color palette for crisp visual scanning.
+ * Automatically honors the standard `NO_COLOR` environment variable.
  */
+const ANSI_CODES = {
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+} as const;
+
+type AnsiStyle = keyof typeof ANSI_CODES;
+
+function paint(text: string, ...styles: AnsiStyle[]): string {
+  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== '') {
+    return text;
+  }
+  const prefix = styles.map((s) => ANSI_CODES[s]).join('');
+  return `${prefix}${text}${ANSI_CODES.reset}`;
+}
+
 export const AGNOSTIC_SPOTCHECK_SCALE: ITokenScaleConfig = {
   colors: [
     'rgb(255, 255, 255)',
@@ -74,56 +91,94 @@ export interface ISpotCheckReport {
 }
 
 export interface ISpotCheckRunOptions {
-  /** Launch Chromium in headless mode (default true; pass false for visual inspection). */
   headless?: boolean;
-  /** Optional slow-motion delay in ms between Playwright actions when `--headed` is active. */
   slowMoMs?: number;
-  /** Optional existing server URL (used when Vite dev server is already running). */
   existingUrl?: string;
 }
 
-/**
- * Formats an `ISpotCheckReport` into a crisp, human-readable terminal summary
- * for interactive developer inspection.
- */
 export function formatSpotCheckSummary(report: ISpotCheckReport): string {
+  const formatCountBadge = (count: number): string =>
+    count > 0 ? paint(`${count} FAIL`, 'bold', 'red') : paint('0 PASS', 'bold', 'green');
+
+  const divider = paint(
+    '====================================================================',
+    'cyan'
+  );
+  const title = paint(
+    '  uirig Live 4-Tool Spot-Check Report (AgnosticUI Lit Sandbox)',
+    'bold',
+    'cyan'
+  );
+
   const lines: string[] = [
     '',
-    '====================================================================',
-    '  uirig Live 4-Tool Spot-Check Report (AgnosticUI Lit Sandbox)',
-    '====================================================================',
-    `1. [tokens]   Design Token Violations : ${report.lightMode.tokenViolations.length}`,
+    divider,
+    title,
+    divider,
+    `${paint('1. [tokens]', 'bold', 'magenta')}   Design Token Violations : ${formatCountBadge(
+      report.lightMode.tokenViolations.length
+    )}`,
     ...report.lightMode.tokenViolations.map(
-      (v) => `   - ${v.selector} (${v.property}: ${v.actualValue})${v.inShadowDom ? ' [ShadowDOM]' : ''}`
+      (v) =>
+        `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
+          v.property,
+          'cyan'
+        )}: ${paint(v.actualValue, 'bold', 'red')})${
+          v.inShadowDom ? paint(' [ShadowDOM]', 'magenta') : ''
+        }`
     ),
-    `2. [contrast] Light Mode Violations   : ${report.lightMode.contrastViolations.length}`,
+    `${paint('2. [contrast]', 'bold', 'magenta')} Light Mode Violations   : ${formatCountBadge(
+      report.lightMode.contrastViolations.length
+    )}`,
     ...report.lightMode.contrastViolations.map(
-      (v) => `   - ${v.selector} (${v.contrastRatio}:1 < 4.5:1 | ${v.foregroundRgb} on ${v.backgroundRgb})`
+      (v) =>
+        `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
+          `${v.contrastRatio}:1 < 4.5:1`,
+          'bold',
+          'red'
+        )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'dim')})`
     ),
-    `   [contrast] Dark Mode (${report.darkMode.activeThemeAttr ?? 'none'}) Violations : ${report.darkMode.contrastViolations.length}`,
+    `   ${paint('[contrast]', 'bold', 'magenta')} Dark Mode (${paint(
+      report.darkMode.activeThemeAttr ?? 'none',
+      'cyan'
+    )}) Violations : ${formatCountBadge(report.darkMode.contrastViolations.length)}`,
     ...report.darkMode.contrastViolations.map(
-      (v) => `   - ${v.selector} (${v.contrastRatio}:1 < 4.5:1 | ${v.foregroundRgb} on ${v.backgroundRgb})`
+      (v) =>
+        `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
+          `${v.contrastRatio}:1 < 4.5:1`,
+          'bold',
+          'red'
+        )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'dim')})`
     ),
-    `3. [stress]   Geometric Overflow Hits : ${report.lightMode.stressViolations.length}`,
+    `${paint('3. [stress]', 'bold', 'magenta')}   Geometric Overflow Hits : ${formatCountBadge(
+      report.lightMode.stressViolations.length
+    )}`,
     ...report.lightMode.stressViolations.map(
       (v) =>
-        `   - [${v.violationType}] ${v.selector}${v.relatedSelector ? ` -> ${v.relatedSelector}` : ''} (+${v.measuredLeakPixels}px)`
+        `   ${paint('•', 'red')} [${paint(v.violationType, 'cyan')}] ${paint(
+          v.selector,
+          'yellow'
+        )}${v.relatedSelector ? ` -> ${paint(v.relatedSelector, 'yellow')}` : ''} (${paint(
+          `+${v.measuredLeakPixels}px`,
+          'bold',
+          'red'
+        )})`
     ),
-    `4. [cls]      Max Session CLS Score   : ${report.lightMode.clsEvaluation.maxSessionCls} (budget: 0.1) -> ${
-      report.lightMode.clsEvaluation.violation ? 'FAIL (Shift Detected)' : 'PASS'
+    `${paint('4. [cls]', 'bold', 'magenta')}      Max Session CLS Score   : ${paint(
+      String(report.lightMode.clsEvaluation.maxSessionCls),
+      'bold',
+      report.lightMode.clsEvaluation.violation ? 'red' : 'green'
+    )} ${paint('(budget: 0.1)', 'dim')} -> ${
+      report.lightMode.clsEvaluation.violation
+        ? paint('FAIL (Shift Detected)', 'bold', 'red')
+        : paint('PASS', 'bold', 'green')
     }`,
-    '====================================================================',
+    divider,
     '',
   ];
 
   return lines.join('\n');
 }
-
-/**
- * Executes all 4 `uirig` tools against the live Vite + AgnosticUI sandbox.
- * Can either attach to an already-running Vite URL (`options.existingUrl`) or
- * spin up an ephemeral in-process Vite dev server automatically.
- */
 export async function runLivePlaygroundSpotCheck(
   port: number = 5173,
   options: ISpotCheckRunOptions = {}
@@ -221,7 +276,6 @@ export async function runLivePlaygroundSpotCheck(
   }
 }
 
-// Direct CLI Entrypoint: `node --experimental-strip-types playground/src/spot-check.ts [--headed]`
 const isDirectExecution =
   process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
