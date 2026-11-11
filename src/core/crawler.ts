@@ -14,7 +14,23 @@ export interface IFSNode {
   children?: IFSNode[];
 }
 
-export const BLOCKLIST_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'build', 'docs_old']);
+/**
+ * Directories excluded from recursive repository scans.
+ *
+ * Design Note:
+ * - Standard build/dependency caches (`node_modules`, `.git`, `dist`, `build`) are skipped
+ *   to prevent traversal bottlenecks and noise.
+ * - `'playground'` is blocklisted so our isolated Vite + Lit spot-checking sandbox
+ *   never leaks into production repository manifests or source audits.
+ */
+export const BLOCKLIST_DIRECTORIES = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'docs_old',
+  'playground',
+]);
 
 export function generateDirectoryTree(dirPath: string): IFSNode {
   const nodeName = basename(dirPath);
