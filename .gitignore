@@ -4,9 +4,11 @@ dist/
 build/
 .env
 
-# Local Workspace State Logs & Artifacts
-.uirig/snapshots/
-.uirig/copy_paste_pack.md
+# uirig Local Runtime State
+.uirig/session.json
+.uirig/snapshots/*
+.uirig/snapshots/.gitkeep
+.uirig/github_pr_comment.md
 
 # OS/IDE Artifacts
 .DS_Store
