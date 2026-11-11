@@ -3,11 +3,16 @@
  * End-to-end live spot-check runner executing all 4 core `uirig` validation engines
  * (`crawlPageTokens`, `auditPageContrast`, `runGeometricStressAudit`, `collectPageCls`)
  * against the live Vite + AgnosticUI Lit sandbox in both Light Mode and Dark Mode.
+ *
+ * Supports both:
+ * - Programmatic calls from Vitest (`headless: true`, ephemeral port)
+ * - Direct CLI inspection (`node --experimental-strip-types playground/src/spot-check.ts --headed`)
  */
 
 import { chromium, type Browser } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
 import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 import {
   crawlPageTokens,
   type ITokenScaleConfig,
@@ -33,7 +38,6 @@ import {
  */
 export const AGNOSTIC_SPOTCHECK_SCALE: ITokenScaleConfig = {
   colors: [
-    // Light & dark surface and text tokens
     'rgb(255, 255, 255)',
     'rgb(1, 4, 9)',
     'rgb(17, 24, 39)',
@@ -56,9 +60,6 @@ export const AGNOSTIC_SPOTCHECK_SCALE: ITokenScaleConfig = {
   radii: ['0px', '4px', '6px', '8px', '16px', '9999px'],
 };
 
-/**
- * Structured telemetry report returned by `runLivePlaygroundSpotCheck`.
- */
 export interface ISpotCheckReport {
   lightMode: {
     tokenViolations: ITokenViolation[];
@@ -72,37 +73,89 @@ export interface ISpotCheckReport {
   };
 }
 
+export interface ISpotCheckRunOptions {
+  /** Launch Chromium in headless mode (default true; pass false for visual inspection). */
+  headless?: boolean;
+  /** Optional slow-motion delay in ms between Playwright actions when `--headed` is active. */
+  slowMoMs?: number;
+  /** Optional existing server URL (used when Vite dev server is already running). */
+  existingUrl?: string;
+}
+
 /**
- * Starts an in-process Vite dev server for `playground/`, launches headless Chromium,
- * and verifies all 4 `uirig` tools end-to-end across Light and Dark modes.
- *
- * @param port - Local port for Vite dev server (default 5173).
- * @returns Structured report of all 4 tool outputs.
+ * Formats an `ISpotCheckReport` into a crisp, human-readable terminal summary
+ * for interactive developer inspection.
+ */
+export function formatSpotCheckSummary(report: ISpotCheckReport): string {
+  const lines: string[] = [
+    '',
+    '====================================================================',
+    '  uirig Live 4-Tool Spot-Check Report (AgnosticUI Lit Sandbox)',
+    '====================================================================',
+    `1. [tokens]   Design Token Violations : ${report.lightMode.tokenViolations.length}`,
+    ...report.lightMode.tokenViolations.map(
+      (v) => `   - ${v.selector} (${v.property}: ${v.actualValue})${v.inShadowDom ? ' [ShadowDOM]' : ''}`
+    ),
+    `2. [contrast] Light Mode Violations   : ${report.lightMode.contrastViolations.length}`,
+    ...report.lightMode.contrastViolations.map(
+      (v) => `   - ${v.selector} (${v.contrastRatio}:1 < 4.5:1 | ${v.foregroundRgb} on ${v.backgroundRgb})`
+    ),
+    `   [contrast] Dark Mode (${report.darkMode.activeThemeAttr ?? 'none'}) Violations : ${report.darkMode.contrastViolations.length}`,
+    ...report.darkMode.contrastViolations.map(
+      (v) => `   - ${v.selector} (${v.contrastRatio}:1 < 4.5:1 | ${v.foregroundRgb} on ${v.backgroundRgb})`
+    ),
+    `3. [stress]   Geometric Overflow Hits : ${report.lightMode.stressViolations.length}`,
+    ...report.lightMode.stressViolations.map(
+      (v) =>
+        `   - [${v.violationType}] ${v.selector}${v.relatedSelector ? ` -> ${v.relatedSelector}` : ''} (+${v.measuredLeakPixels}px)`
+    ),
+    `4. [cls]      Max Session CLS Score   : ${report.lightMode.clsEvaluation.maxSessionCls} (budget: 0.1) -> ${
+      report.lightMode.clsEvaluation.violation ? 'FAIL (Shift Detected)' : 'PASS'
+    }`,
+    '====================================================================',
+    '',
+  ];
+
+  return lines.join('\n');
+}
+
+/**
+ * Executes all 4 `uirig` tools against the live Vite + AgnosticUI sandbox.
+ * Can either attach to an already-running Vite URL (`options.existingUrl`) or
+ * spin up an ephemeral in-process Vite dev server automatically.
  */
 export async function runLivePlaygroundSpotCheck(
-  port: number = 5173
+  port: number = 5173,
+  options: ISpotCheckRunOptions = {}
 ): Promise<ISpotCheckReport> {
+  const headless = options.headless ?? true;
+  const slowMo = options.slowMoMs ?? 0;
+
   let server: ViteDevServer | null = null;
   let browser: Browser | null = null;
 
   try {
-    const playgroundRoot = resolve(process.cwd(), 'playground');
-    server = await createServer({
-      root: playgroundRoot,
-      server: { port, strictPort: false },
-      logLevel: 'silent',
-    });
-    await server.listen();
+    let targetUrl = options.existingUrl;
 
-    const resolvedAddress = server.httpServer?.address();
-    const activePort =
-      typeof resolvedAddress === 'object' && resolvedAddress !== null
-        ? resolvedAddress.port
-        : port;
-    const targetUrl = `http://localhost:${activePort}`;
+    if (!targetUrl) {
+      const playgroundRoot = resolve(process.cwd(), 'playground');
+      server = await createServer({
+        root: playgroundRoot,
+        server: { port, strictPort: false },
+        logLevel: 'silent',
+      });
+      await server.listen();
 
-    console.log(`[spot-check] Vite dev server listening at ${targetUrl}`);
-    browser = await chromium.launch({ headless: true });
+      const resolvedAddress = server.httpServer?.address();
+      const activePort =
+        typeof resolvedAddress === 'object' && resolvedAddress !== null
+          ? resolvedAddress.port
+          : port;
+      targetUrl = `http://localhost:${activePort}`;
+    }
+
+    console.log(`[spot-check] Auditing live playground at ${targetUrl} (headless=${headless})...`);
+    browser = await chromium.launch({ headless, slowMo });
 
     // 1. Context A: Read-only Tokens + Contrast + Dark Mode Toggle Check
     const readOnlyContext = await browser.newContext({
@@ -146,8 +199,6 @@ export async function runLivePlaygroundSpotCheck(
     const clsEvaluation = await collectPageCls(clsPage, 0.1, 350);
     await clsContext.close();
 
-    console.log('[spot-check] All 4 tools completed live verification successfully.');
-
     return {
       lightMode: {
         tokenViolations,
@@ -168,4 +219,23 @@ export async function runLivePlaygroundSpotCheck(
       await server.close();
     }
   }
+}
+
+// Direct CLI Entrypoint: `node --experimental-strip-types playground/src/spot-check.ts [--headed]`
+const isDirectExecution =
+  process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectExecution) {
+  const isHeaded = process.argv.includes('--headed');
+  runLivePlaygroundSpotCheck(5173, {
+    headless: !isHeaded,
+    slowMoMs: isHeaded ? 450 : 0,
+  })
+    .then((report) => {
+      console.log(formatSpotCheckSummary(report));
+    })
+    .catch((err: unknown) => {
+      console.error('[spot-check] Fatal error during live inspection:', err);
+      process.exitCode = 1;
+    });
 }

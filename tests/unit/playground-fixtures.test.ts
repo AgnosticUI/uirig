@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { scheduleClsTrapInjection } from '../../playground/src/cls-trap.js';
+import { formatSpotCheckSummary, type ISpotCheckReport } from '../../playground/src/spot-check.js';
 
 describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::', () => {
   it('==> Should bind AgnosticUI --ag-* tokens and mount baseline components + adversarial traps in playground/index.html', () => {
@@ -98,4 +99,62 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
       vi.useRealTimers();
     }
   });
+
+  it('==> Should format a human-readable terminal report from ISpotCheckReport', () => {
+    console.log('\n::: RUNNING UNIT CHECKS: Validating Human-Readable Spot-Check Summary :::');
+
+    const sampleReport: ISpotCheckReport = {
+      lightMode: {
+        tokenViolations: [
+          {
+            selector: 'div#contrast-token-trap',
+            property: 'fontSize',
+            actualValue: '13px',
+            inShadowDom: false,
+          },
+        ],
+        contrastViolations: [
+          {
+            selector: 'div#contrast-token-trap',
+            foregroundRgb: 'rgb(156, 163, 175)',
+            backgroundRgb: 'rgb(243, 244, 246)',
+            contrastRatio: 2.54,
+            inShadowDom: false,
+          },
+        ],
+        stressViolations: [
+          {
+            violationType: 'container_overflow',
+            selector: 'span#overflow-trap-label',
+            relatedSelector: 'div#overflow-trap-box',
+            measuredLeakPixels: 185,
+            inShadowDom: false,
+          },
+        ],
+        clsEvaluation: {
+          maxSessionCls: 0.24,
+          violation: {
+            measuredClsScore: 0.24,
+            clsMaxLimit: 0.1,
+            shiftCountInWorstWindow: 1,
+            offendingSelectors: ['main.sandbox-grid'],
+          },
+        },
+      },
+      darkMode: {
+        activeThemeAttr: 'dark',
+        contrastViolations: [],
+      },
+    };
+
+    const summary = formatSpotCheckSummary(sampleReport);
+    expect(summary).toContain('uirig Live 4-Tool Spot-Check Report');
+    expect(summary).toContain('div#contrast-token-trap (fontSize: 13px)');
+    expect(summary).toContain('2.54:1 < 4.5:1');
+    expect(summary).toContain('span#overflow-trap-label -> div#overflow-trap-box (+185px)');
+    expect(summary).toContain('0.24 (budget: 0.1) -> FAIL (Shift Detected)');
+
+    console.log('[+] Verified: formatSpotCheckSummary renders clean terminal diagnostics.');
+  });
+
 });
