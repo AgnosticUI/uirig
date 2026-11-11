@@ -10,7 +10,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "node --loader ts-node/esm src/index.ts check"
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "ui",
@@ -32,7 +32,6 @@
   "devDependencies": {
     "@types/node": "^26.6.6",
     "playwright": "^1.65.0",
-    "ts-node": "^10.9.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.7",
     "vitest": "^5.1.0"

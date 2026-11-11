@@ -9,6 +9,21 @@ import { resolve } from 'path';
 import { randomUUID } from 'crypto';
 import { atomicWriteFile } from '../utils/fs.js';
 
+export const DEFAULT_UIRIG_CONFIG = {
+  $schema: "https://json-schema.org",
+  targetUrls: ["http://localhost:3000"],
+  tokensPath: "./config/default_tokens.json",
+  thresholdBudgets: {
+    clsMaxLimit: 0.1,
+    overflowPixelTolerance: 2,
+    touchTargetMinSpacingPx: 24
+  },
+  viewports: [
+    { name: "mobile", width: 375, height: 812 },
+    { name: "desktop", width: 1440, height: 900 }
+  ]
+};
+
 export async function executeInitCommand(): Promise<void> {
   console.log('\n::: INITIALIZING WORKSPACE RUNTIME BOUNDARIES :::');
 
@@ -17,22 +32,7 @@ export async function executeInitCommand(): Promise<void> {
 
   // 1. Scaffold uirig.config.json with default layout tolerances if absent
   if (!existsSync(configPath)) {
-    const defaultConfig = {
-      $schema: "https://json-schema.org",
-      targetUrls: ["http://localhost:3000"],
-      tokensPath: "./config/default_tokens.json",
-      thresholdBudgets: {
-        clsMaxLimit: 0.1,
-        overflowPixelTolerance: 2,
-        touchTargetMinSpacingPx: 24
-      },
-      viewports: [
-        { name: "mobile", width: 375, height: 812 },
-        { name: "desktop", width: 1440, height: 900 }
-      ]
-    };
-    
-    atomicWriteFile(configPath, JSON.stringify(defaultConfig, null, 2));
+    atomicWriteFile(configPath, JSON.stringify(DEFAULT_UIRIG_CONFIG, null, 2));
     console.log('==> Generated single configuration footprint: uirig.config.json');
   }
 

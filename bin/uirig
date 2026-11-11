@@ -3,7 +3,6 @@
 /**
  * bin/uirig
  * Global executable bridge routing parameters.
- * Anchored directly to the November 10, 2026 system timeline baseline.
  */
 
 import { spawn } from 'child_process';
@@ -14,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const entryPoint = resolve(__dirname, '../src/index.ts');
 
-const child = spawn('node', ['--loader', 'ts-node/esm', entryPoint, ...process.argv.slice(2)], {
+const child = spawn('node', [entryPoint, ...process.argv.slice(2)], {
   stdio: 'inherit'
 });
 

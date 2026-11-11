@@ -14,12 +14,8 @@ export interface IFSNode {
   children?: IFSNode[];
 }
 
-const BLOCKLIST_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'build', 'docs_old']);
+export const BLOCKLIST_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'build', 'docs_old']);
 
-/**
- * Depth-first directory tree crawler spider.
- * Recursively filters out blackhole directories to isolate relevant code assets.
- */
 export function generateDirectoryTree(dirPath: string): IFSNode {
   const nodeName = basename(dirPath);
   const stats = statSync(dirPath);
@@ -37,7 +33,7 @@ export function generateDirectoryTree(dirPath: string): IFSNode {
 
   for (const entry of entries) {
     if (BLOCKLIST_DIRECTORIES.has(entry)) {
-      continue; // Skip the directory subtree block entirely
+      continue;
     }
 
     const fullChildPath = join(dirPath, entry);
@@ -52,9 +48,6 @@ export function generateDirectoryTree(dirPath: string): IFSNode {
   };
 }
 
-/**
- * Serializes a structured file tree graph into an aligned plaintext ASCII visual trace layout.
- */
 export function serializeTreeToAscii(node: IFSNode, depthIndent: string = ''): string {
   let asciiRepresentation = `${depthIndent}├── ${node.name}${node.type === 'directory' ? '/' : ''}\n`;
   
