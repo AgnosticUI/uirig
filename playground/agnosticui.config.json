@@ -1,0 +1,48 @@
+{
+  "$schema": "https://agnosticui.com/schema.json",
+  "version": "2.0.0-alpha",
+  "framework": "lit",
+  "paths": {
+    "reference": "./agnosticui",
+    "components": "./src/components/ag"
+  },
+  "components": {
+    "Button": {
+      "added": "2026-11-11T21:32:22.576Z",
+      "version": "2.0.0-alpha",
+      "framework": "lit",
+      "files": [
+        "/Users/roblevin/workspace/opensource/uirig/playground/src/components/ag/Button/core"
+      ]
+    },
+    "Card": {
+      "added": "2026-11-11T21:32:22.577Z",
+      "version": "2.0.0-alpha",
+      "framework": "lit",
+      "files": [
+        "/Users/roblevin/workspace/opensource/uirig/playground/src/components/ag/Card/core"
+      ]
+    },
+    "Input": {
+      "added": "2026-11-11T21:32:22.577Z",
+      "version": "2.0.0-alpha",
+      "framework": "lit",
+      "files": [
+        "/Users/roblevin/workspace/opensource/uirig/playground/src/components/ag/Input/core"
+      ]
+    }
+  },
+  "ai": {
+    "includeReference": true,
+    "includeContext": true,
+    "contextPath": "./agnosticui/docs"
+  },
+  "git": {
+    "commitReference": true
+  },
+  "tarball": {
+    "source": "/Users/roblevin/workspace/opensource/uirig/playground/.tmp-ag-download/agnosticui-core-2.0.0-alpha.31.tgz",
+    "version": "2.0.0-alpha",
+    "installed": "2026-11-11T21:31:55.633Z"
+  }
+}

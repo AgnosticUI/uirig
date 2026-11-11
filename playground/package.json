@@ -1,0 +1,11 @@
+{
+  "name": "uirig-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
+    "focus-trap": "^8.2.4",
+    "lit": "^3.3.3"
+  }
+}

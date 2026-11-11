@@ -1,0 +1,13 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+
+agnosticui/
+.agnosticui-viewer/
