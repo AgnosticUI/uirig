@@ -28,6 +28,7 @@
   "license": "MIT",
   "dependencies": {
     "chokidar": "^6.0.0",
+    "colorjs.io": "^0.7.1",
     "ws": "^8.22.2"
   },
   "devDependencies": {
