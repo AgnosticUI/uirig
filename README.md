@@ -13,3 +13,10 @@
 ### uirig check
 *   **Syntax:** `uirig check [--config=<path>] [--reporter=github] [--json]`
 *   **Description:** Executes the core suite. When `--json` is appended, suppresses terminal tables and streams raw machine-readable JSON error tokens to stdout so agents can parse and fix layouts natively.
+
+## Setup
+
+```shell
+npm i
+npx playwright install
+```
