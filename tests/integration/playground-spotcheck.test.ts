@@ -1,19 +1,35 @@
 /**
  * tests/integration/playground-spotcheck.test.ts
  * End-to-end integration test executing all 4 core `uirig` validation engines
- * against the live Vite + AgnosticUI Lit sandbox in headless Chromium.
+ * against the live Vite + AgnosticUI Lit sandbox in Chromium.
+ *
+ * Supports `UIRIG_HEADED=1` (via `npm run playground:inspect`) for visual
+ * slow-motion browser inspection and full terminal report printing.
  */
 
 import { describe, it, expect } from 'vitest';
-import { runLivePlaygroundSpotCheck } from '../../playground/src/spot-check.js';
+import {
+  runLivePlaygroundSpotCheck,
+  formatSpotCheckSummary,
+} from '../../playground/src/spot-check.js';
 
 describe('::: PHASE 4 TASK 4.4: LIVE 4-TOOL AGNOSTICUI SPOT-CHECK VERIFICATION :::', () => {
   it(
     '==> Should verify Shadow DOM piercing, token drift, contrast traps, overflow stress, CLS shifts, and dark mode toggle',
     async () => {
-      console.log('\n::: RUNNING LIVE 4-TOOL END-TO-END PLAYWRIGHT SPOT-CHECK :::');
+      const isHeaded = process.env.UIRIG_HEADED === '1';
+      console.log(
+        `\n::: RUNNING LIVE 4-TOOL END-TO-END PLAYWRIGHT SPOT-CHECK (headed=${isHeaded}) :::`
+      );
 
-      const report = await runLivePlaygroundSpotCheck(0);
+      const report = await runLivePlaygroundSpotCheck(isHeaded ? 5173 : 0, {
+        headless: !isHeaded,
+        slowMoMs: isHeaded ? 450 : 0,
+      });
+
+      if (isHeaded) {
+        console.log(formatSpotCheckSummary(report));
+      }
 
       // 1. Token Auditor (`crawlPageTokens`): catches off-scale styles on `#contrast-token-trap`
       const tokenTrapHits = report.lightMode.tokenViolations.filter(
@@ -57,6 +73,6 @@ describe('::: PHASE 4 TASK 4.4: LIVE 4-TOOL AGNOSTICUI SPOT-CHECK VERIFICATION :
 
       console.log('[+] Verified all 4 tools end-to-end against live AgnosticUI Web Components!');
     },
-    30000
+    60000
   );
 });
