@@ -1,0 +1,40 @@
+{
+  "name": "uirig",
+  "version": "0.1.0",
+  "description": "The zero-config, framework-blind UI quality gate for CI/CD pipelines.",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "uirig": "./bin/uirig"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "node --loader ts-node/esm src/index.ts check"
+  },
+  "keywords": [
+    "ui",
+    "ux",
+    "design-tokens",
+    "accessibility",
+    "contrast",
+    "cls",
+    "fuzzer",
+    "playwright",
+    "cicd"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chokidar": "^6.0.0",
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "playwright": "^1.65.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.7",
+    "vitest": "^5.1.0"
+  }
+}

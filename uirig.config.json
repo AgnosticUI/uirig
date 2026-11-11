@@ -1,8 +1,7 @@
 {
-  "$schema": "http://json-schema.org",
+  "$schema": "https://json-schema.org",
   "targetUrls": [
-    "http://localhost:3000",
-    "http://localhost:3000/dashboard"
+    "http://localhost:3000"
   ],
   "tokensPath": "./config/default_tokens.json",
   "thresholdBudgets": {
@@ -15,11 +14,6 @@
       "name": "mobile",
       "width": 375,
       "height": 812
-    },
-    {
-      "name": "tablet",
-      "width": 768,
-      "height": 1024
     },
     {
       "name": "desktop",

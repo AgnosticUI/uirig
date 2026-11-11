@@ -13,40 +13,41 @@ uirig/
 │       └── release.yml
 ├── .uirig/                         # Local workspace tracking directory
 │   ├── docs/
-│   │   └── NEXT_PROMPT.md          # Volatile continuation capsule block
+│   │   └── NEXT_PROMPT.md          # Volatile chronological continuation capsule
 │   ├── snapshots/
 │   │   ├── .gitkeep
-│   ├── github_pr_comment.md        # Clean Markdown comment export artifact
-│   └── session.json                # Immutable history tracking ledger
+│   ├── github_pr_comment.md        # Standalone Markdown PR comment report artifact
+│   └── session.json                # Immutable transaction tracking ledger
 ├── bin/
-│   └── uirig                       # Global CLI executable shell router
-├── uirig.config.json               # Unified single configuration file footprint
-├── package.json                    # Project configuration manifest
+│   └── uirig                       # Global CLI executable entry router shell script
+├── uirig.config.json               # Unified single configuration profile footprint
+├── package.json                    # Project configuration and script manifest
 ├── src/
-│   ├── index.ts                    # Main system entry and argument parser
-│   ├── commands/                   # CLI command wrapper interaction layers
-│   │   ├── check.ts                # [MVP] Orchestrates parallel tool checks
-│   │   ├── init.ts                 # [MVP] Workspace initializer command
-│   │   └── manifest.ts             # Repository file indexing crawler command
+│   ├── index.ts                    # Main system entry and CLI argument parser
+│   ├── commands/                   # 15 Tools CLI interaction wrapper handlers
+│   │   ├── check.ts                # [MVP] Orchestrates parallel context tool validation runs
+│   │   ├── init.ts                 # [MVP] Scaffolds uirig.config.json and .uirig/ ledger
+│   │   └── manifest.ts             # Blackhole-safe repository filesystem crawler
 │   ├── core/                       # Agnostic core domain evaluation logic
-│   │   ├── adversary.ts            # [MVP] Playwright geometric stress execution core
-│   │   ├── cls.ts                  # [MVP] Performance observer monitoring core
-│   │   ├── matrix.ts               # [MVP] Rendered luminance contrast core
-│   │   ├── tokens.ts               # [MVP] Shadow-piercing runtime computed style crawler
-│   │   └── session.ts              # Transaction ledger manager and tracker
-│   ├── interfaces/                 # Shared data model contracts
-│   │   ├── browser.ts              # Headless driver token contracts
-│   │   └── config.ts               # Configuration mapping boundaries
-│   └── utils/
-│       ├── formatter.ts            # Typographic console text formatting utilities
-│       └── fs.ts                   # Atomic markdown and ledger file writers
-├── tsconfig.json                   # ESM compilation settings
-└── tests/                          # Automated local validation test suite
+│   │   ├── adversary.ts            # [MVP] Playwright geometric stress execution core (stress)
+│   │   ├── cls.ts                  # [MVP] PerformanceObserver runtime shift monitor (cls)
+│   │   ├── matrix.ts               # [MVP] Rendered luminance contrast checking core (contrast)
+│   │   ├── session.ts              # transaction lifecycle manager and SHA-256 validator
+│   │   └── tokens.ts               # [MVP] Shadow-piercing computed style verification core (tokens)
+│   ├── interfaces/                 # Shared data model type contracts
+│   │   ├── browser.ts              # Headless automation driver token contracts
+│   │   └── config.ts               # Configuration mapping boundaries and payload shapes
+│   └── utils/                      # Low-overhead utility primitives
+│       ├── formatter.ts            # Typographic console styler and agentic JSON stream router
+│       └── fs.ts                   # Atomic filesystem handlers and markdown comment writers
+├── tsconfig.json                   # ESM compilation target settings
+└── tests/                          # Automated local testing validation manifest
     ├── unit/
     │   ├── matrix.test.ts          # Contrast luminance math unit tests
-    │   └── tokens.test.ts          # Shadow-piercing crawler unit tests
+    │   └── tokens.test.ts          # Shadow-piercing crawler tree unit tests
     └── integration/
-        └── workflow.test.ts        # End-to-end parallel run workflow check
+        └── workflow.test.ts        # End-to-end parallel incognito run check
+
 ```
 
 ---

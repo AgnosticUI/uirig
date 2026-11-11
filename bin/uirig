@@ -1,0 +1,23 @@
+#!/usr/bin/env node
+
+/**
+ * bin/uirig
+ * Global executable bridge routing parameters.
+ * Anchored directly to the November 10, 2026 system timeline baseline.
+ */
+
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const entryPoint = resolve(__dirname, '../src/index.ts');
+
+const child = spawn('node', ['--loader', 'ts-node/esm', entryPoint, ...process.argv.slice(2)], {
+  stdio: 'inherit'
+});
+
+child.on('close', (code) => {
+  process.exit(code ?? 0);
+});
