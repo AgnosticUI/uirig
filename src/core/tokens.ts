@@ -4,6 +4,9 @@
  * Evaluates live DOM and Shadow DOM elements against approved design system scales.
  */
 
+// Import only the TypeScript type for Playwright's Page so zero runtime bundle weight is added
+import type { Page } from 'playwright';
+
 /**
  * Defines the approved design system values that rendered DOM elements are allowed to use.
  * Any computed style outside these arrays will be flagged as design token drift.
@@ -138,4 +141,141 @@ export function validateComputedStyleEntry(
   }
 
   return violations;
+}
+
+/**
+ * Executes a recursive TreeWalker inside a live Playwright Page that pierces
+ * open ShadowRoot boundaries to extract computed styles from all visible elements.
+ *
+ * @param page - An active Playwright Page instance loaded with target HTML/URL.
+ * @returns An array of extracted style snapshots across both Light DOM and Shadow DOM.
+ */
+export async function extractShadowPiercingStyles(page: Page): Promise<IExtractedElementStyles[]> {
+  console.log('[tokens:crawler] Dispatching recursive shadow-piercing TreeWalker into browser sandbox...');
+
+  // page.evaluate serializes this self-contained function and runs it inside Chromium's V8 context
+  const extractedNodes = await page.evaluate((): IExtractedElementStyles[] => {
+    // Store every visible element's computed style snapshot across all DOM and ShadowRoot levels
+    const snapshots: IExtractedElementStyles[] = [];
+
+    // Non-visual structural tags that should never be audited for design tokens
+    const nonVisualTags = new Set([
+      'HTML',
+      'HEAD',
+      'SCRIPT',
+      'STYLE',
+      'META',
+      'LINK',
+      'NOSCRIPT',
+      'TEMPLATE',
+      'SLOT',
+    ]);
+
+    // Helper inside the browser context to format a readable selector string (e.g. 'button.primary-btn')
+    function formatSelector(el: Element): string {
+      const tagName = el.tagName.toLowerCase();
+      if (el.id) {
+        return `${tagName}#${el.id}`;
+      }
+      if (typeof el.className === 'string' && el.className.trim().length > 0) {
+        const classList = el.className.trim().split(/\s+/).join('.');
+        return `${tagName}.${classList}`;
+      }
+      return tagName;
+    }
+
+    // Recursive walker that traverses a Document or ShadowRoot and dives into any child ShadowRoots
+    function traverseRoot(
+      root: Document | ShadowRoot,
+      shadowPrefix: string,
+      insideShadow: boolean
+    ): void {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      let currentNode = walker.nextNode() as Element | null;
+
+      while (currentNode) {
+        if (!nonVisualTags.has(currentNode.tagName)) {
+          // Ask the browser's CSS engine for the final resolved pixel and RGB values
+          const computed = window.getComputedStyle(currentNode);
+          const elementLabel = formatSelector(currentNode);
+          const fullSelector = shadowPrefix ? `${shadowPrefix} >> ${elementLabel}` : elementLabel;
+
+          // Record computed styles only if the element actually renders on screen
+          if (computed.display !== 'none') {
+            snapshots.push({
+              selector: fullSelector,
+              inShadowDom: insideShadow,
+              styles: {
+                color: computed.color,
+                backgroundColor: computed.backgroundColor,
+                paddingTop: computed.paddingTop,
+                paddingBottom: computed.paddingBottom,
+                paddingLeft: computed.paddingLeft,
+                paddingRight: computed.paddingRight,
+                fontSize: computed.fontSize,
+                borderRadius: computed.borderRadius,
+              },
+            });
+          }
+
+          // Open vs. Closed ShadowRoot Boundary:
+          // `element.shadowRoot` returns the ShadowRoot instance ONLY when attached with `{ mode: 'open' }`.
+          // If a Web Component uses `{ mode: 'closed' }`, the browser intentionally returns `null` to standard
+          // page scripts (`page.evaluate`), meaning closed shadow trees cannot be traversed without an
+          // elevated browser extension or custom Playwright selector engine.
+          if (currentNode.shadowRoot) {
+            const nextShadowPrefix = `${fullSelector} >> shadow-root`;
+            traverseRoot(currentNode.shadowRoot, nextShadowPrefix, true);
+          }
+        }
+
+        // Advance the iterator to the next sibling/descendant element in the current root
+        currentNode = walker.nextNode() as Element | null;
+      }
+    }
+
+    // Start traversal at the top-level Light DOM document
+    traverseRoot(document, '', false);
+    return snapshots;
+  });
+
+  const shadowCount = extractedNodes.filter((n) => n.inShadowDom).length;
+  console.log(
+    `[tokens:crawler] Extracted ${extractedNodes.length} visible elements (${shadowCount} inside open Shadow DOM).`
+  );
+  return extractedNodes;
+}
+
+/**
+ * High-level runtime auditor that crawls a live Playwright Page across Light DOM
+ * and open ShadowRoot boundaries, then pipes every extracted style snapshot through
+ * the pure validateComputedStyleEntry rule engine.
+ *
+ * Note on Shadow DOM Encapsulation:
+ * Only Web Components created with `attachShadow({ mode: 'open' })` expose `element.shadowRoot`
+ * to standard `page.evaluate()` scripts. Components using `{ mode: 'closed' }` return `null`
+ * for `element.shadowRoot` and are skipped by design.
+ *
+ * @param page - An active Playwright Page instance pointing to the target viewport.
+ * @param scale - The approved design system token configuration.
+ * @returns An array of all detected design token violations across the viewport.
+ */
+export async function crawlPageTokens(
+  page: Page,
+  scale: ITokenScaleConfig
+): Promise<ITokenViolation[]> {
+  console.log('[tokens:audit] Starting full viewport design token crawl...');
+
+  // Step 1: Extract live computed styles across Light DOM and open ShadowRoots
+  const extractedEntries = await extractShadowPiercingStyles(page);
+
+  // Step 2: Validate every extracted element snapshot against the approved design scale
+  const allViolations: ITokenViolation[] = [];
+  for (const entry of extractedEntries) {
+    const nodeViolations = validateComputedStyleEntry(entry, scale);
+    allViolations.push(...nodeViolations);
+  }
+
+  console.log(`[tokens:audit] Crawl complete. Total violations detected: ${allViolations.length}`);
+  return allViolations;
 }
