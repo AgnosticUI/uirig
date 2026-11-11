@@ -3,11 +3,13 @@
  * Focused unit specs verifying parent-child bounding box overflow, horizontal
  * scrollbar leak detection, and interactive touch-target spacing invariants.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
+import { chromium, type Browser } from 'playwright';
 import {
   checkParentChildOverflow,
   checkHorizontalScrollbarLeak,
   checkTouchTargetSpacing,
+  runGeometricStressAudit,
   type IBoundingBox,
 } from '../../src/core/adversary.js';
 
@@ -147,4 +149,117 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       inShadowDom: false,
     });
   });
+
+  describe('::: PHASE 3 TASK 3.3 (CHUNK 2): LIVE CHROMIUM TEXT-EXPANSION STRESS RIG :::', () => {
+    let browser: Browser | undefined;
+
+    afterAll(async () => {
+      if (browser) {
+        await browser.close();
+        console.log('[+] Headless Chromium instance closed cleanly.');
+      }
+    });
+
+    it('==> Should catch container overflow and horizontal scrollbar bleed after +30% text expansion', async () => {
+      console.log('\n--- START TEST: Live Chromium +30% Text Expansion Overflow Rig ---');
+
+      browser = await chromium.launch({ headless: true });
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      const page = await context.newPage();
+
+      // Render a fixed-width card (140px) with `white-space: nowrap` text that fits in English
+      // but spills past its parent card and causes a horizontal scrollbar when expanded +30%
+      await page.setContent(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { margin: 0; padding: 16px; font-family: sans-serif; }
+              .rigid-card {
+                width: 140px;
+                border: 1px solid #cbd5e1;
+                padding: 8px;
+              }
+              .nowrap-label {
+                display: inline-block;
+                white-space: nowrap;
+                font-size: 16px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="rigid-card">
+              <span class="nowrap-label">Subscription Plan Settings</span>
+            </div>
+          </body>
+        </html>
+      `);
+
+      const violations = await runGeometricStressAudit(page, {
+        overflowPixelTolerance: 2,
+        touchTargetMinSpacingPx: 24,
+      });
+      console.log('[!] Live stress violations caught:', JSON.stringify(violations, null, 2));
+
+      await context.close();
+
+      const overflowViolation = violations.find(
+        (v) => v.violationType === 'container_overflow' && v.selector === 'span.nowrap-label'
+      );
+      expect(overflowViolation).toBeDefined();
+      expect(overflowViolation?.relatedSelector).toBe('div.rigid-card');
+      expect(overflowViolation?.measuredLeakPixels).toBeGreaterThan(2);
+    });
+
+    it('==> Should catch touch target crowding inside an open ShadowRoot when buttons expand', async () => {
+      console.log('\n--- START TEST: Shadow DOM Interactive Touch Target Crowding ---');
+
+      if (!browser) {
+        browser = await chromium.launch({ headless: true });
+      }
+      const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+      const page = await context.newPage();
+
+      await page.setContent(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>body { margin: 0; padding: 24px; }</style>
+          </head>
+          <body>
+            <uirig-toolbar></uirig-toolbar>
+            <script>
+              class UirigToolbar extends HTMLElement {
+                constructor() {
+                  super();
+                  const shadow = this.attachShadow({ mode: 'open' });
+                  shadow.innerHTML =
+                    '<div style="display: flex; gap: 6px; width: 600px;">' +
+                      '<button id="btn-approve">Approve</button>' +
+                      '<button id="btn-reject">Reject</button>' +
+                    '</div>';
+                }
+              }
+              customElements.define('uirig-toolbar', UirigToolbar);
+            </script>
+          </body>
+        </html>
+      `);
+
+      const violations = await runGeometricStressAudit(page, {
+        overflowPixelTolerance: 2,
+        touchTargetMinSpacingPx: 24,
+      });
+      console.log('[!] Shadow DOM touch target violations:', JSON.stringify(violations, null, 2));
+
+      await context.close();
+
+      const collision = violations.find((v) => v.violationType === 'touch_target_collision');
+      expect(collision).toBeDefined();
+      expect(collision?.inShadowDom).toBe(true);
+      expect(collision?.selector).toBe('uirig-toolbar >> shadow-root >> button#btn-approve');
+      expect(collision?.relatedSelector).toBe('uirig-toolbar >> shadow-root >> button#btn-reject');
+    });
+  });
+
 });

@@ -1,9 +1,12 @@
 /**
  * src/core/adversary.ts
  * Geometric Invariant Overflow Rig (uirig stress).
- * Evaluates parent-child containment bounds, viewport horizontal scrollbar leaks,
+ * Injects +30% pseudo-localization text expansion across Light DOM and open ShadowRoots,
+ * then evaluates parent-child containment bounds, viewport horizontal scrollbar leaks,
  * and interactive touch-target spacing invariants using Euclidean box math.
  */
+
+import type { Page } from 'playwright';
 
 /**
  * Axis-aligned bounding box coordinates matching browser `DOMRect` geometry.
@@ -40,6 +43,18 @@ export interface IGeometricViolation {
 }
 
 /**
+ * Configuration budgets passed into `runGeometricStressAudit` (mapped from `uirig.config.json`).
+ */
+export interface IStressAuditOptions {
+  /** Allowed sub-pixel rounding buffer in pixels (default 2px). */
+  overflowPixelTolerance?: number;
+  /** Minimum edge-to-edge clearance between interactive controls in pixels (default 24px). */
+  touchTargetMinSpacingPx?: number;
+  /** Expansion multiplier applied to visible text nodes (default 0.30 for +30% length). */
+  expansionRatio?: number;
+}
+
+/**
  * Checks whether a child element's right or bottom edge breaches its parent container's
  * bounding box beyond `overflowPixelTolerance`.
  *
@@ -58,13 +73,11 @@ export function checkParentChildOverflow(
   child: IBoundingBox,
   overflowPixelTolerance: number = 2
 ): IGeometricViolation | null {
-  // Compute right and bottom edges for both parent and child rectangles
   const parentRight = parent.x + parent.width;
   const parentBottom = parent.y + parent.height;
   const childRight = child.x + child.width;
   const childBottom = child.y + child.height;
 
-  // Measure positive overflow on each axis (0 if child fits inside parent)
   const rightOverflow = Math.max(0, childRight - parentRight);
   const bottomOverflow = Math.max(0, childBottom - parentBottom);
   const maxOverflow = Math.max(rightOverflow, bottomOverflow);
@@ -124,8 +137,6 @@ export function checkTouchTargetSpacing(
   targetB: IBoundingBox,
   touchTargetMinSpacingPx: number = 24
 ): IGeometricViolation | null {
-  // Compute signed horizontal and vertical edge-to-edge distances between rectangles.
-  // Positive values mean separated by a gap; negative values mean overlapping on that axis.
   const dx = Math.max(
     targetB.x - (targetA.x + targetA.width),
     targetA.x - (targetB.x + targetB.width)
@@ -164,4 +175,243 @@ export function checkTouchTargetSpacing(
   }
 
   return null;
+}
+
+/**
+ * Snapshot payload returned from Playwright's `page.evaluate()` after +30% text expansion.
+ */
+interface IStressDomSnapshot {
+  documentScrollWidth: number;
+  windowInnerWidth: number;
+  parentChildPairs: Array<{
+    parent: IBoundingBox;
+    child: IBoundingBox;
+  }>;
+  interactiveTargets: IBoundingBox[];
+}
+
+/**
+ * Mutates a live Playwright Page by injecting +30% pseudo-localization text expansion
+ * across Light DOM and open ShadowRoot nodes, then evaluates parent-child containment,
+ * global horizontal scrollbar leaks, and interactive touch-target spacing invariants.
+ *
+ * @param page - An active Playwright Page instance loaded inside an isolated context.
+ * @param options - Optional tolerance and spacing budgets from `uirig.config.json`.
+ * @returns An array of detected geometric violations (empty if layout survives stress).
+ */
+export async function runGeometricStressAudit(
+  page: Page,
+  options: IStressAuditOptions = {}
+): Promise<IGeometricViolation[]> {
+  const overflowPixelTolerance = options.overflowPixelTolerance ?? 2;
+  const touchTargetMinSpacingPx = options.touchTargetMinSpacingPx ?? 24;
+  const expansionRatio = options.expansionRatio ?? 0.3;
+
+  console.log(
+    `[adversary:stress] Injecting +${Math.round(expansionRatio * 100)}% pseudo-localization expansion & measuring bounds...`
+  );
+
+  const snapshot = await page.evaluate((ratio: number): IStressDomSnapshot => {
+    const nonVisualTags = new Set([
+      'HTML',
+      'HEAD',
+      'SCRIPT',
+      'STYLE',
+      'META',
+      'LINK',
+      'NOSCRIPT',
+      'TEMPLATE',
+      'SLOT',
+    ]);
+
+    const interactiveTags = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA']);
+    const pseudoGlyphs = 'Ĥéĺĺő_Ŵőŕĺď_Ťéśť_Łőćáĺé';
+
+    function formatSelector(el: Element): string {
+      const tagName = el.tagName.toLowerCase();
+      if (el.id) {
+        return `${tagName}#${el.id}`;
+      }
+      if (typeof el.className === 'string' && el.className.trim().length > 0) {
+        const classList = el.className.trim().split(/\s+/).join('.');
+        return `${tagName}.${classList}`;
+      }
+      return tagName;
+    }
+
+    function isInteractiveControl(el: Element): boolean {
+      if (interactiveTags.has(el.tagName)) {
+        return true;
+      }
+      const role = el.getAttribute('role');
+      return role === 'button' || role === 'link' || role === 'tab';
+    }
+
+    // Step 1: Expand all visible text nodes across Light DOM and open ShadowRoots
+    function expandTextsInRoot(root: Document | ShadowRoot): void {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      let currentEl = walker.nextNode() as Element | null;
+
+      while (currentEl) {
+        if (!nonVisualTags.has(currentEl.tagName)) {
+          const computed = window.getComputedStyle(currentEl);
+          if (computed.display !== 'none' && computed.visibility !== 'hidden') {
+            for (const child of Array.from(currentEl.childNodes)) {
+              if (child.nodeType === Node.TEXT_NODE) {
+                const rawText = child.textContent ?? '';
+                const trimmed = rawText.trim();
+                if (trimmed.length > 0) {
+                  const extraChars = Math.max(4, Math.ceil(trimmed.length * ratio));
+                  const padding = pseudoGlyphs.repeat(Math.ceil(extraChars / pseudoGlyphs.length)).slice(0, extraChars);
+                  child.textContent = `${trimmed} [${padding}]`;
+                }
+              }
+            }
+          }
+
+          if (currentEl.shadowRoot) {
+            expandTextsInRoot(currentEl.shadowRoot);
+          }
+        }
+        currentEl = walker.nextNode() as Element | null;
+      }
+    }
+
+    expandTextsInRoot(document);
+
+    // Step 2: Force synchronous reflow and collect post-expansion bounding boxes
+    const parentChildPairs: Array<{ parent: IBoundingBox; child: IBoundingBox }> = [];
+    const interactiveTargets: IBoundingBox[] = [];
+
+    function measureRoot(
+      root: Document | ShadowRoot,
+      shadowPrefix: string,
+      insideShadow: boolean
+    ): void {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      let currentEl = walker.nextNode() as Element | null;
+
+      while (currentEl) {
+        if (!nonVisualTags.has(currentEl.tagName) && currentEl.tagName !== 'BODY') {
+          const computed = window.getComputedStyle(currentEl);
+          const elementLabel = formatSelector(currentEl);
+          const fullSelector = shadowPrefix ? `${shadowPrefix} >> ${elementLabel}` : elementLabel;
+
+          if (computed.display !== 'none' && computed.visibility !== 'hidden') {
+            const rect = currentEl.getBoundingClientRect();
+
+            if (rect.width > 0 && rect.height > 0) {
+              const currentBox: IBoundingBox = {
+                selector: fullSelector,
+                x: rect.left,
+                y: rect.top,
+                width: rect.width,
+                height: rect.height,
+                inShadowDom: insideShadow,
+              };
+
+              // Record interactive touch targets
+              if (isInteractiveControl(currentEl)) {
+                interactiveTargets.push(currentBox);
+              }
+
+              // Check containment against immediate parent (unless element is `position: fixed`)
+              const parentEl = currentEl.parentElement;
+              if (
+                parentEl &&
+                parentEl.tagName !== 'HTML' &&
+                parentEl.tagName !== 'BODY' &&
+                computed.position !== 'fixed'
+              ) {
+                const parentComputed = window.getComputedStyle(parentEl);
+                const parentRect = parentEl.getBoundingClientRect();
+
+                // Skip scrollable containers (`overflow: auto/scroll/hidden`) that intentionally clip/scroll
+                const clipsHorizontal =
+                  parentComputed.overflowX === 'auto' ||
+                  parentComputed.overflowX === 'scroll' ||
+                  parentComputed.overflowX === 'hidden';
+                const clipsVertical =
+                  parentComputed.overflowY === 'auto' ||
+                  parentComputed.overflowY === 'scroll' ||
+                  parentComputed.overflowY === 'hidden';
+
+                if (!clipsHorizontal && !clipsVertical && parentRect.width > 0 && parentRect.height > 0) {
+                  const parentLabel = formatSelector(parentEl);
+                  const parentFullSelector = shadowPrefix
+                    ? `${shadowPrefix} >> ${parentLabel}`
+                    : parentLabel;
+
+                  parentChildPairs.push({
+                    parent: {
+                      selector: parentFullSelector,
+                      x: parentRect.left,
+                      y: parentRect.top,
+                      width: parentRect.width,
+                      height: parentRect.height,
+                      inShadowDom: insideShadow,
+                    },
+                    child: currentBox,
+                  });
+                }
+              }
+            }
+          }
+
+          if (currentEl.shadowRoot) {
+            const nextShadowPrefix = `${fullSelector} >> shadow-root`;
+            measureRoot(currentEl.shadowRoot, nextShadowPrefix, true);
+          }
+        }
+
+        currentEl = walker.nextNode() as Element | null;
+      }
+    }
+
+    measureRoot(document, '', false);
+
+    return {
+      documentScrollWidth: document.documentElement.scrollWidth,
+      windowInnerWidth: window.innerWidth,
+      parentChildPairs,
+      interactiveTargets,
+    };
+  }, expansionRatio);
+
+  const violations: IGeometricViolation[] = [];
+
+  // 1. Check global horizontal scrollbar leak
+  const scrollLeak = checkHorizontalScrollbarLeak(
+    snapshot.documentScrollWidth,
+    snapshot.windowInnerWidth,
+    overflowPixelTolerance
+  );
+  if (scrollLeak) {
+    violations.push(scrollLeak);
+  }
+
+  // 2. Check all parent-child containment boundaries
+  for (const pair of snapshot.parentChildPairs) {
+    const overflow = checkParentChildOverflow(pair.parent, pair.child, overflowPixelTolerance);
+    if (overflow) {
+      violations.push(overflow);
+    }
+  }
+
+  // 3. Check pairwise spacing across all interactive touch targets
+  for (let i = 0; i < snapshot.interactiveTargets.length; i++) {
+    for (let j = i + 1; j < snapshot.interactiveTargets.length; j++) {
+      const targetA = snapshot.interactiveTargets.at(i);
+      const targetB = snapshot.interactiveTargets.at(j);
+      if (targetA && targetB) {
+        const collision = checkTouchTargetSpacing(targetA, targetB, touchTargetMinSpacingPx);
+        if (collision) {
+          violations.push(collision);
+        }
+      }
+    }
+  }
+
+  console.log(`[adversary:stress] Stress audit complete. Violations detected: ${violations.length}`);
+  return violations;
 }

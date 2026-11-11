@@ -16,19 +16,30 @@
   * **Action:** Generate initial schema parameters for uirig.config.json defining viewports, clsMaxLimit, and overflowPixelTolerance rules.
 
 ### Phase 3: Browser Telemetry Cores & Fuzzers (MVP)
-- [ ] **Task 3.1: Shadow-Piercing Token Crawler (uirig tokens)**
-  * **Action:** Code src/core/tokens.ts to recursively climb running viewports, piercing Shadow DOM boundaries to evaluate computed styles framework-blindly against design tokens json fields.
-- [ ] **Task 3.2: Rendered Luminance Contrast Gate (uirig contrast)**
-  * **Action:** Program relative luminance calculations inside src/core/matrix.ts utilizing browser calculated color channels.
-- [ ] **Task 3.3: Geometric Invariant Overflow Rig (uirig stress)**
-  * **Action:** Code text-expansion fuzzer routines inside src/core/adversary.ts to validate parent-child containment boxes via getBoundingClientRect(), evaluating overflows against the overflowPixelTolerance buffer threshold.
+- [x] **Task 3.1: Shadow-Piercing Token Crawler (uirig tokens)**
+  * **Action:** Code `src/core/tokens.ts` to recursively climb running viewports, piercing Shadow DOM boundaries to evaluate computed styles framework-blindly against design tokens json fields.
+- [x] **Task 3.2: Rendered Luminance Contrast Gate (uirig contrast)**
+  * **Action:** Program relative luminance calculations inside `src/core/matrix.ts` utilizing browser calculated color channels and `colorjs.io`.
+- [ ] **Task 3.3: Geometric Invariant Overflow Rig (uirig stress)** *(Micro-Chunk 1 Complete | Micro-Chunk 2 Next)*
+  * **Action:** Code text-expansion fuzzer routines inside `src/core/adversary.ts` to validate parent-child containment boxes via `getBoundingClientRect()`, evaluating overflows against the `overflowPixelTolerance` buffer threshold.
 - [ ] **Task 3.4: Layout Shift Monitor Core (uirig cls)**
-  * **Action:** Program src/core/cls.ts to capture native browser layout-shift performance entries during initialization loops, tracking metrics against the clsMaxLimit budget.
+  * **Action:** Program `src/core/cls.ts` to capture native browser `layout-shift` performance entries during initialization loops, tracking metrics against the `clsMaxLimit` budget.
 
-### Phase 4: CI/CD Orchestration & Reporting (MVP)
-- [ ] **Task 4.1: Isolated Parallel Context Dispatcher**
-  * **Action:** Build src/commands/check.ts to launch a single Playwright browser, running tasks across separate isolated context incognito sessions concurrently to maximize execution speed without cross-tool pollution.
-- [ ] **Task 4.2: Markdown PR Comment Reporter**
-  * **Action:** Code src/utils/fs.ts to synthesize evaluation results into a single clean markdown report saved directly at .uirig/github_pr_comment.md.
-- [ ] **Task 4.3: Agentic JSON Tool Stream Output Generator (MVP)**
-  * **Action:** Code a conditional fork inside src/utils/formatter.ts that skips console text table generation and serializes the raw layout violation array directly to standard output when options.json is true.
+### Phase 4: Local Spot Checking Test Bed
+- [ ] **Task 4.1: Isolated Vite + Lit Sandbox Initialization**
+  * **Action:** Scaffold a lightweight Vite TypeScript app in `playground/` (and add `playground/` to `BLOCKLIST_DIRECTORIES` in `src/core/crawler.ts` so repository scans stay isolated). Configure `experimentalDecorators: true` and `useDefineForClassFields: false` per AgnosticUI's Lit TypeScript requirements.
+  - [ ] **Task 4.2: Local AgnosticUI CLI Component, Token & Dark-Mode Toggle Installation**
+  * **Action:** Initialize AgnosticUI locally inside `playground/` via `npx agnosticui-cli init --framework lit` and install core Web Components (`npx agnosticui-cli add button card input`) along with `./src/components/ag/styles/ag-tokens.css` and `ag-tokens-dark.css`. Wire a `#theme-toggle` button that toggles `data-theme="dark"` on `document.documentElement` (`<html>`) so both light and dark token modes can be spot-checked.
+- [ ] **Task 4.3: Baseline & Adversarial Test Fixture Assembly**
+  * **Action:** Build a simple spot-checking page in `playground/index.html` and `playground/src/main.ts` rendering both compliant AgnosticUI components (`<ag-card>`, `<ag-button>`, `<ag-input>`) and deliberate layout/token/contrast traps (e.g., cramped card width, low-contrast inline override, un-sized image causing CLS).
+- [ ] **Task 4.4: Live `uirig` 4-Tool Spot-Check Verification**
+  * **Action:** Run the Vite dev server (`npm run dev` on `http://localhost:5173`) and execute `crawlPageTokens`, `auditPageContrast`, `runGeometricStressAudit`, and `monitorPageCls` against the live AgnosticUI Web Components to verify Shadow DOM piercing, token alignment, contrast legibility, stress overflow detection, and CLS tracking end-to-end.
+
+### Phase 5: CI/CD Orchestration & Reporting (MVP)
+- [ ] **Task 5.1: Isolated Parallel Context Dispatcher**
+  * **Action:** Build `src/commands/check.ts` to launch a single Playwright browser, running tasks across separate isolated context incognito sessions concurrently to maximize execution speed without cross-tool pollution.
+- [ ] **Task 5.2: Markdown PR Comment Reporter**
+  * **Action:** Code `src/utils/fs.ts` to synthesize evaluation results into a single clean markdown report saved directly at `.uirig/github_pr_comment.md`.
+- [ ] **Task 5.3: Agentic JSON Tool Stream Output Generator (MVP)**
+  * **Action:** Code a conditional fork inside `src/utils/formatter.ts` that skips console text table generation and serializes the raw layout violation array directly to standard output when `options.json` is true.
+
