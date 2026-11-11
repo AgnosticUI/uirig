@@ -11,6 +11,5 @@
 *   **Description:** Scaffolds the localized `.uirig/` tracking paths and drops the primary single configuration profile file `uirig.config.json` into the root path directory.
 
 ### uirig check
-*   **Syntax:** `uirig check [--config=<path>] [--reporter=github]`
-*   **Description:** The primary composite execution command. Boots one single Playwright engine instance and runs the token compliance audits, accessibility contrast checks, layout stability observers, and geometric text expansion fuzzers concurrently across separate isolated browser contexts. Built-in layout and shift tolerance thresholds filter out anti-aliasing artifacts and font-rendering shifts to guarantee 100% rust-proof, non-flaky execution.
-*   **Output:** Emits clean typographic pass/fail status tables to terminal consoles, and outputs a complete markdown report file to `.uirig/github_pr_comment.md` ready for pull-request integration loops.
+*   **Syntax:** `uirig check [--config=<path>] [--reporter=github] [--json]`
+*   **Description:** Executes the core suite. When `--json` is appended, suppresses terminal tables and streams raw machine-readable JSON error tokens to stdout so agents can parse and fix layouts natively.

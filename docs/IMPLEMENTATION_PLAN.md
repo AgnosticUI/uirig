@@ -30,4 +30,5 @@
   * **Action:** Build src/commands/check.ts to launch a single Playwright browser, running tasks across separate isolated context incognito sessions concurrently to maximize execution speed without cross-tool pollution.
 - [ ] **Task 4.2: Markdown PR Comment Reporter**
   * **Action:** Code src/utils/fs.ts to synthesize evaluation results into a single clean markdown report saved directly at .uirig/github_pr_comment.md.
-  
+- [ ] **Task 4.3: Agentic JSON Tool Stream Output Generator (MVP)**
+  * **Action:** Code a conditional fork inside src/utils/formatter.ts that skips console text table generation and serializes the raw layout violation array directly to standard output when options.json is true.

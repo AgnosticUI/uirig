@@ -215,6 +215,20 @@ export interface ILayoutViolation {
 export interface IFuzzDiagnosticReporter {
   emitDiagnosticReport(violations: ILayoutViolation[]): void;
 }
+
+export interface ICLIArgumentPayload {
+  command: string;
+  args: string[];
+  options: {
+    config?: string;
+    reporter?: 'github' | 'standard';
+    json?: boolean; // True when called programmatically by an AI agent tool callout
+  };
+}
+
+export interface ICLICommandRouter {
+  dispatchRoute(payload: ICLIArgumentPayload): Promise<void>;
+}
 ```
 
 ---
