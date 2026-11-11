@@ -1,6 +1,8 @@
 # Implementation Blueprint: uirig Scoped MVP
 
-This document defines the focused Phase 1 engineering scope, core architectural compromises, and verification invariants required to ship uirig: a framework-agnostic UI verification and layout linter gate built explicitly for CI/CD pipelines.
+This document defines the focused Phase 1 engineering scope, core architectural compromises, and verification invariants required to ship **uirig**: a zero-config, framework-blind UI verification gate for CI/CD pipelines and **the deterministic verification engine for AI Design System Harnesses**.
+
+While design tokens, `AGENTS.md` files, and Figma MCP servers give AI agents *context* on how to build UI, context alone cannot guarantee rendered quality. `uirig` closes the harness loop by providing fast, machine-readable, deterministic ground truth over live browser viewports—catching visual, geometric, and token drift without stuffing bulky style guides into LLM context windows.
 
 ## 1. The 4-Tool High-Signal MVP Matrix
 
@@ -55,6 +57,7 @@ To deliver immediate end-to-end design governance without code-generation fragil
 *   **Runtime Engine:** Node.js 22+ LTS Stable Releases
 *   **Automation Driver Context:** Playwright Core v1.64+ (Headless browser configuration layers)
 *   **System Configuration Identity:** Single configuration architecture file (`uirig.config.json`)
+*   **Agentic Harness Contract (`--json`):** Streams structured, zero-bloat JSON violation tokens (`remediationAdvice`, offending selectors, and measured deltas) directly to `stdout`, enabling coding agents to run `uirig check --json` as a self-healing post-edit verification loop.
 
 ---
 

@@ -4,7 +4,7 @@
 
 ## 1. Complete Software File Architecture
 
-The following tree represents the framework-blind file system blueprint for the `uirig` open-source codebase. By executing all validation routines inside isolated browser contexts, it requires zero heavy file generation pipelines or language compilation weights.
+The following tree represents the framework-blind file system blueprint for the `uirig` open-source codebase. Designed to serve both traditional CI/CD pipelines and **AI Design System Harnesses**, it executes all validation routines inside isolated headless browser contexts—delivering deterministic visual and token verification with zero context bloat or heavy code-generation weights.
 
 ```text
 uirig/
@@ -74,6 +74,12 @@ The architecture decouples individual quality tools into clean processing tracks
          Compiles results array & writes to disk at:
                 .uirig/github_pr_comment.md
 ```
+
+### 2.1 Agentic Design System Harness Integration
+In an AI-assisted workflow, `uirig` acts as the deterministic verification layer that keeps non-deterministic agents aligned with a team's design system:
+1. **Zero Context Bloat:** Design rules live in `uirig.config.json` rather than giant system prompts.
+2. **Deterministic Ground Truth:** Instead of fragile screenshot pixel-diffs or static AST linters, `uirig` audits computed styles, Porter-Duff composited contrast, and bounding-box geometry in a live viewport.
+3. **Closed-Loop Self-Healing:** Coding agents invoke `uirig check --json`, parse `ILayoutViolation.remediationAdvice`, patch the UI code, and re-run until POSIX exit code `0`.
 
 ---
 

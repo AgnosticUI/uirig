@@ -41,5 +41,8 @@
 - [ ] **Task 5.2: Markdown PR Comment Reporter**
   * **Action:** Code `src/utils/fs.ts` to synthesize evaluation results into a single clean markdown report saved directly at `.uirig/github_pr_comment.md`.
 - [ ] **Task 5.3: Agentic JSON Tool Stream Output Generator (MVP)**
-  * **Action:** Code a conditional fork inside `src/utils/formatter.ts` that skips console text table generation and serializes the raw layout violation array directly to standard output when `options.json` is true.
-
+  * **Action:** Code a conditional fork inside `src/utils/formatter.ts` that skips console text table generation and serializes the raw layout violation array directly to standard output when `options.json` is true, acting as the deterministic feedback loop for AI Design System Harnesses.
+- [ ] **Task 5.4: Retrofit `uirig init` to Emit `.uirig/SKILL.md`**
+  * **Action:** Update the existing `src/commands/init.ts` scaffolder so that running `uirig init` automatically generates `.uirig/SKILL.md` alongside `uirig.config.json`, giving teams immediate agent-ready instructions on first run.
+- [ ] **Task 5.5: Design System Harness Agent Recipe (`AGENTS.md` / CLI Snippet)**
+  * **Action:** Define the lightweight agent recipe and optional `AGENTS.md` integration snippet that teaches AI coding agents (Claude Code, Cursor, Codex) how to invoke `uirig check --json` after UI edits and self-correct violations without context bloat.
