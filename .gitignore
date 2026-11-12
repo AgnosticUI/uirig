@@ -1,6 +1,8 @@
 # System & Dependency Overhead
 node_modules/
+playground/node_modules/
 dist/
+playground/dist/
 build/
 .env
 
