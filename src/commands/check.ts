@@ -22,6 +22,7 @@ import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '.
 import { logTelemetry, paint } from '../utils/formatter.js';
 import { formatAgenticJsonStream } from '../utils/agent-stream.js';
 import { writeGithubPrCommentReport, DEFAULT_PR_COMMENT_PATH } from '../utils/fs.js';
+import { runDomIntegrityAudit } from '../core/dom.js';
 import {
   runDarkModeAudit,
   DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
@@ -366,6 +367,7 @@ export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExi
   }
   return 0;
 }
+
 /**
  * Audits a single `(url, viewport)` target across isolated Playwright `BrowserContext`
  * sessions running concurrently (`Promise.all`) inside one shared Chromium browser.
@@ -377,7 +379,8 @@ export async function auditViewportInParallel(
   tokenScale: ITokenScaleConfig | null,
   budgets: IThresholdBudgets,
   only?: AuditToolName,
-  ignoreRules: IUirigIgnoreRule[] = []
+  ignoreRules: IUirigIgnoreRule[] = [],
+  isLocalStaticTarget: boolean = false
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
   const runTokens = (!only || only === 'tokens') && tokenScale !== null;
@@ -385,6 +388,8 @@ export async function auditViewportInParallel(
   const runDarkMode = !only || only === 'dark-mode';
   const runStress = !only || only === 'stress';
   const runCls = !only || only === 'cls';
+  const runDom = !only || only === 'dom';
+  const runRuntimeCapture = !only;
 
   const activeScope = only ? `single engine (${only})` : '4 isolated contexts';
   logTelemetry(
@@ -396,18 +401,47 @@ export async function auditViewportInParallel(
     )}...`
   );
 
-  // Track 1: Read-Only Light-Mode Audits (`tokens` and/or `contrast`)
+  // Track 1: Read-Only Audits (`tokens`, `contrast`, `dom`) & Runtime JS Error Capture
   const runReadOnlyTrack = async (): Promise<{
     tokenViolations: ITokenViolation[];
     contrastViolations: IContrastViolation[];
+    domViolations: IDomIntegrityViolation[];
+    runtimeErrors: IRuntimeErrorViolation[];
   }> => {
-    if (!runTokens && !runContrast) {
-      return { tokenViolations: [], contrastViolations: [] };
+    if (!runTokens && !runContrast && !runDom && !runRuntimeCapture) {
+      return {
+        tokenViolations: [],
+        contrastViolations: [],
+        domViolations: [],
+        runtimeErrors: [],
+      };
     }
     const context = await browser.newContext({ viewport: viewportSize });
     try {
       const page = await context.newPage();
-      await page.goto(url, { waitUntil: 'networkidle' });
+      const runtimeErrors: IRuntimeErrorViolation[] = [];
+
+      if (runRuntimeCapture) {
+        page.on('pageerror', (err: Error) => {
+          runtimeErrors.push({
+            source: 'pageerror',
+            message: err.message,
+            location: url,
+          });
+        });
+        page.on('console', (msg) => {
+          if (msg.type() === 'error') {
+            const loc = msg.location();
+            runtimeErrors.push({
+              source: 'console_error',
+              message: msg.text(),
+              location: loc.url ? `${loc.url}:${loc.lineNumber}` : url,
+            });
+          }
+        });
+      }
+
+      const response = await page.goto(url, { waitUntil: 'networkidle' });
       const tokenViolations =
         runTokens && tokenScale !== null
           ? await crawlPageTokens(page, tokenScale, ignoreRules)
@@ -415,7 +449,14 @@ export async function auditViewportInParallel(
       const contrastViolations = runContrast
         ? await auditPageContrast(page, MIN_WCAG_AA_CONTRAST, ignoreRules)
         : [];
-      return { tokenViolations, contrastViolations };
+      const domViolations = runDom
+        ? await runDomIntegrityAudit(page, {
+            navigationResponse: isLocalStaticTarget ? null : response,
+            ignoreRules,
+          })
+        : [];
+
+      return { tokenViolations, contrastViolations, domViolations, runtimeErrors };
     } finally {
       await context.close();
     }
@@ -490,10 +531,11 @@ export async function auditViewportInParallel(
     darkModeViolations,
     stressViolations,
     clsEvaluation,
-    domViolations: [],
-    runtimeErrors: [],
+    domViolations: readOnlyResult.domViolations,
+    runtimeErrors: readOnlyResult.runtimeErrors,
   };
 }
+
 
 /**
  * Main orchestration entry point for `uirig check` and `uirig <url-or-file>`.
@@ -527,14 +569,14 @@ export async function executeCheckCommand(
       );
     }
 
-    const resolvedTargets: Array<{ displayUrl: string; liveUrl: string }> = [];
+    const resolvedTargets: Array<{ displayUrl: string; liveUrl: string; isLocal: boolean }> = [];
     for (const rawTarget of config.targetUrls) {
       if (isLocalFileTarget(rawTarget)) {
         const server = await startEphemeralStaticServer(rawTarget, cwd);
         ephemeralServers.push(server);
-        resolvedTargets.push({ displayUrl: rawTarget, liveUrl: server.url });
+        resolvedTargets.push({ displayUrl: rawTarget, liveUrl: server.url, isLocal: true });
       } else {
-        resolvedTargets.push({ displayUrl: rawTarget, liveUrl: rawTarget });
+        resolvedTargets.push({ displayUrl: rawTarget, liveUrl: rawTarget, isLocal: false });
       }
     }
 
@@ -556,7 +598,8 @@ export async function executeCheckCommand(
           tokenScale,
           config.thresholdBudgets,
           options.only,
-          config.ignore ?? []
+          config.ignore ?? [],
+          targetEntry.isLocal
         );
         results.push({
           ...viewportReport,

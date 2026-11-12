@@ -299,4 +299,25 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     });
   });
 
+  it('parses standalone dom subcommand and --only=dom', () => {
+    console.log('\n--- START TEST: Standalone dom Subcommand Parsing ---');
+    expect(parseCliArgs(['dom', './dist/index.html', '--json'])).toEqual({
+      command: 'check',
+      target: './dist/index.html',
+      only: 'dom',
+      configPath: undefined,
+      json: true,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['check', '--only=dom'])).toEqual({
+      command: 'check',
+      target: undefined,
+      only: 'dom',
+      configPath: undefined,
+      json: false,
+      headless: true,
+    });
+  });
+
 });

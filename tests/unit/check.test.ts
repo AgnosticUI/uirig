@@ -38,7 +38,10 @@ function createCleanViewportReport(): IViewportAuditReport {
 function startFixtureServer(html: string): Promise<{ server: Server; url: string }> {
   return new Promise((resolveServer) => {
     const server = createServer((_req, res) => {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'X-Frame-Options': 'DENY',
+      });
       res.end(html);
     });
     server.listen(0, '127.0.0.1', () => {
@@ -536,4 +539,67 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalStressViolations).toBe(0);
     expect(report.summary.totalTokenViolations).toBe(0);
   });
+
+  it('catches structural DOM hallucinations via --only=dom and returns exitCode 1', async () => {
+    console.log('[test:check] Running isolated dom integrity check on unlabeled input fixture...');
+    const brokenDomHtml = `<!DOCTYPE html>
+      <html>
+        <body>
+          <input placeholder="Unlabeled input" />
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(brokenDomHtml);
+    activeServer = server;
+
+    const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+    const report = await executeCheckCommand({
+      target: url,
+      cwd: tempDir,
+      headless: true,
+      only: 'dom',
+      reportOutputPath: reportOutput,
+    });
+
+    expect(report.exitCode).toBe(1);
+    expect(report.summary.totalDomViolations).toBeGreaterThan(0);
+  });
+
+  it('captures uncaught runtime JS pageerror exceptions during navigation and returns exitCode 1', async () => {
+    console.log('[test:check] Running runtime JS pageerror capture check...');
+    const runtimeCrashHtml = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root { --bg: #ffffff; --fg: #111827; }
+            :root[data-theme="dark"] { --bg: #0f172a; --fg: #f8fafc; }
+            body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); }
+          </style>
+        </head>
+        <body>
+          <h1>Hydration Crash Fixture</h1>
+          <script>
+            throw new TypeError('Cannot read properties of undefined (reading "mount")');
+          </script>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(runtimeCrashHtml);
+    activeServer = server;
+
+    const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+    const report = await executeCheckCommand({
+      target: url,
+      cwd: tempDir,
+      headless: true,
+      reportOutputPath: reportOutput,
+    });
+
+    expect(report.exitCode).toBe(1);
+    expect(report.summary.totalRuntimeErrors).toBeGreaterThan(0);
+    expect(report.results.at(0)?.runtimeErrors?.at(0)?.message).toContain(
+      'Cannot read properties of undefined'
+    );
+  });
+
 });

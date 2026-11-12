@@ -5,7 +5,7 @@
  * - `uirig <url-or-file> [--only=<tool>] [--config=<path>] [--json] [--headed]` (zero-config instant check)
  * - `uirig init`
  * - `uirig check [<url-or-file>] [--only=<tool>] [--config=<path>] [--json] [--headed]`
- * - `uirig tokens | contrast | dark-mode | stress | cls [<url-or-file>] [--config=<path>] [--json] [--headed]`
+ * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--config=<path>] [--json] [--headed]`
  * - `uirig manifest`
  * - `uirig --help` / `uirig --version`
  */
@@ -29,6 +29,7 @@ const AUDIT_TOOL_NAMES = new Set<AuditToolName>([
   'dark-mode',
   'stress',
   'cls',
+  'dom',
 ]);
 
 export const CLI_HELP_TEXT = `
@@ -40,17 +41,18 @@ ${paint('USAGE:', 'bold')}
 
 ${paint('COMMANDS:', 'bold')}
   init                            Scaffold uirig.config.json, .uirig/session.json, and .uirig/SKILL.md
-  check [<url-or-file>]           Run verification engines concurrently in isolated contexts
+  check [<url-or-file>]           Run all 6 verification engines concurrently in isolated contexts
   tokens [<url-or-file>]          Run only the shadow-piercing design token drift auditor
   contrast [<url-or-file>]        Run only the WCAG 2.1 rendered luminance contrast gate
   dark-mode [<url-or-file>]       Run only the dark-mode theme parity & surface luminance gate
   stress [<url-or-file>]          Run only the +30% text-expansion geometric overflow fuzzer
   cls [<url-or-file>]             Run only the W3C session-window Cumulative Layout Shift monitor
+  dom [<url-or-file>]             Run only the structural DOM, ARIA, media & prompt-injection gate
   manifest                        Print ASCII repository tree blueprint (excluding blocklisted dirs)
 
-${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / cls):', 'bold')}
+${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / cls / dom):', 'bold')}
   --config=<path>                 Path to uirig.config.json (also supports: --config <path>)
-  --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls
+  --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls | dom
   --json                          Route telemetry to stderr and emit machine-readable JSON to stdout
   --headed                        Launch Chromium with a visible browser window for local debugging
 
@@ -59,8 +61,8 @@ ${paint('GLOBAL OPTIONS:', 'bold')}
   -v, --version                   Print CLI version
 
 ${paint('POSIX EXIT CODES:', 'bold')}
-  0                               All geometric bounds, contrast ratios, and token checks passed
-  1                               Config error, design token drift, or WCAG/dark-mode contrast failure
+  0                               All geometric bounds, contrast ratios, token, and DOM checks passed
+  1                               Config error, token drift, contrast failure, DOM violation, or runtime JS error
   2                               Structural layout break (overflow/collision) or CLS budget breach
 `;
 
