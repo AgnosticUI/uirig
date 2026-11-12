@@ -47,10 +47,14 @@ export interface IUirigConfig {
   viewports: IViewportConfig[];
 }
 
+export type AuditToolName = 'tokens' | 'contrast' | 'stress' | 'cls';
+
 export interface ICheckCommandOptions {
   configPath?: string;
   json?: boolean;
   headless?: boolean;
+  /** Optional single-engine filter (`tokens` | `contrast` | `stress` | `cls`). Runs all 4 when omitted. */
+  only?: AuditToolName;
   /** Optional inline token scale override (useful for programmatic calls & tests). */
   tokenScaleOverride?: ITokenScaleConfig;
   /** Optional custom output path for the Markdown PR comment report (defaults to `.uirig/github_pr_comment.md`). */
@@ -240,43 +244,62 @@ export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExi
   }
   return 0;
 }
+
 /**
- * Audits a single `(url, viewport)` target across 3 isolated Playwright `BrowserContext`
- * sessions running concurrently (`Promise.all`) inside one shared Chromium browser:
+ * Audits a single `(url, viewport)` target across up to 3 isolated Playwright `BrowserContext`
+ * sessions running concurrently (`Promise.all`) inside one shared Chromium browser.
+ * When `only` is provided, spawns only the single `BrowserContext` needed for that engine:
  *
- * - **Context 1 (Read-Only):** Runs `crawlPageTokens()` + `auditPageContrast()` without DOM mutation.
- * - **Context 2 (Mutated Fuzzing):** Runs `runGeometricStressAudit()` (+30% pseudo-localization).
- * - **Context 3 (CLS Monitor):** Installs `prepareClsObserver()` prior to `page.goto()` and runs `collectPageCls()`.
+ * - **Context 1 (Read-Only):** Runs `crawlPageTokens()` (`tokens`) and/or `auditPageContrast()` (`contrast`) without DOM mutation.
+ * - **Context 2 (Mutated Fuzzing):** Runs `runGeometricStressAudit()` (`stress`, +30% pseudo-localization).
+ * - **Context 3 (CLS Monitor):** Installs `prepareClsObserver()` prior to `page.goto()` and runs `collectPageCls()` (`cls`).
+ *
+ * @param browser - Shared headless/headed Chromium `Browser` instance.
+ * @param url - Target page URL to open inside each isolated context.
+ * @param viewport - Viewport dimensions and profile label (`name`, `width`, `height`).
+ * @param tokenScale - Approved design token scale loaded from `tokensPath`.
+ * @param budgets - Threshold budgets (`clsMaxLimit`, `overflowPixelTolerance`, `touchTargetMinSpacingPx`).
+ * @param only - Optional single-engine filter (`'tokens' | 'contrast' | 'stress' | 'cls'`). Runs all 4 when omitted.
+ * @returns Aggregated `IViewportAuditReport` for this `(url, viewport)` target.
  */
 export async function auditViewportInParallel(
   browser: Browser,
   url: string,
   viewport: IViewportConfig,
   tokenScale: ITokenScaleConfig,
-  budgets: IThresholdBudgets
+  budgets: IThresholdBudgets,
+  only?: AuditToolName
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
+  const runTokens = !only || only === 'tokens';
+  const runContrast = !only || only === 'contrast';
+  const runStress = !only || only === 'stress';
+  const runCls = !only || only === 'cls';
+
+  const activeScope = only ? `single engine (${only})` : '3 isolated contexts';
   logTelemetry(
     'check:dispatch',
-    `Spawning 3 isolated contexts for ${paint(url, 'cyan')} @ ${paint(
+    `Running ${activeScope} for ${paint(url, 'cyan')} @ ${paint(
       `${viewport.name} (${viewport.width}x${viewport.height})`,
       'bold',
       'green'
     )}...`
   );
 
-
-  // Track 1: Read-Only Audits (`tokens` + `contrast`)
+  // Track 1: Read-Only Audits (`tokens` and/or `contrast`)
   const runReadOnlyTrack = async (): Promise<{
     tokenViolations: ITokenViolation[];
     contrastViolations: IContrastViolation[];
   }> => {
+    if (!runTokens && !runContrast) {
+      return { tokenViolations: [], contrastViolations: [] };
+    }
     const context = await browser.newContext({ viewport: viewportSize });
     try {
       const page = await context.newPage();
       await page.goto(url, { waitUntil: 'networkidle' });
-      const tokenViolations = await crawlPageTokens(page, tokenScale);
-      const contrastViolations = await auditPageContrast(page);
+      const tokenViolations = runTokens ? await crawlPageTokens(page, tokenScale) : [];
+      const contrastViolations = runContrast ? await auditPageContrast(page) : [];
       return { tokenViolations, contrastViolations };
     } finally {
       await context.close();
@@ -285,6 +308,9 @@ export async function auditViewportInParallel(
 
   // Track 2: Mutated DOM Fuzzing (`stress`)
   const runStressTrack = async (): Promise<IGeometricViolation[]> => {
+    if (!runStress) {
+      return [];
+    }
     const context = await browser.newContext({ viewport: viewportSize });
     try {
       const page = await context.newPage();
@@ -300,6 +326,9 @@ export async function auditViewportInParallel(
 
   // Track 3: Pre-Navigation Layout Shift Monitor (`cls`)
   const runClsTrack = async (): Promise<IClsEvaluationResult> => {
+    if (!runCls) {
+      return { maxSessionCls: 0, violation: null };
+    }
     const context = await browser.newContext({ viewport: viewportSize });
     try {
       const page = await context.newPage();
@@ -326,6 +355,7 @@ export async function auditViewportInParallel(
     clsEvaluation,
   };
 }
+
 
 /**
  * Main orchestration entry point for `uirig check`.
@@ -377,11 +407,13 @@ export async function executeCheckCommand(
           url,
           viewport,
           tokenScale,
-          config.thresholdBudgets
+          config.thresholdBudgets,
+          options.only
         );
         results.push(viewportReport);
       }
     }
+
 
     const exitCode = evaluatePosixExitCode(results);
 

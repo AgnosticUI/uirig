@@ -122,6 +122,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     expect(checkSpy).toHaveBeenLastCalledWith({
       configPath: 'custom.json',
       json: true,
+      only: undefined,
       headless: false,
     });
     expect(await runCli(['check'], { check: checkSpy })).toBe(2);
@@ -154,6 +155,66 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     });
     expect(helpOutput).toContain('uirig <command> [options]');
     expect(helpOutput).toContain('POSIX EXIT CODES:');
+  });
+
+  it('parses standalone tool subcommands (tokens, contrast, stress, cls) and --only=<tool>', () => {
+    console.log('\n--- START TEST: Standalone Engine Subcommands & --only Flag ---');
+    expect(parseCliArgs(['tokens', '--json'])).toEqual({
+      command: 'check',
+      only: 'tokens',
+      configPath: undefined,
+      json: true,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['contrast', '--config=custom.json'])).toEqual({
+      command: 'check',
+      only: 'contrast',
+      configPath: 'custom.json',
+      json: false,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['stress', '--headed'])).toEqual({
+      command: 'check',
+      only: 'stress',
+      configPath: undefined,
+      json: false,
+      headless: false,
+    });
+
+    expect(parseCliArgs(['cls'])).toEqual({
+      command: 'check',
+      only: 'cls',
+      configPath: undefined,
+      json: false,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['check', '--only=contrast'])).toEqual({
+      command: 'check',
+      only: 'contrast',
+      configPath: undefined,
+      json: false,
+      headless: true,
+    });
+
+    const invalidOnly = parseCliArgs(['check', '--only=unknown']);
+    expect(invalidOnly.command).toBe('unknown');
+  });
+
+  it('dispatches standalone tool commands (e.g. uirig contrast --json) with only="contrast"', async () => {
+    console.log('\n--- START TEST: Standalone Tool Execution Routing ---');
+    const checkSpy = vi.fn().mockResolvedValue(createMockReport(0));
+
+    const exitCode = await runCli(['contrast', '--json'], { check: checkSpy });
+    expect(exitCode).toBe(0);
+    expect(checkSpy).toHaveBeenCalledWith({
+      configPath: undefined,
+      only: 'contrast',
+      json: true,
+      headless: true,
+    });
   });
 
 });

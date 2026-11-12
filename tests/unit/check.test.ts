@@ -393,5 +393,71 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     }
   });
 
+  it('filters execution to a single engine when options.only is specified', async () => {
+    console.log('\n--- START TEST: Single-Engine Filter (options.only = "contrast") ---');
+    // Fixture has BOTH a low-contrast paragraph AND a cramped stress-overflow box
+    const mixedHtml = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background-color: rgb(255, 255, 255); color: rgb(17, 24, 39); font-size: 16px; }
+            p.low-contrast { margin: 0; font-size: 16px; color: rgb(156, 163, 175); }
+            .cramped { width: 80px; }
+            .nowrap { display: inline-block; white-space: nowrap; }
+          </style>
+        </head>
+        <body>
+          <p class="low-contrast">Muted text</p>
+          <div class="cramped"><span class="nowrap">Long text that would fail stress</span></div>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(mixedHtml);
+    activeServer = server;
+
+    const tokensFile = join(tempDir, 'tokens.json');
+    const configFile = join(tempDir, 'uirig.config.json');
+
+    writeFileSync(
+      tokensFile,
+      JSON.stringify({
+        colors: ['rgb(255, 255, 255)', 'rgb(17, 24, 39)', 'rgb(156, 163, 175)'],
+        spacing: ['0px', '16px'],
+        fontSizes: ['16px'],
+        radii: ['0px'],
+      }),
+      'utf8'
+    );
+
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: [url],
+        tokensPath: './tokens.json',
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1024, height: 768 }],
+      }),
+      'utf8'
+    );
+
+    const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+    const report = await executeCheckCommand({
+      configPath: configFile,
+      headless: true,
+      only: 'contrast',
+      reportOutputPath: reportOutput,
+    });
+
+    // Should catch contrast (exitCode 1) while skipping stress (which would have returned exitCode 2)
+    expect(report.exitCode).toBe(1);
+    expect(report.summary.totalContrastViolations).toBeGreaterThan(0);
+    expect(report.summary.totalStressViolations).toBe(0);
+    expect(report.summary.totalTokenViolations).toBe(0);
+  });
+
 });
 
