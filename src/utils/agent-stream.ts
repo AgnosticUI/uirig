@@ -142,32 +142,47 @@ export function normalizeViewportViolations(
     }
   }
 
-    // 4. Normalize Geometric Stress Breaches (`stress`)
+  // 4. Normalize Geometric Stress Breaches (`stress`)
   for (const stressViolation of viewportReport.stressViolations) {
     let remediationAdvice = '';
+    let measuredDelta = `+${stressViolation.measuredLeakPixels}px`;
 
     if (stressViolation.violationType === 'container_overflow') {
       const parentTarget = stressViolation.relatedSelector ?? 'its parent container';
       remediationAdvice = `Allow text wrapping, remove 'white-space: nowrap', or widen '${parentTarget}' so '${stressViolation.selector}' does not overflow by ${stressViolation.measuredLeakPixels}px under +30% text expansion.`;
     } else if (stressViolation.violationType === 'horizontal_scrollbar') {
       remediationAdvice = `Eliminate horizontal viewport overflow (${stressViolation.measuredLeakPixels}px bleed) by constraining rigid widths or applying 'max-width: 100%' / responsive flex/grid wrapping.`;
+    } else if (stressViolation.violationType === 'undersized_touch_target') {
+      remediationAdvice = `Increase width/height or padding of interactive control '${stressViolation.selector}' by ${stressViolation.measuredLeakPixels}px so it meets the minimum 24x24px WCAG 2.5.8 touch-target size.`;
+    } else if (stressViolation.violationType === 'squished_avatar') {
+      measuredDelta = `${stressViolation.measuredLeakPixels}% aspect-ratio distortion`;
+      remediationAdvice = `Add 'flex-shrink: 0' and explicit width/height to avatar '${stressViolation.selector}' so sibling text expansion does not distort its aspect ratio (${stressViolation.measuredLeakPixels}% drift).`;
+    } else if (stressViolation.violationType === 'stuck_invisible_element') {
+      measuredDelta = 'opacity: 0 while occupying layout space';
+      remediationAdvice = `Element '${stressViolation.selector}' has 'opacity: 0' while occupying layout bounds. Ensure scroll-reveal animations complete or apply 'display: none' / 'aria-hidden="true"' if intentionally hidden.`;
     } else {
       const neighborTarget = stressViolation.relatedSelector ?? 'adjacent interactive element';
       remediationAdvice = `Increase gap/margin between '${stressViolation.selector}' and '${neighborTarget}' by at least ${stressViolation.measuredLeakPixels}px to meet the minimum touch-target spacing budget.`;
     }
+
+    const hostComponent =
+      stressViolation.hostComponent !== undefined
+        ? stressViolation.hostComponent
+        : extractHostComponentFromSelector(stressViolation.selector);
 
     normalized.push({
       engine: 'stress',
       violationType: stressViolation.violationType,
       url: viewportReport.url,
       viewport: viewportLabel,
-      hostComponent: extractHostComponentFromSelector(stressViolation.selector),
+      hostComponent,
       selector: stressViolation.selector,
       inShadowDom: stressViolation.inShadowDom,
-      measuredDelta: `+${stressViolation.measuredLeakPixels}px`,
+      measuredDelta,
       remediationAdvice,
     });
   }
+
 
   // 5. Normalize Cumulative Layout Shift Budget Breaches (`cls`)
   const clsViolation = viewportReport.clsEvaluation.violation;

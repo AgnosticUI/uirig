@@ -84,6 +84,7 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
     expect(result).toEqual({
       violationType: 'horizontal_scrollbar',
       selector: 'document.documentElement',
+      hostComponent: null,
       measuredLeakPixels: 37,
       inShadowDom: false,
     });
@@ -149,7 +150,6 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       inShadowDom: false,
     });
   });
-
   describe('::: PHASE 3 TASK 3.3 (CHUNK 2): LIVE CHROMIUM TEXT-EXPANSION STRESS RIG :::', () => {
     let browser: Browser | undefined;
 
@@ -260,6 +260,93 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       expect(collision?.selector).toBe('uirig-toolbar >> shadow-root >> button#btn-approve');
       expect(collision?.relatedSelector).toBe('uirig-toolbar >> shadow-root >> button#btn-reject');
     });
-  });
 
+    it('==> Should exempt inline paragraph links and .sr-only utilities without false positives', async () => {
+      console.log('\n--- START TEST: Inline Prose Links & .sr-only False-Positive Exemptions ---');
+
+      if (!browser) {
+        browser = await chromium.launch({ headless: true });
+      }
+      const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+      const page = await context.newPage();
+
+      await page.setContent(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { margin: 0; padding: 24px; font-family: sans-serif; font-size: 16px; line-height: 1.5; }
+              .sr-only {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                opacity: 0;
+                overflow: hidden;
+              }
+            </style>
+          </head>
+          <body>
+            <span class="sr-only">Screen reader announcement</span>
+            <p>
+              Read our <a href="/terms">terms</a> and <a href="/privacy">privacy</a> policies for details.
+            </p>
+          </body>
+        </html>
+      `);
+
+      const violations = await runGeometricStressAudit(page, {
+        overflowPixelTolerance: 2,
+        touchTargetMinSpacingPx: 24,
+      });
+
+      await context.close();
+
+      expect(violations).toEqual([]);
+    });
+
+    it('==> Should catch undersized touch targets, flex-squished avatars, and stuck opacity:0 elements', async () => {
+      console.log('\n--- START TEST: Undersized Target, Squished Avatar & Stuck Opacity:0 Detection ---');
+
+      if (!browser) {
+        browser = await chromium.launch({ headless: true });
+      }
+      const context = await browser.newContext({ viewport: { width: 420, height: 600 } });
+      const page = await context.newPage();
+
+      await page.setContent(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { margin: 0; padding: 16px; font-family: sans-serif; }
+              .tiny-icon-btn { width: 16px; height: 16px; padding: 0; border: 1px solid #333; }
+              .row { display: flex; width: 220px; align-items: center; gap: 8px; margin-top: 32px; }
+              .avatar { width: 48px; height: 48px; background: #3b82f6; }
+              .stuck-reveal { opacity: 0; width: 180px; height: 48px; margin-top: 32px; }
+            </style>
+          </head>
+          <body>
+            <button class="tiny-icon-btn" aria-label="Tiny">x</button>
+            <div class="row">
+              <div class="avatar"></div>
+              <span>Long User Display Name That Expands</span>
+            </div>
+            <div class="stuck-reveal">Never faded in</div>
+          </body>
+        </html>
+      `);
+
+      const violations = await runGeometricStressAudit(page, {
+        overflowPixelTolerance: 2,
+        touchTargetMinSpacingPx: 24,
+      });
+
+      await context.close();
+
+      const types = violations.map((v) => v.violationType);
+      expect(types).toContain('undersized_touch_target');
+      expect(types).toContain('squished_avatar');
+      expect(types).toContain('stuck_invisible_element');
+    });
+  });
 });

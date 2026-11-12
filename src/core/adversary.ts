@@ -10,12 +10,14 @@
 import type { Page } from 'playwright';
 import { logTelemetry, paint } from '../utils/formatter.js';
 import { isElementIgnoredInBrowser, type IUirigIgnoreRule } from '../utils/ignore.js';
+import { createBrowserDomWalker } from '../utils/dom-walker.js';
 
 /**
  * Axis-aligned bounding box coordinates matching browser `DOMRect` geometry.
  */
 export interface IBoundingBox {
   selector: string;
+  hostComponent?: string | null;
   x: number;
   y: number;
   width: number;
@@ -29,9 +31,17 @@ export interface IBoundingBox {
  */
 export interface IGeometricViolation {
   /** Type of structural invariant broken by text expansion or viewport stress. */
-  violationType: 'container_overflow' | 'horizontal_scrollbar' | 'touch_target_collision';
+  violationType:
+    | 'container_overflow'
+    | 'horizontal_scrollbar'
+    | 'touch_target_collision'
+    | 'undersized_touch_target'
+    | 'squished_avatar'
+    | 'stuck_invisible_element';
   /** CSS selector or Shadow DOM breadcrumb identifying the offending element. */
   selector: string;
+  /** Enclosing Web Component custom element tag when inside an open ShadowRoot. */
+  hostComponent?: string | null;
   /** Optional related container or neighbor selector involved in the breach. */
   relatedSelector?: string;
   /** Measured pixel breach beyond the allowed tolerance or spacing budget. */
@@ -76,6 +86,7 @@ export function checkParentChildOverflow(
     return {
       violationType: 'container_overflow',
       selector: child.selector,
+      hostComponent: child.hostComponent,
       relatedSelector: parent.selector,
       measuredLeakPixels: Math.round(maxOverflow * 100) / 100,
       inShadowDom: child.inShadowDom,
@@ -100,6 +111,7 @@ export function checkHorizontalScrollbarLeak(
     return {
       violationType: 'horizontal_scrollbar',
       selector: 'document.documentElement',
+      hostComponent: null,
       measuredLeakPixels: Math.round(leakPixels * 100) / 100,
       inShadowDom: false,
     };
@@ -132,6 +144,7 @@ export function checkTouchTargetSpacing(
     return {
       violationType: 'touch_target_collision',
       selector: targetA.selector,
+      hostComponent: targetA.hostComponent ?? targetB.hostComponent,
       relatedSelector: targetB.selector,
       measuredLeakPixels: Math.round((touchTargetMinSpacingPx + overlapDepth) * 100) / 100,
       inShadowDom: targetA.inShadowDom || targetB.inShadowDom,
@@ -148,6 +161,7 @@ export function checkTouchTargetSpacing(
     return {
       violationType: 'touch_target_collision',
       selector: targetA.selector,
+      hostComponent: targetA.hostComponent ?? targetB.hostComponent,
       relatedSelector: targetB.selector,
       measuredLeakPixels: Math.round(deficit * 100) / 100,
       inShadowDom: targetA.inShadowDom || targetB.inShadowDom,
@@ -156,8 +170,34 @@ export function checkTouchTargetSpacing(
 
   return null;
 }
+
 /**
- * Snapshot payload returned from Playwright's `page.evaluate()` after +30% text expansion.
+ * Pure helper checking whether a standalone interactive touch target meets the
+ * WCAG 2.5.8 minimum 24x24px bounding box size.
+ */
+export function checkMinimumTouchTargetSize(
+  target: IBoundingBox,
+  minSizePx: number = 24
+): IGeometricViolation | null {
+  const widthShortfall = Math.max(0, minSizePx - target.width);
+  const heightShortfall = Math.max(0, minSizePx - target.height);
+  const maxShortfall = Math.max(widthShortfall, heightShortfall);
+
+  if (maxShortfall > 0.5) {
+    return {
+      violationType: 'undersized_touch_target',
+      selector: target.selector,
+      measuredLeakPixels: Math.round(maxShortfall * 100) / 100,
+      inShadowDom: target.inShadowDom,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Snapshot payload returned from Playwright's `page.evaluate()` after +30% text expansion
+ * and long space-free string injection.
  */
 interface IStressDomSnapshot {
   documentScrollWidth: number;
@@ -168,12 +208,28 @@ interface IStressDomSnapshot {
     child: IBoundingBox;
   }>;
   interactiveTargets: IBoundingBox[];
+  undersizedTargets: IBoundingBox[];
+  squishedAvatars: Array<{
+    selector: string;
+    hostComponent: string | null;
+    inShadowDom: boolean;
+    aspectDriftPercent: number;
+  }>;
+  stuckInvisibleElements: Array<{
+    selector: string;
+    hostComponent: string | null;
+    inShadowDom: boolean;
+  }>;
 }
 
 /**
- * Mutates a live Playwright Page by injecting +30% text expansion across Light DOM
- * and open ShadowRoot nodes, then evaluates parent-child containment, global horizontal
- * scrollbar leaks, and interactive touch-target spacing invariants.
+ * Mutates a live Playwright Page by injecting +30% text expansion and long space-free
+ * strings (emails/URLs) across Light DOM and open ShadowRoot nodes, then evaluates:
+ * 1. Global horizontal scrollbar leaks (`100vw` bleed)
+ * 2. Parent-child containment bounds (exempting `overflow-x/y: auto/scroll/hidden`)
+ * 3. Standalone interactive touch-target spacing and `24x24px` minimum size (exempting inline text links)
+ * 4. Flex-squished avatar aspect-ratio distortion
+ * 5. Layout-occupying `opacity: 0` elements (exempting `.sr-only`, `aria-hidden`, `inert`, and collapsed `[aria-expanded="false"]` subtrees)
  */
 export async function runGeometricStressAudit(
   page: Page,
@@ -193,200 +249,251 @@ export async function runGeometricStressAudit(
     )} text expansion & measuring bounds...`
   );
 
-  const ignoreHelperSource = isElementIgnoredInBrowser.toString();
-
   const snapshot = await page.evaluate(
     ({
       ratio,
+      minTouchPx,
       rules,
-      helperFn,
+      walkerFactorySrc,
+      ignoreHelperSrc,
     }: {
       ratio: number;
+      minTouchPx: number;
       rules: IUirigIgnoreRule[];
-      helperFn: string;
+      walkerFactorySrc: string;
+      ignoreHelperSrc: string;
     }): IStressDomSnapshot => {
-      const checkIgnored = new Function(`return (${helperFn});`)() as typeof isElementIgnoredInBrowser;
-      const currentUrl = window.location.href;
-
-      const nonVisualTags = new Set([
-        'HTML',
-        'HEAD',
-        'SCRIPT',
-        'STYLE',
-        'META',
-        'LINK',
-        'NOSCRIPT',
-        'TEMPLATE',
-        'SLOT',
-      ]);
+      const buildWalker = new Function(
+        `return (${walkerFactorySrc});`
+      )() as typeof createBrowserDomWalker;
+      const walker = buildWalker(window.location.href, rules, ignoreHelperSrc);
 
       const interactiveTags = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA']);
+      const inlineProseParents = new Set(['P', 'LI', 'BLOCKQUOTE', 'DD', 'TD', 'SPAN']);
       const pseudoGlyphs = 'Ĥéĺĺő_Ŵőŕĺď_Ťéśť_Łőćáĺé';
+      const unbreakableToken = 'alexandra.van.der.berg@enterprise-platform.io';
 
-      function formatSelector(el: Element): string {
-        const tagName = el.tagName.toLowerCase();
-        if (el.id) {
-          return `${tagName}#${el.id}`;
+      function isHiddenSubtree(el: Element): boolean {
+        if (
+          el.classList.contains('sr-only') ||
+          el.classList.contains('visually-hidden') ||
+          el.closest('.sr-only, .visually-hidden, [aria-hidden="true"], [inert]')
+        ) {
+          return true;
         }
-        if (typeof el.className === 'string' && el.className.trim().length > 0) {
-          const classList = el.className.trim().split(/\s+/).join('.');
-          return `${tagName}.${classList}`;
+        let cursor: Element | null = el.parentElement;
+        while (cursor) {
+          if (cursor.getAttribute('aria-expanded') === 'false') {
+            return true;
+          }
+          cursor = cursor.parentElement;
         }
-        return tagName;
+        return false;
       }
 
-      function isInteractiveControl(el: Element): boolean {
-        if (interactiveTags.has(el.tagName)) {
+      function isStandaloneInteractiveControl(el: Element): boolean {
+        const tag = el.tagName;
+        if (tag === 'INPUT' && (el.getAttribute('type') ?? '').toLowerCase() === 'hidden') {
+          return false;
+        }
+        if (tag === 'A' && el.parentElement && inlineProseParents.has(el.parentElement.tagName)) {
+          return false;
+        }
+        if (interactiveTags.has(tag)) {
           return true;
         }
         const role = el.getAttribute('role');
         return role === 'button' || role === 'link' || role === 'tab';
       }
 
-      // Step 1: Expand visible text nodes across Light DOM and open ShadowRoots
-      function expandTextsInRoot(root: Document | ShadowRoot): void {
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-        let currentEl = walker.nextNode() as Element | null;
-
-        while (currentEl) {
-          if (!nonVisualTags.has(currentEl.tagName)) {
-            const computed = window.getComputedStyle(currentEl);
-            if (
-              computed.display !== 'none' &&
-              computed.visibility !== 'hidden' &&
-              !checkIgnored(currentEl, 'stress', currentUrl, rules)
-            ) {
-              for (const child of Array.from(currentEl.childNodes)) {
-                if (child.nodeType === Node.TEXT_NODE) {
-                  const rawText = child.textContent ?? '';
-                  const trimmed = rawText.trim();
-                  if (trimmed.length > 0) {
-                    const extraChars = Math.max(4, Math.ceil(trimmed.length * ratio));
-                    const padding = pseudoGlyphs
-                      .repeat(Math.ceil(extraChars / pseudoGlyphs.length))
-                      .slice(0, extraChars);
-                    child.textContent = `${trimmed} [${padding}]`;
-                  }
-                }
-              }
-            }
-
-            if (currentEl.shadowRoot) {
-              expandTextsInRoot(currentEl.shadowRoot);
-            }
-          }
-          currentEl = walker.nextNode() as Element | null;
+      function isAvatarCandidate(el: Element): boolean {
+        if (el.tagName === 'IMG') {
+          const imgEl = el as HTMLImageElement;
+          return imgEl.classList.contains('avatar') || /avatar|profile/i.test(imgEl.alt || imgEl.id || '');
         }
+        return el.classList.contains('avatar');
       }
 
-      expandTextsInRoot(document);
+
+      // Step 0: Record baseline avatar aspect ratios before text expansion
+      const baselineAvatarRatios = new Map<Element, number>();
+      walker.walkElements(
+        (el) => {
+          if (isAvatarCandidate(el) && !walker.isIgnored(el, 'stress')) {
+            const rect = el.getBoundingClientRect();
+            if (rect.width >= 20 && rect.height >= 20) {
+              baselineAvatarRatios.set(el, rect.width / rect.height);
+            }
+          }
+        },
+        { includeBody: false }
+      );
+
+      // Step 1: Expand visible text nodes and inject unbreakable strings across Light + Shadow DOM
+      let injectedUnbreakable = false;
+      walker.walkElements((currentEl) => {
+        const computed = window.getComputedStyle(currentEl);
+        if (
+          computed.display === 'none' ||
+          computed.visibility === 'hidden' ||
+          isHiddenSubtree(currentEl) ||
+          walker.isIgnored(currentEl, 'stress')
+        ) {
+          return;
+        }
+
+        for (const child of Array.from(currentEl.childNodes)) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            const trimmed = (child.textContent ?? '').trim();
+            if (trimmed.length > 0) {
+              const extraChars = Math.max(4, Math.ceil(trimmed.length * ratio));
+              const padding = pseudoGlyphs
+                .repeat(Math.ceil(extraChars / pseudoGlyphs.length))
+                .slice(0, extraChars);
+              if (!injectedUnbreakable && currentEl.tagName === 'P' && trimmed.includes('@')) {
+                child.textContent = `${trimmed} ${unbreakableToken}`;
+                injectedUnbreakable = true;
+              } else {
+                child.textContent = `${trimmed} [${padding}]`;
+              }
+            }
+          }
+        }
+      });
 
       // Step 2: Force synchronous reflow and collect post-expansion bounding boxes
       const parentChildPairs: Array<{ parent: IBoundingBox; child: IBoundingBox }> = [];
       const interactiveTargets: IBoundingBox[] = [];
+      const undersizedTargets: IBoundingBox[] = [];
+      const squishedAvatars: IStressDomSnapshot['squishedAvatars'] = [];
+      const stuckInvisibleElements: IStressDomSnapshot['stuckInvisibleElements'] = [];
 
-      function measureRoot(
-        root: Document | ShadowRoot,
-        shadowPrefix: string,
-        insideShadow: boolean
-      ): void {
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-        let currentEl = walker.nextNode() as Element | null;
+      walker.walkElements(
+        (currentEl, meta) => {
+          const computed = window.getComputedStyle(currentEl);
+          if (
+            computed.display === 'none' ||
+            computed.visibility === 'hidden' ||
+            isHiddenSubtree(currentEl) ||
+            walker.isIgnored(currentEl, 'stress')
+          ) {
+            return;
+          }
 
-        while (currentEl) {
-          if (!nonVisualTags.has(currentEl.tagName) && currentEl.tagName !== 'BODY') {
-            const computed = window.getComputedStyle(currentEl);
-            const elementLabel = formatSelector(currentEl);
-            const fullSelector = shadowPrefix ? `${shadowPrefix} >> ${elementLabel}` : elementLabel;
+          const rect = currentEl.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) {
+            return;
+          }
 
-            if (
-              computed.display !== 'none' &&
-              computed.visibility !== 'hidden' &&
-              !checkIgnored(currentEl, 'stress', currentUrl, rules)
-            ) {
-              const rect = currentEl.getBoundingClientRect();
+          // Detect layout-occupying `opacity: 0` elements (e.g. stuck scroll-reveal animations)
+          if (parseFloat(computed.opacity) === 0 && rect.width >= 24 && rect.height >= 24) {
+            stuckInvisibleElements.push({
+              selector: meta.selector,
+              hostComponent: meta.hostComponent,
+              inShadowDom: meta.inShadowDom,
+            });
+          }
 
-              if (rect.width > 0 && rect.height > 0) {
-                const currentBox: IBoundingBox = {
-                  selector: fullSelector,
-                  x: rect.left,
-                  y: rect.top,
-                  width: rect.width,
-                  height: rect.height,
-                  inShadowDom: insideShadow,
-                };
-
-                if (isInteractiveControl(currentEl)) {
-                  interactiveTargets.push(currentBox);
-                }
-
-                const parentEl = currentEl.parentElement;
-                if (
-                  parentEl &&
-                  parentEl.tagName !== 'HTML' &&
-                  parentEl.tagName !== 'BODY' &&
-                  computed.position !== 'fixed'
-                ) {
-                  const parentComputed = window.getComputedStyle(parentEl);
-                  const parentRect = parentEl.getBoundingClientRect();
-
-                  const clipsHorizontal =
-                    parentComputed.overflowX === 'auto' ||
-                    parentComputed.overflowX === 'scroll' ||
-                    parentComputed.overflowX === 'hidden';
-                  const clipsVertical =
-                    parentComputed.overflowY === 'auto' ||
-                    parentComputed.overflowY === 'scroll' ||
-                    parentComputed.overflowY === 'hidden';
-
-                  if (
-                    !clipsHorizontal &&
-                    !clipsVertical &&
-                    parentRect.width > 0 &&
-                    parentRect.height > 0
-                  ) {
-                    const parentLabel = formatSelector(parentEl);
-                    const parentFullSelector = shadowPrefix
-                      ? `${shadowPrefix} >> ${parentLabel}`
-                      : parentLabel;
-
-                    parentChildPairs.push({
-                      parent: {
-                        selector: parentFullSelector,
-                        x: parentRect.left,
-                        y: parentRect.top,
-                        width: parentRect.width,
-                        height: parentRect.height,
-                        inShadowDom: insideShadow,
-                      },
-                      child: currentBox,
-                    });
-                  }
-                }
-              }
-            }
-
-            if (currentEl.shadowRoot) {
-              const nextShadowPrefix = `${fullSelector} >> shadow-root`;
-              measureRoot(currentEl.shadowRoot, nextShadowPrefix, true);
+          // Detect flex-squished avatars whose aspect ratio distorted > 15%
+          const initialRatio = baselineAvatarRatios.get(currentEl);
+          if (initialRatio !== undefined && rect.height > 0) {
+            const postRatio = rect.width / rect.height;
+            const drift = Math.abs(postRatio - initialRatio) / initialRatio;
+            if (drift > 0.15) {
+              squishedAvatars.push({
+                selector: meta.selector,
+                hostComponent: meta.hostComponent,
+                inShadowDom: meta.inShadowDom,
+                aspectDriftPercent: Math.round(drift * 100),
+              });
             }
           }
 
-          currentEl = walker.nextNode() as Element | null;
-        }
-      }
+          const currentBox: IBoundingBox = {
+            selector: meta.selector,
+            hostComponent: meta.hostComponent,
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height,
+            inShadowDom: meta.inShadowDom,
+          };
 
-      measureRoot(document, '', false);
+          if (isStandaloneInteractiveControl(currentEl)) {
+            interactiveTargets.push(currentBox);
+            if (rect.width < minTouchPx || rect.height < minTouchPx) {
+              undersizedTargets.push(currentBox);
+            }
+          }
+
+          const parentEl = currentEl.parentElement;
+          if (
+            parentEl &&
+            parentEl.tagName !== 'HTML' &&
+            parentEl.tagName !== 'BODY' &&
+            computed.position !== 'fixed'
+          ) {
+            const parentComputed = window.getComputedStyle(parentEl);
+            const parentRect = parentEl.getBoundingClientRect();
+
+            const clipsHorizontal =
+              parentComputed.overflowX === 'auto' ||
+              parentComputed.overflowX === 'scroll' ||
+              parentComputed.overflowX === 'hidden';
+            const clipsVertical =
+              parentComputed.overflowY === 'auto' ||
+              parentComputed.overflowY === 'scroll' ||
+              parentComputed.overflowY === 'hidden';
+
+            if (
+              !clipsHorizontal &&
+              !clipsVertical &&
+              parentRect.width > 0 &&
+              parentRect.height > 0
+            ) {
+              const parentLabel = walker.formatSelector(parentEl);
+              const shadowBoundary = meta.selector.lastIndexOf(' >> shadow-root >> ');
+              const parentFullSelector =
+                shadowBoundary !== -1
+                  ? `${meta.selector.slice(0, shadowBoundary + ' >> shadow-root >> '.length)}${parentLabel}`
+                  : parentLabel;
+
+              parentChildPairs.push({
+                parent: {
+                  selector: parentFullSelector,
+                  hostComponent: meta.hostComponent,
+                  x: parentRect.left,
+                  y: parentRect.top,
+                  width: parentRect.width,
+                  height: parentRect.height,
+                  inShadowDom: meta.inShadowDom,
+                },
+                child: currentBox,
+              });
+            }
+          }
+        },
+        { includeBody: false }
+      );
 
       return {
         documentScrollWidth: document.documentElement.scrollWidth,
         windowInnerWidth: window.innerWidth,
-        ignoreRootScrollLeak: checkIgnored(document.documentElement, 'stress', currentUrl, rules),
+        ignoreRootScrollLeak: walker.isIgnored(document.documentElement, 'stress'),
         parentChildPairs,
         interactiveTargets,
+        undersizedTargets,
+        squishedAvatars,
+        stuckInvisibleElements,
       };
     },
-    { ratio: expansionRatio, rules: ignoreRules, helperFn: ignoreHelperSource }
+    {
+      ratio: expansionRatio,
+      minTouchPx: touchTargetMinSpacingPx,
+      rules: ignoreRules,
+      walkerFactorySrc: createBrowserDomWalker.toString(),
+      ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
+    }
   );
 
   const violations: IGeometricViolation[] = [];
@@ -407,6 +514,40 @@ export async function runGeometricStressAudit(
     if (overflow) {
       violations.push(overflow);
     }
+  }
+
+  for (const smallTarget of snapshot.undersizedTargets) {
+    const deficit = Math.max(
+      touchTargetMinSpacingPx - smallTarget.width,
+      touchTargetMinSpacingPx - smallTarget.height
+    );
+    violations.push({
+      violationType: 'undersized_touch_target',
+      selector: smallTarget.selector,
+      hostComponent: smallTarget.hostComponent,
+      measuredLeakPixels: Math.round(deficit * 100) / 100,
+      inShadowDom: smallTarget.inShadowDom,
+    });
+  }
+
+  for (const avatar of snapshot.squishedAvatars) {
+    violations.push({
+      violationType: 'squished_avatar',
+      selector: avatar.selector,
+      hostComponent: avatar.hostComponent,
+      measuredLeakPixels: avatar.aspectDriftPercent,
+      inShadowDom: avatar.inShadowDom,
+    });
+  }
+
+  for (const hiddenEl of snapshot.stuckInvisibleElements) {
+    violations.push({
+      violationType: 'stuck_invisible_element',
+      selector: hiddenEl.selector,
+      hostComponent: hiddenEl.hostComponent,
+      measuredLeakPixels: 0,
+      inShadowDom: hiddenEl.inShadowDom,
+    });
   }
 
   for (let i = 0; i < snapshot.interactiveTargets.length; i++) {
