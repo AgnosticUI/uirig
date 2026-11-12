@@ -76,6 +76,9 @@
 - [ ] **Task 7.7: CLI Help Colorization & Subcommand-Specific `--help` Coverage (`src/index.ts`)**
   * **Why:** Currently `CLI_HELP_TEXT` renders unstyled monochrome output and `uirig <subcommand> --help` (e.g., `npx uirig stress --help`) prints the generic global help instead of explaining the specific tool's purpose, mechanics, flags, and exit codes.
   * **Action:** Refactor `src/index.ts` + `tests/unit/index.test.ts` to render dynamic ANSI-styled help output (`renderHelpText(topic?)`) and support dedicated `--help` pages for `init`, `check`, `tokens`, `contrast`, `stress`, `cls`, `manifest`, `xss`, and `a11y`.
+- [ ] **Task 7.8: Runtime-Native Rule Escape Hatches (`data-uirig-ignore` & Config `ignore`)**
+  * **Why:** Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comments, developers need a bundler-proof way to intentionally exempt one-off landing page overrides, legacy embeds, or specific routes without disabling entire validation gates globally.
+  * **Action:** Add a shared `isElementIgnored(el, ruleName, url, config)` helper across `tokens.ts`, `matrix.ts`, `adversary.ts`, `xss.ts`, and `a11y.ts` that respects both element/ancestor `data-uirig-ignore="<rule>|all"` attributes (including across Shadow DOM boundaries) and `ignore: [{ rule, selector?, url? }]` entries in `uirig.config.json`.
 
 ---
 
