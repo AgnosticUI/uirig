@@ -29,7 +29,7 @@ Catches the structural hallucinations AI agents make most:
   ◦ unsafe javascript: URIs
   ◦ hidden prompt-injection traps
 
-▸ 𝗰𝗹𝗼𝘀𝗲𝗱-𝗹𝗼𝗼𝗽 𝗔𝗜 𝗵𝗮𝗿𝗻𝗲𝘀𝘀 𝗶𝗻𝘁𝗲𝗴𝗿𝗮𝘁𝗶𝗼𝗻
-Agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser using --json mode, which streams deduplicated violations with hostComponent attribution, suggestedToken fixes, and POSIX exit codes (0, 1, 2) to stdout.
+▸ 𝗰𝗹𝗼𝘀𝗲𝗱-𝗹𝗼𝗼𝗽 𝗮𝗴𝗲𝗻𝘁𝗶𝗰 𝗴𝘂𝗮𝗿𝗱𝗿𝗮𝗶𝗹
+Drop uirig into your AI design system harness (via AGENTS.md or SKILL.md) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running --json streams deduplicated violations with hostComponent attribution, suggestedToken fixes, and POSIX exit codes (0, 1, 2) to stdout.
 
 #DesignSystems #FrontendEngineering #WebComponents #Playwright #AIEngineering #ContextEngineering #DevTools #Accessibility #OpenSource

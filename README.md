@@ -14,7 +14,7 @@
 * **Pierces Web Component Shadow DOMs:** `Lighthouse` won't climb inside a Lit or Stencil `ShadowRoot` to tell a coding agent *which custom element* (`hostComponent`) broke dark-mode contrast or layout bounds.
 * **Zero Screenshot Diff Flakiness:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast, and W3C session-window CLS scores instead of noisy pixel diffs.
 * **Zero-Config First Run:** Point `npx uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required.
-* **Built for AI Design System Harnesses:** Agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser using `--json` mode, which streams deduplicated violations with Shadow host attribution and token-aware `remediationAdvice` to `stdout` until exit code `0`.
+* **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout`.
 
 ---
 
