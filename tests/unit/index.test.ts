@@ -3,7 +3,7 @@
  * 1-to-1 unit tests for `src/index.ts`.
  * Verifies:
  * 1. Pure CLI argument parsing (`parseCliArgs`) across `init`, `manifest`, `check`,
- *    `--config`, `--json`, `--headed`, `--help`, `--version`, and invalid flags.
+ *    direct zero-config `<url-or-file>` targets, `--config`, `--json`, `--headed`, `--help`, `--version`, and invalid flags.
  * 2. Command dispatching and deterministic POSIX exit codes (`0`, `1`, `2`) in `runCli()`.
  */
 
@@ -12,7 +12,6 @@ import { execFileSync } from 'child_process';
 import { resolve } from 'path';
 import { parseCliArgs, runCli, UIRIG_VERSION } from '../../src/index.js';
 import type { ICheckExecutionReport } from '../../src/commands/check.js';
-
 
 function createMockReport(exitCode: 0 | 1 | 2): ICheckExecutionReport {
   return {
@@ -49,6 +48,8 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     console.log('\n--- START TEST: check Command Flag Parsing ---');
     expect(parseCliArgs(['check'])).toEqual({
       command: 'check',
+      target: undefined,
+      only: undefined,
       configPath: undefined,
       json: false,
       headless: true,
@@ -56,6 +57,8 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
 
     expect(parseCliArgs(['check', '--config=./custom.json', '--json', '--headed'])).toEqual({
       command: 'check',
+      target: undefined,
+      only: undefined,
       configPath: './custom.json',
       json: true,
       headless: false,
@@ -63,7 +66,48 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
 
     expect(parseCliArgs(['check', '--config', 'dir/uirig.config.json'])).toEqual({
       command: 'check',
+      target: undefined,
+      only: undefined,
       configPath: 'dir/uirig.config.json',
+      json: false,
+      headless: true,
+    });
+  });
+
+  it('parses direct zero-config <url-or-file> targets and standalone engine + target pairs', () => {
+    console.log('\n--- START TEST: Zero-Config Instant Target CLI Parsing ---');
+    expect(parseCliArgs(['http://localhost:5173'])).toEqual({
+      command: 'check',
+      target: 'http://localhost:5173',
+      only: undefined,
+      configPath: undefined,
+      json: false,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['./dist/index.html', '--json'])).toEqual({
+      command: 'check',
+      target: './dist/index.html',
+      only: undefined,
+      configPath: undefined,
+      json: true,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['contrast', './dist/index.html', '--headed'])).toEqual({
+      command: 'check',
+      target: './dist/index.html',
+      only: 'contrast',
+      configPath: undefined,
+      json: false,
+      headless: false,
+    });
+
+    expect(parseCliArgs(['check', 'https://example.com'])).toEqual({
+      command: 'check',
+      target: 'https://example.com',
+      only: undefined,
+      configPath: undefined,
       json: false,
       headless: true,
     });
@@ -91,7 +135,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
 
     const helpExit = await runCli(['--help']);
     expect(helpExit).toBe(0);
-    expect(stdoutChunks.join('')).toContain('uirig <command> [options]');
+    expect(stdoutChunks.join('')).toContain('uirig <url-or-file> [options]');
 
     stdoutChunks.length = 0;
     const versionExit = await runCli(['--version']);
@@ -99,7 +143,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     expect(stdoutChunks.join('').trim()).toBe(UIRIG_VERSION);
   });
 
-  it('dispatches init, manifest, and check handlers and propagates POSIX exit codes (0, 1, 2)', async () => {
+  it('dispatches init, manifest, check, and direct <url-or-file> handlers and propagates POSIX exit codes (0, 1, 2)', async () => {
     console.log('\n--- START TEST: Command Dispatching & Exit Code Propagation ---');
     const initSpy = vi.fn().mockResolvedValue(undefined);
     const manifestSpy = vi.fn().mockResolvedValue(undefined);
@@ -107,7 +151,8 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       .fn()
       .mockResolvedValueOnce(createMockReport(0))
       .mockResolvedValueOnce(createMockReport(1))
-      .mockResolvedValueOnce(createMockReport(2));
+      .mockResolvedValueOnce(createMockReport(2))
+      .mockResolvedValueOnce(createMockReport(0));
 
     expect(await runCli(['init'], { init: initSpy })).toBe(0);
     expect(initSpy).toHaveBeenCalledTimes(1);
@@ -120,12 +165,22 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       await runCli(['check', '--config=custom.json', '--json', '--headed'], { check: checkSpy })
     ).toBe(1);
     expect(checkSpy).toHaveBeenLastCalledWith({
+      target: undefined,
       configPath: 'custom.json',
       json: true,
       only: undefined,
       headless: false,
     });
     expect(await runCli(['check'], { check: checkSpy })).toBe(2);
+
+    expect(await runCli(['./dist/index.html', '--json'], { check: checkSpy })).toBe(0);
+    expect(checkSpy).toHaveBeenLastCalledWith({
+      target: './dist/index.html',
+      configPath: undefined,
+      json: true,
+      only: undefined,
+      headless: true,
+    });
   });
 
   it('returns POSIX exit code 1 and writes to stderr on unknown commands or thrown runtime errors', async () => {
@@ -153,7 +208,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     const helpOutput = execFileSync(process.execPath, [binPath, '--help'], {
       encoding: 'utf8',
     });
-    expect(helpOutput).toContain('uirig <command> [options]');
+    expect(helpOutput).toContain('uirig <url-or-file> [options]');
     expect(helpOutput).toContain('POSIX EXIT CODES:');
   });
 
@@ -161,6 +216,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     console.log('\n--- START TEST: Standalone Engine Subcommands & --only Flag ---');
     expect(parseCliArgs(['tokens', '--json'])).toEqual({
       command: 'check',
+      target: undefined,
       only: 'tokens',
       configPath: undefined,
       json: true,
@@ -169,6 +225,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
 
     expect(parseCliArgs(['contrast', '--config=custom.json'])).toEqual({
       command: 'check',
+      target: undefined,
       only: 'contrast',
       configPath: 'custom.json',
       json: false,
@@ -177,6 +234,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
 
     expect(parseCliArgs(['stress', '--headed'])).toEqual({
       command: 'check',
+      target: undefined,
       only: 'stress',
       configPath: undefined,
       json: false,
@@ -185,6 +243,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
 
     expect(parseCliArgs(['cls'])).toEqual({
       command: 'check',
+      target: undefined,
       only: 'cls',
       configPath: undefined,
       json: false,
@@ -193,6 +252,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
 
     expect(parseCliArgs(['check', '--only=contrast'])).toEqual({
       command: 'check',
+      target: undefined,
       only: 'contrast',
       configPath: undefined,
       json: false,
@@ -210,11 +270,11 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     const exitCode = await runCli(['contrast', '--json'], { check: checkSpy });
     expect(exitCode).toBe(0);
     expect(checkSpy).toHaveBeenCalledWith({
+      target: undefined,
       configPath: undefined,
       only: 'contrast',
       json: true,
       headless: true,
     });
   });
-
 });

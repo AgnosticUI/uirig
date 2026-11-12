@@ -1,8 +1,6 @@
 /**
  * tests/unit/check.test.ts
  * 1-to-1 unit & integration tests for `src/commands/check.ts`.
- * Covers configuration loading, token scale validation, POSIX exit code resolution,
- * and concurrent 3-context Playwright execution against local HTTP fixtures.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -99,7 +97,7 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(config.targetUrls).toEqual(['http://localhost:3000']);
     expect(config.thresholdBudgets.clsMaxLimit).toBe(0.1);
 
-    const scale = loadTokenScale(config.tokensPath, configFile);
+    const scale = loadTokenScale(config.tokensPath as string, configFile);
     expect(scale.colors).toContain('rgb(255, 255, 255)');
     expect(scale.spacing).toEqual(['0px', '8px', '16px']);
   });
@@ -124,7 +122,7 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(() => loadTokenScale('./bad-tokens.json', configFile)).toThrow(/ERR_TOKENS_SCHEMA/);
   });
 
-  it('returns POSIX exit code 0 when all 4 audits pass across viewports', () => {
+  it('returns POSIX exit code 0 when all audits pass across viewports', () => {
     console.log('[test:check] Verifying POSIX exit code 0 on clean audit results...');
     const exitCode = evaluatePosixExitCode([createCleanViewportReport()]);
     expect(exitCode).toBe(0);
@@ -177,7 +175,46 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(evaluatePosixExitCode([clsFail])).toBe(2);
   });
 
-    it('executes 3 isolated Playwright contexts concurrently and returns exitCode 0 for a compliant page', async () => {
+  it('runs zero-config mode against a standalone local .html file with no uirig.config.json', async () => {
+    console.log('[test:check] Running zero-config audit against a standalone local .html file...');
+    const htmlPath = join(tempDir, 'standalone.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background: #ffffff; color: #111827; font-family: sans-serif; }
+            h1 { margin: 0 0 12px 0; font-size: 22px; }
+            p { margin: 0; font-size: 16px; }
+          </style>
+        </head>
+        <body>
+          <h1>Zero-Config Standalone Preview</h1>
+          <p>Runs contrast, stress, and CLS checks automatically with no config file.</p>
+        </body>
+      </html>`,
+      'utf8'
+    );
+
+    const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+    const report = await executeCheckCommand({
+      target: './standalone.html',
+      cwd: tempDir,
+      headless: true,
+      reportOutputPath: reportOutput,
+    });
+
+    expect(report.exitCode).toBe(0);
+    expect(report.configPath).toBe('zero-config (built-in defaults)');
+    expect(report.summary.totalViewportsAudited).toBe(2);
+    expect(report.summary.totalTokenViolations).toBe(0);
+    expect(report.summary.totalContrastViolations).toBe(0);
+    expect(report.summary.totalStressViolations).toBe(0);
+    expect(report.summary.totalClsViolations).toBe(0);
+    expect(report.results.at(0)?.url).toBe('./standalone.html');
+  });
+  it('executes 3 isolated Playwright contexts concurrently and returns exitCode 0 for a compliant page', async () => {
     console.log('[test:check] Running live 3-context parallel check on a compliant HTML fixture...');
     const compliantHtml = `<!DOCTYPE html>
       <html>
@@ -235,7 +272,6 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       headless: true,
       reportOutputPath: reportOutput,
     });
-
 
     expect(report.exitCode).toBe(0);
     expect(report.summary.totalViewportsAudited).toBe(1);
@@ -395,7 +431,6 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
 
   it('filters execution to a single engine when options.only is specified', async () => {
     console.log('\n--- START TEST: Single-Engine Filter (options.only = "contrast") ---');
-    // Fixture has BOTH a low-contrast paragraph AND a cramped stress-overflow box
     const mixedHtml = `<!DOCTYPE html>
       <html>
         <head>
@@ -452,12 +487,9 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       reportOutputPath: reportOutput,
     });
 
-    // Should catch contrast (exitCode 1) while skipping stress (which would have returned exitCode 2)
     expect(report.exitCode).toBe(1);
     expect(report.summary.totalContrastViolations).toBeGreaterThan(0);
     expect(report.summary.totalStressViolations).toBe(0);
     expect(report.summary.totalTokenViolations).toBe(0);
   });
-
 });
-

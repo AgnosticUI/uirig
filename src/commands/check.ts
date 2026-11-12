@@ -1,11 +1,14 @@
 /**
  * src/commands/check.ts
  * Isolated Parallel Context Dispatcher (uirig check).
- * Launches a single Playwright Chromium instance and orchestrates 3 isolated
+ * Launches a single Playwright Chromium instance and orchestrates isolated
  * BrowserContext sessions concurrently (`Promise.all`) per target URL/viewport
  * so read-only audits (`tokens`, `contrast`), mutated DOM fuzzing (`stress`),
  * and pre-navigation `PerformanceObserver` monitoring (`cls`) execute without
  * cross-tool pollution or multiple browser startup overhead.
+ *
+ * Also supports zero-config runs (`npx uirig <url-or-file>`) and automatically
+ * spins up ephemeral local HTTP servers for `.html` file targets.
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -18,13 +21,12 @@ import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '.
 import { logTelemetry, paint } from '../utils/formatter.js';
 import { formatAgenticJsonStream } from '../utils/agent-stream.js';
 import { writeGithubPrCommentReport, DEFAULT_PR_COMMENT_PATH } from '../utils/fs.js';
+import {
+  isLocalFileTarget,
+  startEphemeralStaticServer,
+  type IEphemeralStaticServer,
+} from '../utils/static-server.js';
 
-/**
- * Deterministic POSIX exit codes enforced by `uirig check`:
- * - `0`: All token, contrast, geometric stress, and CLS checks passed.
- * - `1`: Configuration/token load error, design token drift, or WCAG contrast failure (< 4.5:1).
- * - `2`: Structural layout break (overflow, horizontal scrollbar, touch collision) or CLS budget breach.
- */
 export type PosixExitCode = 0 | 1 | 2;
 
 export interface IViewportConfig {
@@ -37,12 +39,13 @@ export interface IThresholdBudgets {
   clsMaxLimit: number;
   overflowPixelTolerance: number;
   touchTargetMinSpacingPx: number;
+  darkModeMaxSurfaceLuminance?: number;
 }
 
 export interface IUirigConfig {
   $schema?: string;
   targetUrls: string[];
-  tokensPath: string;
+  tokensPath?: string;
   thresholdBudgets: IThresholdBudgets;
   viewports: IViewportConfig[];
 }
@@ -50,15 +53,14 @@ export interface IUirigConfig {
 export type AuditToolName = 'tokens' | 'contrast' | 'stress' | 'cls';
 
 export interface ICheckCommandOptions {
+  target?: string;
   configPath?: string;
   json?: boolean;
   headless?: boolean;
-  /** Optional single-engine filter (`tokens` | `contrast` | `stress` | `cls`). Runs all 4 when omitted. */
   only?: AuditToolName;
-  /** Optional inline token scale override (useful for programmatic calls & tests). */
   tokenScaleOverride?: ITokenScaleConfig;
-  /** Optional custom output path for the Markdown PR comment report (defaults to `.uirig/github_pr_comment.md`). */
   reportOutputPath?: string;
+  cwd?: string;
 }
 
 export interface IViewportAuditReport {
@@ -85,10 +87,20 @@ export interface ICheckExecutionReport {
   };
 }
 
-/**
- * Fallback built-in token scale used only when `tokensPath` is omitted or explicitly
- * configured to use defaults, ensuring zero-config runs remain resilient.
- */
+export const ZERO_CONFIG_DEFAULTS: Omit<IUirigConfig, 'targetUrls'> = {
+  tokensPath: undefined,
+  thresholdBudgets: {
+    clsMaxLimit: 0.1,
+    overflowPixelTolerance: 2,
+    touchTargetMinSpacingPx: 24,
+    darkModeMaxSurfaceLuminance: 0.85,
+  },
+  viewports: [
+    { name: 'mobile', width: 375, height: 812 },
+    { name: 'desktop', width: 1440, height: 900 },
+  ],
+};
+
 export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
   colors: ['rgb(255, 255, 255)', 'rgb(0, 0, 0)', 'rgb(17, 24, 39)', 'rgb(243, 244, 246)'],
   spacing: ['0px', '4px', '8px', '12px', '16px', '20px', '24px', '32px'],
@@ -96,10 +108,6 @@ export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
   radii: ['0px', '4px', '6px', '8px', '16px', '9999px'],
 };
 
-/**
- * Reads and validates `uirig.config.json` from disk.
- * Throws descriptive `ERR_CONFIG_*` errors so CLI callers can exit with POSIX code `1`.
- */
 export function loadUirigConfig(
   configPath: string = resolve(process.cwd(), 'uirig.config.json')
 ): IUirigConfig {
@@ -107,7 +115,7 @@ export function loadUirigConfig(
 
   if (!existsSync(configPath)) {
     throw new Error(
-      `ERR_CONFIG_MISSING: Configuration file not found at ${configPath}. Run 'uirig init' first.`
+      `ERR_CONFIG_MISSING: Configuration file not found at ${configPath}. Run 'uirig init' or pass a target directly (e.g. 'uirig ./index.html').`
     );
   }
 
@@ -132,9 +140,12 @@ export function loadUirigConfig(
     );
   }
 
-  if (typeof candidate.tokensPath !== 'string' || candidate.tokensPath.trim().length === 0) {
+  if (
+    candidate.tokensPath !== undefined &&
+    (typeof candidate.tokensPath !== 'string' || candidate.tokensPath.trim().length === 0)
+  ) {
     throw new Error(
-      `ERR_CONFIG_SCHEMA: 'tokensPath' must be a valid file path string in ${configPath}.`
+      `ERR_CONFIG_SCHEMA: 'tokensPath' must be a non-empty file path string when specified in ${configPath}.`
     );
   }
 
@@ -165,22 +176,59 @@ export function loadUirigConfig(
       clsMaxLimit: budgets.clsMaxLimit,
       overflowPixelTolerance: budgets.overflowPixelTolerance,
       touchTargetMinSpacingPx: budgets.touchTargetMinSpacingPx,
+      darkModeMaxSurfaceLuminance: budgets.darkModeMaxSurfaceLuminance ?? 0.85,
     },
     viewports: candidate.viewports,
   };
 }
 
-/**
- * Loads and validates the approved design token scale JSON referenced by `tokensPath`.
- * Resolves relative paths against the directory containing `uirig.config.json`.
- */
+export function resolveExecutionConfig(
+  options: ICheckCommandOptions,
+  cwd: string
+): { config: IUirigConfig; configLabel: string } {
+  const defaultConfigPath = resolve(cwd, 'uirig.config.json');
+
+  if (options.configPath) {
+    const explicitPath = resolve(cwd, options.configPath);
+    const loaded = loadUirigConfig(explicitPath);
+    return {
+      config: options.target ? { ...loaded, targetUrls: [options.target] } : loaded,
+      configLabel: explicitPath,
+    };
+  }
+
+  if (existsSync(defaultConfigPath)) {
+    const loaded = loadUirigConfig(defaultConfigPath);
+    return {
+      config: options.target ? { ...loaded, targetUrls: [options.target] } : loaded,
+      configLabel: defaultConfigPath,
+    };
+  }
+
+  if (options.target) {
+    logTelemetry(
+      'check:zero-config',
+      `Running in zero-config mode against ${paint(options.target, 'cyan')}...`
+    );
+    return {
+      config: {
+        ...ZERO_CONFIG_DEFAULTS,
+        targetUrls: [options.target],
+      },
+      configLabel: 'zero-config (built-in defaults)',
+    };
+  }
+
+  loadUirigConfig(defaultConfigPath);
+  throw new Error(`ERR_CONFIG_MISSING: Configuration file not found at ${defaultConfigPath}.`);
+}
+
 export function loadTokenScale(tokensPath: string, configFilePath: string): ITokenScaleConfig {
   const resolvedTokensPath = resolve(dirname(configFilePath), tokensPath);
   logTelemetry(
     'check:tokens',
     `Loading design token scale from ${paint(resolvedTokensPath, 'cyan')}...`
   );
-
 
   if (!existsSync(resolvedTokensPath)) {
     throw new Error(`ERR_TOKENS_MISSING: Token scale file not found at ${resolvedTokensPath}.`);
@@ -219,10 +267,6 @@ export function loadTokenScale(tokensPath: string, configFilePath: string): ITok
   };
 }
 
-/**
- * Evaluates an array of viewport audit reports and determines the deterministic
- * POSIX exit code for CI/CD pipelines (`0` = pass, `1` = token/contrast, `2` = stress/CLS).
- */
 export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExitCode {
   let hasStructuralOrClsFailure = false;
   let hasTokenOrContrastFailure = false;
@@ -245,33 +289,16 @@ export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExi
   return 0;
 }
 
-/**
- * Audits a single `(url, viewport)` target across up to 3 isolated Playwright `BrowserContext`
- * sessions running concurrently (`Promise.all`) inside one shared Chromium browser.
- * When `only` is provided, spawns only the single `BrowserContext` needed for that engine:
- *
- * - **Context 1 (Read-Only):** Runs `crawlPageTokens()` (`tokens`) and/or `auditPageContrast()` (`contrast`) without DOM mutation.
- * - **Context 2 (Mutated Fuzzing):** Runs `runGeometricStressAudit()` (`stress`, +30% pseudo-localization).
- * - **Context 3 (CLS Monitor):** Installs `prepareClsObserver()` prior to `page.goto()` and runs `collectPageCls()` (`cls`).
- *
- * @param browser - Shared headless/headed Chromium `Browser` instance.
- * @param url - Target page URL to open inside each isolated context.
- * @param viewport - Viewport dimensions and profile label (`name`, `width`, `height`).
- * @param tokenScale - Approved design token scale loaded from `tokensPath`.
- * @param budgets - Threshold budgets (`clsMaxLimit`, `overflowPixelTolerance`, `touchTargetMinSpacingPx`).
- * @param only - Optional single-engine filter (`'tokens' | 'contrast' | 'stress' | 'cls'`). Runs all 4 when omitted.
- * @returns Aggregated `IViewportAuditReport` for this `(url, viewport)` target.
- */
 export async function auditViewportInParallel(
   browser: Browser,
   url: string,
   viewport: IViewportConfig,
-  tokenScale: ITokenScaleConfig,
+  tokenScale: ITokenScaleConfig | null,
   budgets: IThresholdBudgets,
   only?: AuditToolName
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
-  const runTokens = !only || only === 'tokens';
+  const runTokens = (!only || only === 'tokens') && tokenScale !== null;
   const runContrast = !only || only === 'contrast';
   const runStress = !only || only === 'stress';
   const runCls = !only || only === 'cls';
@@ -286,7 +313,6 @@ export async function auditViewportInParallel(
     )}...`
   );
 
-  // Track 1: Read-Only Audits (`tokens` and/or `contrast`)
   const runReadOnlyTrack = async (): Promise<{
     tokenViolations: ITokenViolation[];
     contrastViolations: IContrastViolation[];
@@ -298,7 +324,8 @@ export async function auditViewportInParallel(
     try {
       const page = await context.newPage();
       await page.goto(url, { waitUntil: 'networkidle' });
-      const tokenViolations = runTokens ? await crawlPageTokens(page, tokenScale) : [];
+      const tokenViolations =
+        runTokens && tokenScale !== null ? await crawlPageTokens(page, tokenScale) : [];
       const contrastViolations = runContrast ? await auditPageContrast(page) : [];
       return { tokenViolations, contrastViolations };
     } finally {
@@ -306,7 +333,6 @@ export async function auditViewportInParallel(
     }
   };
 
-  // Track 2: Mutated DOM Fuzzing (`stress`)
   const runStressTrack = async (): Promise<IGeometricViolation[]> => {
     if (!runStress) {
       return [];
@@ -324,7 +350,6 @@ export async function auditViewportInParallel(
     }
   };
 
-  // Track 3: Pre-Navigation Layout Shift Monitor (`cls`)
   const runClsTrack = async (): Promise<IClsEvaluationResult> => {
     if (!runCls) {
       return { maxSessionCls: 0, violation: null };
@@ -356,28 +381,11 @@ export async function auditViewportInParallel(
   };
 }
 
-
-/**
- * Main orchestration entry point for `uirig check`.
- * Loads configuration, launches a single Chromium browser binary, runs all configured
- * `(url, viewport)` targets through `auditViewportInParallel()`, synthesizes the standalone
- * Markdown PR comment report to `.uirig/github_pr_comment.md`, and returns the complete
- * report with deterministic POSIX exit code (`0`, `1`, or `2`).
- *
- * When `options.json` is `true`, sets `UIRIG_JSON_MODE=1` so `logTelemetry()` routes
- * diagnostic logs to `stderr`, keeping `stdout` 100% pure for `formatAgenticJsonStream()`.
- */
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
 ): Promise<ICheckExecutionReport> {
-  const resolvedConfigPath = resolve(
-    process.cwd(),
-    options.configPath ?? 'uirig.config.json'
-  );
-  const resolvedReportPath = resolve(
-    process.cwd(),
-    options.reportOutputPath ?? DEFAULT_PR_COMMENT_PATH
-  );
+  const cwd = options.cwd ?? process.cwd();
+  const resolvedReportPath = resolve(cwd, options.reportOutputPath ?? DEFAULT_PR_COMMENT_PATH);
   const previousJsonMode = process.env.UIRIG_JSON_MODE;
 
   if (options.json) {
@@ -385,11 +393,33 @@ export async function executeCheckCommand(
   }
 
   let browser: Browser | null = null;
+  const ephemeralServers: IEphemeralStaticServer[] = [];
 
   try {
-    const config = loadUirigConfig(resolvedConfigPath);
-    const tokenScale =
-      options.tokenScaleOverride ?? loadTokenScale(config.tokensPath, resolvedConfigPath);
+    const { config, configLabel } = resolveExecutionConfig(options, cwd);
+
+    let tokenScale: ITokenScaleConfig | null = null;
+    if (options.tokenScaleOverride) {
+      tokenScale = options.tokenScaleOverride;
+    } else if (config.tokensPath) {
+      tokenScale = loadTokenScale(config.tokensPath, configLabel);
+    } else {
+      logTelemetry(
+        'tokens:skip',
+        'No tokensPath configured; skipping design token scale audit.'
+      );
+    }
+
+    const resolvedTargets: Array<{ displayUrl: string; liveUrl: string }> = [];
+    for (const rawTarget of config.targetUrls) {
+      if (isLocalFileTarget(rawTarget)) {
+        const server = await startEphemeralStaticServer(rawTarget, cwd);
+        ephemeralServers.push(server);
+        resolvedTargets.push({ displayUrl: rawTarget, liveUrl: server.url });
+      } else {
+        resolvedTargets.push({ displayUrl: rawTarget, liveUrl: rawTarget });
+      }
+    }
 
     const headless = options.headless ?? true;
     logTelemetry(
@@ -400,20 +430,22 @@ export async function executeCheckCommand(
 
     const results: IViewportAuditReport[] = [];
 
-    for (const url of config.targetUrls) {
+    for (const targetEntry of resolvedTargets) {
       for (const viewport of config.viewports) {
         const viewportReport = await auditViewportInParallel(
           browser,
-          url,
+          targetEntry.liveUrl,
           viewport,
           tokenScale,
           config.thresholdBudgets,
           options.only
         );
-        results.push(viewportReport);
+        results.push({
+          ...viewportReport,
+          url: targetEntry.displayUrl,
+        });
       }
     }
-
 
     const exitCode = evaluatePosixExitCode(results);
 
@@ -430,18 +462,16 @@ export async function executeCheckCommand(
 
     const executionReport: ICheckExecutionReport = {
       timestamp: new Date().toISOString(),
-      configPath: resolvedConfigPath,
+      configPath: configLabel,
       reportPath: resolvedReportPath,
       exitCode,
       results,
       summary,
     };
 
-    // Synthesize standalone GitHub PR comment Markdown report to disk
     writeGithubPrCommentReport(executionReport, resolvedReportPath);
 
     if (options.json) {
-      // Emit raw machine-readable JSON directly to stdout for AI Design System Harnesses
       process.stdout.write(`${formatAgenticJsonStream(executionReport)}\n`);
     } else {
       const exitBadge =
@@ -456,6 +486,9 @@ export async function executeCheckCommand(
     if (browser) {
       await browser.close();
     }
+    for (const server of ephemeralServers) {
+      await server.close();
+    }
     if (options.json) {
       if (previousJsonMode === undefined) {
         delete process.env.UIRIG_JSON_MODE;
@@ -465,4 +498,3 @@ export async function executeCheckCommand(
     }
   }
 }
-

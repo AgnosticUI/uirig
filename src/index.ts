@@ -2,9 +2,10 @@
  * src/index.ts
  * Main system entry point and zero-dependency CLI argument parser/router for `uirig`.
  * Supports:
+ * - `uirig <url-or-file> [--only=<tool>] [--config=<path>] [--json] [--headed]` (zero-config instant check)
  * - `uirig init`
- * - `uirig check [--only=<tool>] [--config=<path>] [--json] [--headed]`
- * - `uirig tokens | contrast | stress | cls [--config=<path>] [--json] [--headed]`
+ * - `uirig check [<url-or-file>] [--only=<tool>] [--config=<path>] [--json] [--headed]`
+ * - `uirig tokens | contrast | stress | cls [<url-or-file>] [--config=<path>] [--json] [--headed]`
  * - `uirig manifest`
  * - `uirig --help` / `uirig --version`
  */
@@ -25,34 +26,35 @@ export const UIRIG_VERSION = '0.1.0';
 const AUDIT_TOOL_NAMES = new Set<AuditToolName>(['tokens', 'contrast', 'stress', 'cls']);
 
 export const CLI_HELP_TEXT = `
-${paint('uirig', 'bold', 'cyan')} v${UIRIG_VERSION} — Deterministic, framework-blind UI verification gate
+${paint('uirig', 'bold', 'cyan')} v${UIRIG_VERSION}: The first line of defense for AI-generated UIs and Web Components
 
 ${paint('USAGE:', 'bold')}
-  uirig <command> [options]
+  uirig <url-or-file> [options]   Run instant zero-config check against a URL or .html file
+  uirig <command> [options]       Run a specific subcommand
 
 ${paint('COMMANDS:', 'bold')}
-  init                        Scaffold uirig.config.json, .uirig/session.json, and .uirig/SKILL.md
-  check [options]             Run all 4 verification engines concurrently in isolated contexts
-  tokens [options]            Run only the shadow-piercing design token drift auditor
-  contrast [options]          Run only the WCAG 2.1 rendered luminance contrast gate
-  stress [options]            Run only the +30% pseudo-localization geometric overflow fuzzer
-  cls [options]               Run only the W3C session-window Cumulative Layout Shift monitor
-  manifest                    Print ASCII repository tree blueprint (excluding blocklisted dirs)
+  init                            Scaffold uirig.config.json, .uirig/session.json, and .uirig/SKILL.md
+  check [<url-or-file>]           Run verification engines concurrently in isolated contexts
+  tokens [<url-or-file>]          Run only the shadow-piercing design token drift auditor
+  contrast [<url-or-file>]        Run only the WCAG 2.1 rendered luminance contrast gate
+  stress [<url-or-file>]          Run only the +30% text-expansion geometric overflow fuzzer
+  cls [<url-or-file>]             Run only the W3C session-window Cumulative Layout Shift monitor
+  manifest                        Print ASCII repository tree blueprint (excluding blocklisted dirs)
 
 ${paint('AUDIT OPTIONS (check / tokens / contrast / stress / cls):', 'bold')}
-  --config=<path>             Path to uirig.config.json (also supports: --config <path>)
-  --only=<tool>               Filter 'check' to one engine: tokens | contrast | stress | cls
-  --json                      Route telemetry to stderr and emit machine-readable JSON to stdout
-  --headed                    Launch Chromium with a visible browser window for local debugging
+  --config=<path>                 Path to uirig.config.json (also supports: --config <path>)
+  --only=<tool>                   Filter 'check' to one engine: tokens | contrast | stress | cls
+  --json                          Route telemetry to stderr and emit machine-readable JSON to stdout
+  --headed                        Launch Chromium with a visible browser window for local debugging
 
 ${paint('GLOBAL OPTIONS:', 'bold')}
-  -h, --help                  Show this help message
-  -v, --version               Print CLI version
+  -h, --help                      Show this help message
+  -v, --version                   Print CLI version
 
 ${paint('POSIX EXIT CODES:', 'bold')}
-  0                           All geometric bounds, contrast ratios, and token checks passed
-  1                           Config error, design token drift, or WCAG contrast failure (< 4.5:1)
-  2                           Structural layout break (overflow/collision) or CLS budget breach
+  0                               All geometric bounds, contrast ratios, and token checks passed
+  1                               Config error, design token drift, or WCAG contrast failure (< 4.5:1)
+  2                               Structural layout break (overflow/collision) or CLS budget breach
 `;
 
 export type ParsedCliCommand =
@@ -62,6 +64,7 @@ export type ParsedCliCommand =
   | { command: 'manifest' }
   | {
       command: 'check';
+      target?: string;
       only?: AuditToolName;
       configPath?: string;
       json: boolean;
@@ -69,15 +72,35 @@ export type ParsedCliCommand =
     }
   | { command: 'unknown'; rawCommand: string; reason: string };
 
- /**
- * Parses shared audit flags (`--config`, `--only`, `--json`, `--headed`) for both
- * `uirig check` and standalone engine subcommands (`tokens`, `contrast`, `stress`, `cls`).
+/**
+ * Determines whether a positional CLI argument looks like a direct HTTP(S) URL
+ * or local `.html` / path target (e.g. `http://localhost:5173`, `./dist/index.html`).
+ */
+export function isDirectTargetArg(arg: string): boolean {
+  const trimmed = arg.trim();
+  if (!trimmed || trimmed.startsWith('-')) {
+    return false;
+  }
+  return (
+    /^https?:\/\//i.test(trimmed) ||
+    trimmed.startsWith('./') ||
+    trimmed.startsWith('../') ||
+    trimmed.startsWith('/') ||
+    /\.html?$/i.test(trimmed)
+  );
+}
+
+/**
+ * Parses shared audit flags (`--config`, `--only`, `--json`, `--headed`) and optional
+ * positional `<url-or-file>` target for `uirig <target>`, `uirig check`, and standalone engines.
  */
 function parseAuditCommandArgs(
   rawSubcommand: string,
   restArgs: string[],
-  presetOnly?: AuditToolName
+  presetOnly?: AuditToolName,
+  initialTarget?: string
 ): ParsedCliCommand {
+  let target: string | undefined = initialTarget;
   let configPath: string | undefined;
   let only: AuditToolName | undefined = presetOnly;
   let json = false;
@@ -123,6 +146,8 @@ function parseAuditCommandArgs(
       i++;
     } else if (token === '-h' || token === '--help') {
       return { command: 'help' };
+    } else if (!token.startsWith('-') && !target && isDirectTargetArg(token)) {
+      target = token;
     } else {
       return {
         command: 'unknown',
@@ -134,6 +159,7 @@ function parseAuditCommandArgs(
 
   return {
     command: 'check',
+    target,
     only,
     configPath,
     json,
@@ -174,6 +200,10 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
 
   if (AUDIT_TOOL_NAMES.has(firstArg as AuditToolName)) {
     return parseAuditCommandArgs(firstArg, argv.slice(1), firstArg as AuditToolName);
+  }
+
+  if (isDirectTargetArg(firstArg)) {
+    return parseAuditCommandArgs(firstArg, argv.slice(1), undefined, firstArg);
   }
 
   return {
@@ -228,6 +258,7 @@ export async function runCli(
 
     const runCheck = handlers.check ?? executeCheckCommand;
     const report = await runCheck({
+      target: parsed.target,
       configPath: parsed.configPath,
       only: parsed.only,
       json: parsed.json,
