@@ -8,7 +8,7 @@
  */
 
 import { defineConfig, type Plugin } from 'vite';
-import { runLivePlaygroundSpotCheck, formatSpotCheckSummary } from './src/spot-check.js';
+import { runLivePlaygroundSpotCheck, formatSpotCheckSummary } from './src/check.js';
 
 function uirigAutoSpotCheckPlugin(): Plugin {
   return {

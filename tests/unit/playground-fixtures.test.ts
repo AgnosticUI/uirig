@@ -8,7 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { scheduleClsTrapInjection } from '../../playground/src/cls-trap.js';
-import { formatSpotCheckSummary, type ISpotCheckReport } from '../../playground/src/spot-check.js';
+import { formatSpotCheckSummary, type ISpotCheckReport } from '../../playground/src/check.js';
 
 describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::', () => {
   it('==> Should bind AgnosticUI --ag-* tokens and mount baseline components + adversarial traps in playground/index.html', () => {

@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import {
   runLivePlaygroundSpotCheck,
   formatSpotCheckSummary,
-} from '../../playground/src/spot-check.js';
+} from '../../playground/src/check.js';
 
 describe('::: PHASE 4 TASK 4.4: LIVE 4-TOOL AGNOSTICUI SPOT-CHECK VERIFICATION :::', () => {
   it(
