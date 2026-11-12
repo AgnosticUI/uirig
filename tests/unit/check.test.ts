@@ -5,7 +5,7 @@
  * and concurrent 3-context Playwright execution against local HTTP fixtures.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -308,5 +308,90 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalContrastViolations).toBe(0);
     expect(report.summary.totalStressViolations).toBeGreaterThan(0);
   });
+
+  it('suppresses console chatter and writes pure agentic JSON to stdout when options.json is true', async () => {
+    console.log('\n--- START TEST: Pure stdout JSON Stream Mode (--json) ---');
+    const contrastFailHtml = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background-color: rgb(255, 255, 255); color: rgb(17, 24, 39); font-size: 16px; }
+            p.low-contrast { margin: 0; font-size: 16px; color: rgb(156, 163, 175); }
+          </style>
+        </head>
+        <body>
+          <p class="low-contrast">Hard to read muted text</p>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(contrastFailHtml);
+    activeServer = server;
+
+    const tokensFile = join(tempDir, 'tokens.json');
+    const configFile = join(tempDir, 'uirig.config.json');
+
+    writeFileSync(
+      tokensFile,
+      JSON.stringify({
+        colors: ['rgb(255, 255, 255)', 'rgb(17, 24, 39)', 'rgb(156, 163, 175)'],
+        spacing: ['0px', '16px'],
+        fontSizes: ['16px'],
+        radii: ['0px'],
+      }),
+      'utf8'
+    );
+
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: [url],
+        tokensPath: './tokens.json',
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1024, height: 768 }],
+      }),
+      'utf8'
+    );
+
+    const capturedChunks: string[] = [];
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array): boolean => {
+        capturedChunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
+        return true;
+      });
+
+    try {
+      const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+      const report = await executeCheckCommand({
+        configPath: configFile,
+        headless: true,
+        json: true,
+        reportOutputPath: reportOutput,
+      });
+
+      expect(report.exitCode).toBe(1);
+      const rawStdout = capturedChunks.join('');
+      const parsed = JSON.parse(rawStdout) as {
+        tool: string;
+        exitCode: number;
+        passed: boolean;
+        violations: Array<{ engine: string; remediationAdvice: string }>;
+      };
+
+      expect(parsed.tool).toBe('uirig');
+      expect(parsed.exitCode).toBe(1);
+      expect(parsed.passed).toBe(false);
+      expect(parsed.violations.length).toBeGreaterThan(0);
+      expect(parsed.violations.at(0)?.engine).toBe('contrast');
+      expect(parsed.violations.at(0)?.remediationAdvice).toContain('4.50:1');
+    } finally {
+      stdoutSpy.mockRestore();
+    }
+  });
+
 });
 

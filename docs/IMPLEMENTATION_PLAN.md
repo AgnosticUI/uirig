@@ -49,7 +49,7 @@
 
 ### Phase 6: Documentation MVP
 - [ ] **Task 6.1: README.md**
-  * **Action:** Complete `README.md`. Should explain what the tool is and why it is of value. Common use cases (CI/CD, git pre-commit hook, and CLI usage patterns). Full setup instructions. How to use `uirig` for common use cases. Etc. etc.
+  * **Action:** Complete `README.md`. Should explain what the tool is and why it is of value. Common use cases (CI/CD, git pre-commit hook, and CLI usage patterns). Full setup instructions. How to use `uirig` for common use cases. Etc. etc. Might be able to extract some of this from the .uirig/SKILL.md and AGENTS.md?
 - [ ] **Task 6.2: LI Announcement**
   * **Action:** Craft a LinkedIn Announcement.
 
