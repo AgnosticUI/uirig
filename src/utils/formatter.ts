@@ -1,6 +1,6 @@
 /**
  * src/utils/formatter.ts
- * Typographic console styler and diagnostic output formatter.
+ * Typographic console styler and diagnostic telemetry badge formatter.
  * Provides zero-dependency ANSI color helpers that automatically honor
  * `NO_COLOR` and programmatic JSON stream mode (`UIRIG_JSON_MODE`).
  */

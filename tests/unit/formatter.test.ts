@@ -35,7 +35,7 @@ describe('formatter.ts — Terminal Styler & Telemetry Formatter', () => {
     delete process.env.NO_COLOR;
     delete process.env.UIRIG_JSON_MODE;
 
-    console.log('[test:formatter] Verifying bold red ANSI escape wrapping...');
+    console.log('\n--- START TEST: ANSI Escape Wrapping ---');
     const output = paint('7 FAIL', 'bold', 'red');
 
     expect(output).toBe(`${ANSI_CODES.bold}${ANSI_CODES.red}7 FAIL${ANSI_CODES.reset}`);
@@ -45,14 +45,14 @@ describe('formatter.ts — Terminal Styler & Telemetry Formatter', () => {
     delete process.env.NO_COLOR;
     delete process.env.UIRIG_JSON_MODE;
 
-    console.log('[test:formatter] Verifying no-op paint() when styles array is empty...');
+    console.log('\n--- START TEST: No-Op Paint Without Styles ---');
     expect(paint('plain text')).toBe('plain text');
   });
 
   it('suppresses all ANSI escape codes when NO_COLOR is set', () => {
     process.env.NO_COLOR = '1';
 
-    console.log('[test:formatter] Verifying NO_COLOR environment suppression...');
+    console.log('\n--- START TEST: NO_COLOR Environment Suppression ---');
     expect(isColorDisabled()).toBe(true);
     expect(paint('7 FAIL', 'bold', 'red')).toBe('7 FAIL');
     expect(formatTelemetryLog('tokens:audit', 'Starting crawl')).toBe(
@@ -64,7 +64,7 @@ describe('formatter.ts — Terminal Styler & Telemetry Formatter', () => {
     delete process.env.NO_COLOR;
     process.env.UIRIG_JSON_MODE = '1';
 
-    console.log('[test:formatter] Verifying UIRIG_JSON_MODE suppression for agentic JSON streams...');
+    console.log('\n--- START TEST: UIRIG_JSON_MODE Suppression ---');
     expect(isColorDisabled()).toBe(true);
     expect(formatTelemetryLog('matrix:audit', 'Contrast check')).toBe(
       '[matrix:audit] Contrast check'
@@ -75,7 +75,7 @@ describe('formatter.ts — Terminal Styler & Telemetry Formatter', () => {
     delete process.env.NO_COLOR;
     delete process.env.UIRIG_JSON_MODE;
 
-    console.log('[test:formatter] Verifying distinct domain tag colors across all 4 engines...');
+    console.log('\n--- START TEST: Distinct Domain Badge Colors ---');
     const tokensLog = formatTelemetryLog('tokens:audit', 'Crawl started');
     const matrixLog = formatTelemetryLog('matrix:audit', 'Contrast started');
     const adversaryLog = formatTelemetryLog('adversary:stress', 'Stress started');
