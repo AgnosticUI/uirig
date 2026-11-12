@@ -98,18 +98,21 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 2): TOKEN VALIDATION LOGIC GATES :::', () 
     expect(violations).toEqual([
       {
         selector: 'my-card >> shadow-root >> span.badge',
+        hostComponent: 'my-card',
         property: 'color',
         actualValue: 'rgb(255, 0, 128)',
         inShadowDom: true,
       },
       {
         selector: 'my-card >> shadow-root >> span.badge',
+        hostComponent: 'my-card',
         property: 'paddingTop',
         actualValue: '13px',
         inShadowDom: true,
       },
       {
         selector: 'my-card >> shadow-root >> span.badge',
+        hostComponent: 'my-card',
         property: 'fontSize',
         actualValue: '15px',
         inShadowDom: true,
@@ -117,6 +120,7 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 2): TOKEN VALIDATION LOGIC GATES :::', () 
     ]);
   });
 });
+
 describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER :::', () => {
   // Hold a reference to the Chromium browser so we can close it cleanly after tests finish
   let browser: Browser | undefined;
@@ -271,18 +275,21 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER 
     expect(shadowViolations).toEqual([
       {
         selector: 'uirig-card >> shadow-root >> span.rogue-badge',
+        hostComponent: 'uirig-card',
         property: 'color',
         actualValue: 'rgb(255, 0, 128)',
         inShadowDom: true,
       },
       {
         selector: 'uirig-card >> shadow-root >> span.rogue-badge',
+        hostComponent: 'uirig-card',
         property: 'paddingTop',
         actualValue: '13px',
         inShadowDom: true,
       },
       {
         selector: 'uirig-card >> shadow-root >> span.rogue-badge',
+        hostComponent: 'uirig-card',
         property: 'fontSize',
         actualValue: '15px',
         inShadowDom: true,
