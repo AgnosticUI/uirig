@@ -127,7 +127,7 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
       delete process.env.NO_COLOR;
       const coloredSummary = formatSpotCheckSummary(sampleReport);
       expect(coloredSummary).toContain('\x1b[');
-      expect(coloredSummary).toContain('uirig Live 4-Tool Spot-Check Report');
+      expect(coloredSummary).toContain('uirig Live 4-Tool Check Report');
       expect(coloredSummary).toContain('div#contrast-token-trap');
       expect(coloredSummary).toContain('2.54:1 < 4.5:1');
       expect(coloredSummary).toContain('+185px');

@@ -32,8 +32,8 @@
   * **Action:** Installed local AgnosticUI Lit Web Components (`button`, `card`, `input`), `ag-tokens.css` / `ag-tokens-dark.css`, and `#theme-toggle` (`playground/src/theme-toggle.ts`).
 - [x] **Task 4.3: Baseline & Adversarial Test Fixture Assembly**
   * **Action:** Built compliant and adversarial fixtures in `playground/index.html`, `playground/src/main.ts`, and `playground/src/cls-trap.ts`.
-- [x] **Task 4.4: Live `uirig` 4-Tool Spot-Check Verification**
-  * **Action:** Verified all 4 tools end-to-end against live AgnosticUI Web Components (`playground/src/spot-check.ts`, `tests/integration/playground-spotcheck.test.ts`) and added shared ANSI terminal styler (`src/utils/formatter.ts`).
+- [x] **Task 4.4: Live `uirig` 4-Tool Playground Verification**
+  * **Action:** Verified all 4 tools end-to-end against live AgnosticUI Web Components (`playground/src/check.ts`, `tests/integration/playground.test.ts`) and added shared ANSI terminal styler (`src/utils/formatter.ts`).
 
 ### Phase 5: CI/CD Orchestration & Reporting (MVP)
 - [x] **Task 5.1: Isolated Parallel Context Dispatcher**
@@ -54,7 +54,6 @@
   * **Action:** Completed `README.md` with value proposition, 4-tool table, setup instructions, CLI reference, CI/CD workflow, Git pre-commit hook, and AI Design System Harness loop.
 - [x] **Task 6.2: LinkedIn Announcement & Repo Hygiene**
   * **Action:** Created `ANNOUNCEMENTS/2026-11-12-mvp-launch.md` and `.gitignore`.
-
 ### Phase 7: MVP Security, Accuracy & High-ROI Tool Additions
 - [x] **Task 7.1: Determine Best ROI Tools To Add**
   * **Action:** Evaluated candidate specifications and design engineering tools into `docs/ROADMAP_ROI_MATRIX.md`, electing 5 high-ROI additions for MVP and deferring lower-ROI/unstable-spec candidates to Post-MVP.

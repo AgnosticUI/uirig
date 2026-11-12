@@ -1,10 +1,10 @@
 /**
- * tests/integration/playground-spotcheck.test.ts
+ * tests/integration/playground.test.ts
  * End-to-end integration test executing all 4 core `uirig` validation engines
  * against the live Vite + AgnosticUI Lit sandbox in Chromium.
  *
- * Supports `UIRIG_HEADED=1` (via `npm run playground:inspect`) for visual
- * slow-motion browser inspection and full terminal report printing.
+ * Supports `UIRIG_HEADED=1` (via `npm run playground:test:headed`) for visual
+ * slow-motion browser execution and full terminal report printing.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -13,13 +13,13 @@ import {
   formatSpotCheckSummary,
 } from '../../playground/src/check.js';
 
-describe('::: PHASE 4 TASK 4.4: LIVE 4-TOOL AGNOSTICUI SPOT-CHECK VERIFICATION :::', () => {
+describe('::: PHASE 4 TASK 4.4: LIVE 4-TOOL AGNOSTICUI PLAYGROUND VERIFICATION :::', () => {
   it(
     '==> Should verify Shadow DOM piercing, token drift, contrast traps, overflow stress, CLS shifts, and dark mode toggle',
     async () => {
       const isHeaded = process.env.UIRIG_HEADED === '1';
       console.log(
-        `\n::: RUNNING LIVE 4-TOOL END-TO-END PLAYWRIGHT SPOT-CHECK (headed=${isHeaded}) :::`
+        `\n::: RUNNING LIVE 4-TOOL END-TO-END PLAYWRIGHT VERIFICATION (headed=${isHeaded}) :::`
       );
 
       const report = await runLivePlaygroundSpotCheck(isHeaded ? 5173 : 0, {

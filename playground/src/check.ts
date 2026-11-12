@@ -1,6 +1,6 @@
 /**
- * playground/src/spot-check.ts
- * End-to-end live spot-check runner executing all 4 core `uirig` validation engines
+ * playground/src/check.ts
+ * End-to-end live check runner executing all 4 core `uirig` validation engines
  * (`crawlPageTokens`, `auditPageContrast`, `runGeometricStressAudit`, `collectPageCls`)
  * against the live Vite + AgnosticUI Lit sandbox in both Light Mode and Dark Mode.
  */
@@ -80,7 +80,7 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
     'cyan'
   );
   const title = paint(
-    '  uirig Live 4-Tool Spot-Check Report (AgnosticUI Lit Sandbox)',
+    '  uirig Live 4-Tool Check Report (AgnosticUI Lit Sandbox)',
     'bold',
     'cyan'
   );
@@ -187,7 +187,7 @@ export async function runLivePlaygroundSpotCheck(
 
     console.log(
       formatTelemetryLog(
-        'spot-check',
+        'check:playground',
         `Auditing live playground at ${paint(targetUrl, 'cyan')} (headless=${headless})...`
       )
     );
@@ -271,7 +271,7 @@ if (isDirectExecution) {
       console.log(formatSpotCheckSummary(report));
     })
     .catch((err: unknown) => {
-      console.error('[spot-check] Fatal error during live inspection:', err);
+      console.error('[check:playground] Fatal error during live inspection:', err);
       process.exitCode = 1;
     });
 }

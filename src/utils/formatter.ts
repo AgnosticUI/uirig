@@ -78,7 +78,7 @@ function resolveTagStyles(tag: string): AnsiStyle[] {
   if (tag.startsWith('cls:')) {
     return ['bold', 'blue'];
   }
-  if (tag.startsWith('spot-check') || tag.startsWith('check')) {
+  if (tag.startsWith('check')) {
     return ['bold', 'green'];
   }
   return ['bold', 'white'];
