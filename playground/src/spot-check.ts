@@ -4,7 +4,6 @@
  * (`crawlPageTokens`, `auditPageContrast`, `runGeometricStressAudit`, `collectPageCls`)
  * against the live Vite + AgnosticUI Lit sandbox in both Light Mode and Dark Mode.
  */
-
 import { chromium, type Browser } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
 import { resolve } from 'path';
@@ -27,31 +26,7 @@ import {
   collectPageCls,
   type IClsEvaluationResult,
 } from '../../src/core/cls.js';
-
-/**
- * Lightweight zero-dependency ANSI terminal color palette for crisp visual scanning.
- * Automatically honors the standard `NO_COLOR` environment variable.
- */
-const ANSI_CODES = {
-  reset: '\x1b[0m',
-  bold: '\x1b[1m',
-  dim: '\x1b[2m',
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  magenta: '\x1b[35m',
-  cyan: '\x1b[36m',
-} as const;
-
-type AnsiStyle = keyof typeof ANSI_CODES;
-
-function paint(text: string, ...styles: AnsiStyle[]): string {
-  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== '') {
-    return text;
-  }
-  const prefix = styles.map((s) => ANSI_CODES[s]).join('');
-  return `${prefix}${text}${ANSI_CODES.reset}`;
-}
+import { formatTelemetryLog, paint } from '../../src/utils/formatter.js';
 
 export const AGNOSTIC_SPOTCHECK_SCALE: ITokenScaleConfig = {
   colors: [
@@ -127,7 +102,7 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
           v.inShadowDom ? paint(' [ShadowDOM]', 'magenta') : ''
         }`
     ),
-    `${paint('2. [contrast]', 'bold', 'magenta')} Light Mode Violations   : ${formatCountBadge(
+    `${paint('2. [contrast]', 'bold', 'cyan')} Light Mode Violations   : ${formatCountBadge(
       report.lightMode.contrastViolations.length
     )}`,
     ...report.lightMode.contrastViolations.map(
@@ -136,11 +111,11 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
           `${v.contrastRatio}:1 < 4.5:1`,
           'bold',
           'red'
-        )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'dim')})`
+        )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'white')})`
     ),
-    `   ${paint('[contrast]', 'bold', 'magenta')} Dark Mode (${paint(
+    `   ${paint('[contrast]', 'bold', 'cyan')} Dark Mode (${paint(
       report.darkMode.activeThemeAttr ?? 'none',
-      'cyan'
+      'magenta'
     )}) Violations : ${formatCountBadge(report.darkMode.contrastViolations.length)}`,
     ...report.darkMode.contrastViolations.map(
       (v) =>
@@ -148,9 +123,9 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
           `${v.contrastRatio}:1 < 4.5:1`,
           'bold',
           'red'
-        )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'dim')})`
+        )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'white')})`
     ),
-    `${paint('3. [stress]', 'bold', 'magenta')}   Geometric Overflow Hits : ${formatCountBadge(
+    `${paint('3. [stress]', 'bold', 'yellow')}   Geometric Overflow Hits : ${formatCountBadge(
       report.lightMode.stressViolations.length
     )}`,
     ...report.lightMode.stressViolations.map(
@@ -164,11 +139,11 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
           'red'
         )})`
     ),
-    `${paint('4. [cls]', 'bold', 'magenta')}      Max Session CLS Score   : ${paint(
+    `${paint('4. [cls]', 'bold', 'blue')}      Max Session CLS Score   : ${paint(
       String(report.lightMode.clsEvaluation.maxSessionCls),
       'bold',
       report.lightMode.clsEvaluation.violation ? 'red' : 'green'
-    )} ${paint('(budget: 0.1)', 'dim')} -> ${
+    )} ${paint('(budget: 0.1)', 'cyan')} -> ${
       report.lightMode.clsEvaluation.violation
         ? paint('FAIL (Shift Detected)', 'bold', 'red')
         : paint('PASS', 'bold', 'green')
@@ -179,6 +154,7 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
 
   return lines.join('\n');
 }
+
 export async function runLivePlaygroundSpotCheck(
   port: number = 5173,
   options: ISpotCheckRunOptions = {}
@@ -209,7 +185,13 @@ export async function runLivePlaygroundSpotCheck(
       targetUrl = `http://localhost:${activePort}`;
     }
 
-    console.log(`[spot-check] Auditing live playground at ${targetUrl} (headless=${headless})...`);
+    console.log(
+      formatTelemetryLog(
+        'spot-check',
+        `Auditing live playground at ${paint(targetUrl, 'cyan')} (headless=${headless})...`
+      )
+    );
+
     browser = await chromium.launch({ headless, slowMo });
 
     // 1. Context A: Read-only Tokens + Contrast + Dark Mode Toggle Check
