@@ -7,15 +7,16 @@
  * and pre-navigation `PerformanceObserver` monitoring (`cls`) execute without
  * cross-tool pollution or multiple browser startup overhead.
  *
- * Also supports zero-config runs (`npx uirig <url-or-file>`) and automatically
- * spins up ephemeral local HTTP servers for `.html` file targets.
+ * Also supports zero-config runs (`npx uirig <url-or-file>`), runtime ignore
+ * rules (`data-uirig-ignore` + `ignore[]`), and ephemeral local HTTP servers
+ * for `.html` file targets.
  */
 
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { chromium, type Browser } from 'playwright';
 import { crawlPageTokens, type ITokenScaleConfig, type ITokenViolation } from '../core/tokens.js';
-import { auditPageContrast, type IContrastViolation } from '../core/matrix.js';
+import { auditPageContrast, type IContrastViolation, MIN_WCAG_AA_CONTRAST } from '../core/matrix.js';
 import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
 import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '../core/cls.js';
 import { logTelemetry, paint } from '../utils/formatter.js';
@@ -26,6 +27,7 @@ import {
   startEphemeralStaticServer,
   type IEphemeralStaticServer,
 } from '../utils/static-server.js';
+import type { IUirigIgnoreRule } from '../utils/ignore.js';
 
 export type PosixExitCode = 0 | 1 | 2;
 
@@ -48,6 +50,7 @@ export interface IUirigConfig {
   tokensPath?: string;
   thresholdBudgets: IThresholdBudgets;
   viewports: IViewportConfig[];
+  ignore?: IUirigIgnoreRule[];
 }
 
 export type AuditToolName = 'tokens' | 'contrast' | 'stress' | 'cls';
@@ -99,6 +102,7 @@ export const ZERO_CONFIG_DEFAULTS: Omit<IUirigConfig, 'targetUrls'> = {
     { name: 'mobile', width: 375, height: 812 },
     { name: 'desktop', width: 1440, height: 900 },
   ],
+  ignore: [],
 };
 
 export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
@@ -168,6 +172,23 @@ export function loadUirigConfig(
     );
   }
 
+  const ignoreRules: IUirigIgnoreRule[] = [];
+  if (candidate.ignore !== undefined) {
+    if (!Array.isArray(candidate.ignore)) {
+      throw new Error(`ERR_CONFIG_SCHEMA: 'ignore' must be an array of ignore rule objects.`);
+    }
+    for (const entry of candidate.ignore) {
+      if (typeof entry !== 'object' || entry === null || typeof entry.rule !== 'string') {
+        throw new Error(`ERR_CONFIG_SCHEMA: Each entry in 'ignore' must specify a 'rule' string.`);
+      }
+      ignoreRules.push({
+        rule: entry.rule,
+        selector: typeof entry.selector === 'string' ? entry.selector : undefined,
+        url: typeof entry.url === 'string' ? entry.url : undefined,
+      });
+    }
+  }
+
   return {
     $schema: candidate.$schema,
     targetUrls: candidate.targetUrls,
@@ -179,6 +200,7 @@ export function loadUirigConfig(
       darkModeMaxSurfaceLuminance: budgets.darkModeMaxSurfaceLuminance ?? 0.85,
     },
     viewports: candidate.viewports,
+    ignore: ignoreRules,
   };
 }
 
@@ -295,7 +317,8 @@ export async function auditViewportInParallel(
   viewport: IViewportConfig,
   tokenScale: ITokenScaleConfig | null,
   budgets: IThresholdBudgets,
-  only?: AuditToolName
+  only?: AuditToolName,
+  ignoreRules: IUirigIgnoreRule[] = []
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
   const runTokens = (!only || only === 'tokens') && tokenScale !== null;
@@ -325,8 +348,12 @@ export async function auditViewportInParallel(
       const page = await context.newPage();
       await page.goto(url, { waitUntil: 'networkidle' });
       const tokenViolations =
-        runTokens && tokenScale !== null ? await crawlPageTokens(page, tokenScale) : [];
-      const contrastViolations = runContrast ? await auditPageContrast(page) : [];
+        runTokens && tokenScale !== null
+          ? await crawlPageTokens(page, tokenScale, ignoreRules)
+          : [];
+      const contrastViolations = runContrast
+        ? await auditPageContrast(page, MIN_WCAG_AA_CONTRAST, ignoreRules)
+        : [];
       return { tokenViolations, contrastViolations };
     } finally {
       await context.close();
@@ -344,6 +371,7 @@ export async function auditViewportInParallel(
       return await runGeometricStressAudit(page, {
         overflowPixelTolerance: budgets.overflowPixelTolerance,
         touchTargetMinSpacingPx: budgets.touchTargetMinSpacingPx,
+        ignoreRules,
       });
     } finally {
       await context.close();
@@ -438,7 +466,8 @@ export async function executeCheckCommand(
           viewport,
           tokenScale,
           config.thresholdBudgets,
-          options.only
+          options.only,
+          config.ignore ?? []
         );
         results.push({
           ...viewportReport,
