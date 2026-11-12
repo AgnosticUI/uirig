@@ -1,7 +1,7 @@
 ================================================================================
           uirig : Chronological Session Continuity Bridge Capsule              
 ================================================================================
- TIMESTAMP BASELINE : 2026-11-12T10:00:00-06:00 (Anchored to Nov 12, 2026 Timeline)
+ TIMESTAMP BASELINE : 2026-11-12T10:15:00-06:00 (Anchored to Nov 12, 2026 Timeline)
  ACTIVE WORKSPACE   : Phase 7 Task 7.2 (Micro-Chunk 1) / src/core/xss.ts
  COMPLETED PHASES   :
    - Phase 1: Specifications & Documentation Design (MVP + Agentic Harness positioning)
@@ -32,6 +32,7 @@
        * Task 7.4: Uncaught Runtime JS & Console Error Gate (`src/commands/check.ts`)
        * Task 7.5: Geometric Stress Accuracy & Edge-Case Pack (`src/core/adversary.ts`)
        * Task 7.6: Unified Forms, ARIA References & Broken Media Gate (`src/core/a11y.ts` + `tests/unit/a11y.test.ts`, wired into `check.ts`, `agent-stream.ts`, and `src/index.ts`)
+       * Task 7.7: CLI Help Colorization & Subcommand-Specific `--help` Coverage (`src/index.ts` + `tests/unit/index.test.ts`)
    - Post-MVP Backlog (v1.1 & v1.2 — Tracked in `MVP.md` & `docs/ROADMAP_ROI_MATRIX.md`)
 
 --- MANDATORY WORKFLOW & MENTOR RULES (ENFORCE STRICTLY) ---

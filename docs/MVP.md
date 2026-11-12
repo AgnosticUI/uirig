@@ -73,6 +73,9 @@
 - [ ] **Task 7.6: Unified Forms, ARIA References & Broken Media Gate (`uirig a11y`)**
   * **Why:** AI-generated UIs frequently ship placeholder-only inputs without `<label>`, unlabeled icon-only buttons, broken `aria-labelledby` IDs, broken `<img>` tags (`naturalWidth === 0`), and unmuted autoplay media.
   * **Action:** Build `src/core/a11y.ts` (and wire `uirig a11y` + `check.ts`) to run a single Light + Shadow DOM sweep verifying accessible names, ARIA/label ID resolution, valid image dimensions, and muted autoplay compliance.
+- [ ] **Task 7.7: CLI Help Colorization & Subcommand-Specific `--help` Coverage (`src/index.ts`)**
+  * **Why:** Currently `CLI_HELP_TEXT` renders unstyled monochrome output and `uirig <subcommand> --help` (e.g., `npx uirig stress --help`) prints the generic global help instead of explaining the specific tool's purpose, mechanics, flags, and exit codes.
+  * **Action:** Refactor `src/index.ts` + `tests/unit/index.test.ts` to render dynamic ANSI-styled help output (`renderHelpText(topic?)`) and support dedicated `--help` pages for `init`, `check`, `tokens`, `contrast`, `stress`, `cls`, `manifest`, `xss`, and `a11y`.
 
 ---
 
