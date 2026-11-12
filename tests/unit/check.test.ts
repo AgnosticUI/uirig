@@ -229,7 +229,13 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       'utf8'
     );
 
-    const report = await executeCheckCommand({ configPath: configFile, headless: true });
+    const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+    const report = await executeCheckCommand({
+      configPath: configFile,
+      headless: true,
+      reportOutputPath: reportOutput,
+    });
+
 
     expect(report.exitCode).toBe(0);
     expect(report.summary.totalViewportsAudited).toBe(1);
@@ -289,7 +295,13 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       'utf8'
     );
 
-    const report = await executeCheckCommand({ configPath: configFile, headless: true, json: true });
+    const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+    const report = await executeCheckCommand({
+      configPath: configFile,
+      headless: true,
+      json: true,
+      reportOutputPath: reportOutput,
+    });
 
     expect(report.exitCode).toBe(2);
     expect(report.summary.totalTokenViolations).toBe(0);

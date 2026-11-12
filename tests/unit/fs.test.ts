@@ -20,6 +20,7 @@ function buildSampleReport(passing: boolean): ICheckExecutionReport {
     return {
       timestamp: '2026-11-11T22:30:00.000Z',
       configPath: '/workspace/uirig.config.json',
+      reportPath: '/workspace/.uirig/github_pr_comment.md',
       exitCode: 0,
       summary: {
         totalViewportsAudited: 1,
@@ -43,6 +44,7 @@ function buildSampleReport(passing: boolean): ICheckExecutionReport {
 
   return {
     timestamp: '2026-11-11T22:35:00.000Z',
+    reportPath: '/workspace/.uirig/github_pr_comment.md',
     configPath: '/workspace/uirig.config.json',
     exitCode: 2,
     summary: {

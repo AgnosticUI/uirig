@@ -16,6 +16,7 @@ import { auditPageContrast, type IContrastViolation } from '../core/matrix.js';
 import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
 import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '../core/cls.js';
 import { formatTelemetryLog, paint } from '../utils/formatter.js';
+import { writeGithubPrCommentReport, DEFAULT_PR_COMMENT_PATH } from '../utils/fs.js';
 
 /**
  * Deterministic POSIX exit codes enforced by `uirig check`:
@@ -51,6 +52,8 @@ export interface ICheckCommandOptions {
   headless?: boolean;
   /** Optional inline token scale override (useful for programmatic calls & tests). */
   tokenScaleOverride?: ITokenScaleConfig;
+  /** Optional custom output path for the Markdown PR comment report (defaults to `.uirig/github_pr_comment.md`). */
+  reportOutputPath?: string;
 }
 
 export interface IViewportAuditReport {
@@ -65,6 +68,7 @@ export interface IViewportAuditReport {
 export interface ICheckExecutionReport {
   timestamp: string;
   configPath: string;
+  reportPath: string;
   exitCode: PosixExitCode;
   results: IViewportAuditReport[];
   summary: {
@@ -329,8 +333,9 @@ export async function auditViewportInParallel(
 /**
  * Main orchestration entry point for `uirig check`.
  * Loads configuration, launches a single Chromium browser binary, runs all configured
- * `(url, viewport)` targets through `auditViewportInParallel()`, computes aggregate counts
- * and POSIX exit code (`0`, `1`, or `2`), and guarantees browser teardown.
+ * `(url, viewport)` targets through `auditViewportInParallel()`, synthesizes the standalone
+ * Markdown PR comment report to `.uirig/github_pr_comment.md`, and returns the complete
+ * report with deterministic POSIX exit code (`0`, `1`, or `2`).
  */
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
@@ -338,6 +343,10 @@ export async function executeCheckCommand(
   const resolvedConfigPath = resolve(
     process.cwd(),
     options.configPath ?? 'uirig.config.json'
+  );
+  const resolvedReportPath = resolve(
+    process.cwd(),
+    options.reportOutputPath ?? DEFAULT_PR_COMMENT_PATH
   );
   const previousJsonMode = process.env.UIRIG_JSON_MODE;
 
@@ -389,6 +398,18 @@ export async function executeCheckCommand(
       ),
     };
 
+    const executionReport: ICheckExecutionReport = {
+      timestamp: new Date().toISOString(),
+      configPath: resolvedConfigPath,
+      reportPath: resolvedReportPath,
+      exitCode,
+      results,
+      summary,
+    };
+
+    // Synthesize standalone GitHub PR comment Markdown report to disk
+    writeGithubPrCommentReport(executionReport, resolvedReportPath);
+
     const exitBadge =
       exitCode === 0
         ? paint('0 (PASS)', 'bold', 'green')
@@ -397,13 +418,7 @@ export async function executeCheckCommand(
       formatTelemetryLog('check:complete', `Audit finished. POSIX Exit Code: ${exitBadge}`)
     );
 
-    return {
-      timestamp: new Date().toISOString(),
-      configPath: resolvedConfigPath,
-      exitCode,
-      results,
-      summary,
-    };
+    return executionReport;
   } finally {
     if (browser) {
       await browser.close();
