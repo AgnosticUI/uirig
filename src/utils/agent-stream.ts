@@ -3,8 +3,8 @@
  * Agentic JSON Tool Stream Output Generator.
  * Single Responsibility: Translates heterogeneous violation structures from all
  * core audit engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`, `runtime`)
- * into a flat, uniform `IAgenticViolation` stream with Shadow host attribution and
- * deterministic `remediationAdvice` for AI agents.
+ * into a flat, uniform `IAgenticViolation` stream with Shadow host attribution,
+ * pattern deduplication (`occurrenceCount`), and deterministic `remediationAdvice` for AI agents.
  */
 
 import type { ICheckExecutionReport, IViewportAuditReport } from '../commands/check.js';
@@ -29,6 +29,10 @@ export interface IAgenticViolation {
   selector: string;
   /** True when the offending node lives inside an open ShadowRoot. */
   inShadowDom: boolean;
+  /** Number of matching elements collapsed into this pattern violation (1 when unique). */
+  occurrenceCount: number;
+  /** Sample selector paths when multiple repeating elements share the exact same defect. */
+  sampleSelectors?: string[];
   /** Human- and machine-readable measurement showing how far the value drifted from budget. */
   measuredDelta: string;
   /** Nearest passing design token when available. */
@@ -75,6 +79,7 @@ export function normalizeViewportViolations(
       hostComponent,
       selector: tokenViolation.selector,
       inShadowDom: tokenViolation.inShadowDom,
+      occurrenceCount: 1,
       measuredDelta: `${tokenViolation.property}: ${tokenViolation.actualValue}`,
       remediationAdvice: `Replace hardcoded CSS property '${tokenViolation.property}' (${tokenViolation.actualValue}) on '${tokenViolation.selector}' with an approved design token from uirig.config.json tokensPath.`,
     });
@@ -86,6 +91,9 @@ export function normalizeViewportViolations(
       contrastViolation.hostComponent !== undefined
         ? contrastViolation.hostComponent
         : extractHostComponentFromSelector(contrastViolation.selector);
+    const tokenSuffix = contrastViolation.suggestedToken
+      ? ` Consider using approved token '${contrastViolation.suggestedToken}'.`
+      : '';
 
     normalized.push({
       engine: 'contrast',
@@ -95,12 +103,16 @@ export function normalizeViewportViolations(
       hostComponent,
       selector: contrastViolation.selector,
       inShadowDom: contrastViolation.inShadowDom,
+      occurrenceCount: 1,
       measuredDelta: `contrast ${contrastViolation.contrastRatio.toFixed(2)}:1 (required >= 4.50:1)`,
-      remediationAdvice: `Adjust foreground (${contrastViolation.foregroundRgb}) or background (${contrastViolation.backgroundRgb}) on '${contrastViolation.selector}' so computed WCAG contrast reaches at least 4.50:1.`,
+      ...(contrastViolation.suggestedToken
+        ? { suggestedToken: contrastViolation.suggestedToken }
+        : {}),
+      remediationAdvice: `Adjust foreground (${contrastViolation.foregroundRgb}) or background (${contrastViolation.backgroundRgb}) on '${contrastViolation.selector}' so computed WCAG contrast reaches at least 4.50:1.${tokenSuffix}`,
     });
   }
 
-  // 3. Normalize Dark-Mode Theme Parity Violations (`dark-mode`)
+    // 3. Normalize Dark-Mode Theme Parity Violations (`dark-mode`)
   for (const darkViolation of viewportReport.darkModeViolations ?? []) {
     const hostComponent =
       darkViolation.hostComponent !== undefined
@@ -121,8 +133,9 @@ export function normalizeViewportViolations(
         hostComponent,
         selector: darkViolation.selector,
         inShadowDom: darkViolation.inShadowDom,
+        occurrenceCount: 1,
         measuredDelta: `luminance ${lum} in dark mode (${darkViolation.backgroundRgb})`,
-        suggestedToken: darkViolation.suggestedToken,
+        ...(darkViolation.suggestedToken ? { suggestedToken: darkViolation.suggestedToken } : {}),
         remediationAdvice: `Replace bright hardcoded background (${darkViolation.backgroundRgb}) on '${darkViolation.selector}' with a semantic dark-mode surface token.${tokenSuffix}`,
       });
     } else {
@@ -135,8 +148,9 @@ export function normalizeViewportViolations(
         hostComponent,
         selector: darkViolation.selector,
         inShadowDom: darkViolation.inShadowDom,
+        occurrenceCount: 1,
         measuredDelta: `dark-mode contrast ${ratio}:1 (required >= 4.50:1)`,
-        suggestedToken: darkViolation.suggestedToken,
+        ...(darkViolation.suggestedToken ? { suggestedToken: darkViolation.suggestedToken } : {}),
         remediationAdvice: `Adjust dark-mode foreground (${darkViolation.foregroundRgb ?? 'text'}) or background (${darkViolation.backgroundRgb}) on '${darkViolation.selector}' to reach >= 4.50:1.${tokenSuffix}`,
       });
     }
@@ -178,11 +192,11 @@ export function normalizeViewportViolations(
       hostComponent,
       selector: stressViolation.selector,
       inShadowDom: stressViolation.inShadowDom,
+      occurrenceCount: 1,
       measuredDelta,
       remediationAdvice,
     });
   }
-
 
   // 5. Normalize Cumulative Layout Shift Budget Breaches (`cls`)
   const clsViolation = viewportReport.clsEvaluation.violation;
@@ -201,12 +215,13 @@ export function normalizeViewportViolations(
       hostComponent: extractHostComponentFromSelector(primarySelector),
       selector: primarySelector,
       inShadowDom: primarySelector.includes('>> shadow-root >>'),
+      occurrenceCount: 1,
       measuredDelta: `CLS ${clsViolation.measuredClsScore.toFixed(3)} (max ${clsViolation.clsMaxLimit.toFixed(3)})`,
       remediationAdvice: `Reserve explicit width/height or min-height dimensions for shifting elements (${selectorsList}) so session-window CLS (${clsViolation.measuredClsScore.toFixed(3)}) stays at or below ${clsViolation.clsMaxLimit.toFixed(3)}.`,
     });
   }
 
-  // 6. Normalize DOM & Markup Integrity Violations (`dom`)
+    // 6. Normalize DOM & Markup Integrity Violations (`dom`)
   for (const domViolation of viewportReport.domViolations ?? []) {
     const hostComponent =
       domViolation.hostComponent !== undefined
@@ -221,6 +236,7 @@ export function normalizeViewportViolations(
       hostComponent,
       selector: domViolation.selector,
       inShadowDom: domViolation.inShadowDom,
+      occurrenceCount: 1,
       measuredDelta: domViolation.detail,
       remediationAdvice: `Fix '${domViolation.rule}' on '${domViolation.selector}': ${domViolation.detail}`,
     });
@@ -236,12 +252,58 @@ export function normalizeViewportViolations(
       hostComponent: null,
       selector: runtimeErr.location ?? 'window',
       inShadowDom: false,
+      occurrenceCount: 1,
       measuredDelta: runtimeErr.message,
       remediationAdvice: `Resolve uncaught runtime error (${runtimeErr.source}): ${runtimeErr.message}`,
     });
   }
 
   return normalized;
+}
+
+/**
+ * Normalizes a selector path by stripping `#id` suffixes so repeating list/card items
+ * (e.g. `li#item-1 > span.muted` and `li#item-2 > span.muted`) group cleanly together.
+ */
+function buildPatternSignature(selector: string): string {
+  return selector.replace(/#[A-Za-z0-9_-]+/g, '');
+}
+
+/**
+ * Collapses repeating identical defects within the same `(engine, violationType, url, viewport, hostComponent, pattern, measuredDelta)`
+ * bucket into a single entry with `occurrenceCount` and up to 5 `sampleSelectors` to prevent AI context bloat.
+ */
+export function deduplicateAgenticViolations(
+  violations: IAgenticViolation[]
+): IAgenticViolation[] {
+  const grouped = new Map<string, IAgenticViolation>();
+
+  for (const item of violations) {
+    const pattern = buildPatternSignature(item.selector);
+    const key = [
+      item.engine,
+      item.violationType,
+      item.url,
+      item.viewport,
+      item.hostComponent ?? '',
+      pattern,
+      item.measuredDelta,
+    ].join('::');
+
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { ...item, occurrenceCount: 1 });
+    } else {
+      existing.occurrenceCount += 1;
+      const samples = existing.sampleSelectors ?? [existing.selector];
+      if (!samples.includes(item.selector) && samples.length < 5) {
+        samples.push(item.selector);
+      }
+      existing.sampleSelectors = samples;
+    }
+  }
+
+  return Array.from(grouped.values());
 }
 
 /**
@@ -252,12 +314,14 @@ export function normalizeViewportViolations(
  * @returns Deterministic, pretty-printed JSON string ready for `process.stdout.write()`.
  */
 export function formatAgenticJsonStream(report: ICheckExecutionReport): string {
-  const violations: IAgenticViolation[] = [];
+  const rawViolations: IAgenticViolation[] = [];
 
   for (const viewportResult of report.results) {
     const viewportViolations = normalizeViewportViolations(viewportResult);
-    violations.push(...viewportViolations);
+    rawViolations.push(...viewportViolations);
   }
+
+  const violations = deduplicateAgenticViolations(rawViolations);
 
   const payload: IAgenticJsonStreamPayload = {
     tool: 'uirig',

@@ -447,8 +447,15 @@ export async function auditViewportInParallel(
           ? await crawlPageTokens(page, tokenScale, ignoreRules)
           : [];
       const contrastViolations = runContrast
-        ? await auditPageContrast(page, MIN_WCAG_AA_CONTRAST, ignoreRules)
+        ? await auditPageContrast(
+            page,
+            MIN_WCAG_AA_CONTRAST,
+            ignoreRules,
+            'contrast',
+            tokenScale?.colors ?? []
+          )
         : [];
+
       const domViolations = runDom
         ? await runDomIntegrityAudit(page, {
             navigationResponse: isLocalStaticTarget ? null : response,
@@ -475,7 +482,9 @@ export async function auditViewportInParallel(
         maxSurfaceLuminance:
           budgets.darkModeMaxSurfaceLuminance ?? DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
         ignoreRules,
+        allowedColors: tokenScale?.colors ?? [],
       });
+
     } finally {
       await context.close();
     }
