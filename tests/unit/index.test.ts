@@ -1,0 +1,159 @@
+/**
+ * tests/unit/index.test.ts
+ * 1-to-1 unit tests for `src/index.ts`.
+ * Verifies:
+ * 1. Pure CLI argument parsing (`parseCliArgs`) across `init`, `manifest`, `check`,
+ *    `--config`, `--json`, `--headed`, `--help`, `--version`, and invalid flags.
+ * 2. Command dispatching and deterministic POSIX exit codes (`0`, `1`, `2`) in `runCli()`.
+ */
+
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { execFileSync } from 'child_process';
+import { resolve } from 'path';
+import { parseCliArgs, runCli, UIRIG_VERSION } from '../../src/index.js';
+import type { ICheckExecutionReport } from '../../src/commands/check.js';
+
+
+function createMockReport(exitCode: 0 | 1 | 2): ICheckExecutionReport {
+  return {
+    timestamp: '2026-11-12T08:00:00.000Z',
+    configPath: '/workspace/uirig.config.json',
+    reportPath: '/workspace/.uirig/github_pr_comment.md',
+    exitCode,
+    results: [],
+    summary: {
+      totalViewportsAudited: 1,
+      totalTokenViolations: exitCode === 1 ? 1 : 0,
+      totalContrastViolations: 0,
+      totalStressViolations: exitCode === 2 ? 1 : 0,
+      totalClsViolations: 0,
+    },
+  };
+}
+
+describe('index.ts — Root CLI Parser & Command Router', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('parses help, version, init, and manifest subcommands accurately', () => {
+    console.log('\n--- START TEST: Basic Subcommand & Flag Parsing ---');
+    expect(parseCliArgs([])).toEqual({ command: 'help' });
+    expect(parseCliArgs(['--help'])).toEqual({ command: 'help' });
+    expect(parseCliArgs(['-v'])).toEqual({ command: 'version' });
+    expect(parseCliArgs(['init'])).toEqual({ command: 'init' });
+    expect(parseCliArgs(['manifest'])).toEqual({ command: 'manifest' });
+  });
+
+  it('parses check flags (--config=, --config <path>, --json, --headed)', () => {
+    console.log('\n--- START TEST: check Command Flag Parsing ---');
+    expect(parseCliArgs(['check'])).toEqual({
+      command: 'check',
+      configPath: undefined,
+      json: false,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['check', '--config=./custom.json', '--json', '--headed'])).toEqual({
+      command: 'check',
+      configPath: './custom.json',
+      json: true,
+      headless: false,
+    });
+
+    expect(parseCliArgs(['check', '--config', 'dir/uirig.config.json'])).toEqual({
+      command: 'check',
+      configPath: 'dir/uirig.config.json',
+      json: false,
+      headless: true,
+    });
+  });
+
+  it('returns command=unknown with descriptive reason on invalid commands or missing flag values', () => {
+    console.log('\n--- START TEST: Invalid Command & Missing Flag Value Detection ---');
+    const badCmd = parseCliArgs(['deploy']);
+    expect(badCmd.command).toBe('unknown');
+
+    const missingConfigVal = parseCliArgs(['check', '--config=']);
+    expect(missingConfigVal.command).toBe('unknown');
+
+    const badFlag = parseCliArgs(['check', '--bogus']);
+    expect(badFlag.command).toBe('unknown');
+  });
+
+  it('writes help and version text to stdout and returns POSIX exit code 0', async () => {
+    console.log('\n--- START TEST: Help & Version stdout Output ---');
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array): boolean => {
+      stdoutChunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
+      return true;
+    });
+
+    const helpExit = await runCli(['--help']);
+    expect(helpExit).toBe(0);
+    expect(stdoutChunks.join('')).toContain('uirig <command> [options]');
+
+    stdoutChunks.length = 0;
+    const versionExit = await runCli(['--version']);
+    expect(versionExit).toBe(0);
+    expect(stdoutChunks.join('').trim()).toBe(UIRIG_VERSION);
+  });
+
+  it('dispatches init, manifest, and check handlers and propagates POSIX exit codes (0, 1, 2)', async () => {
+    console.log('\n--- START TEST: Command Dispatching & Exit Code Propagation ---');
+    const initSpy = vi.fn().mockResolvedValue(undefined);
+    const manifestSpy = vi.fn().mockResolvedValue(undefined);
+    const checkSpy = vi
+      .fn()
+      .mockResolvedValueOnce(createMockReport(0))
+      .mockResolvedValueOnce(createMockReport(1))
+      .mockResolvedValueOnce(createMockReport(2));
+
+    expect(await runCli(['init'], { init: initSpy })).toBe(0);
+    expect(initSpy).toHaveBeenCalledTimes(1);
+
+    expect(await runCli(['manifest'], { manifest: manifestSpy })).toBe(0);
+    expect(manifestSpy).toHaveBeenCalledTimes(1);
+
+    expect(await runCli(['check'], { check: checkSpy })).toBe(0);
+    expect(
+      await runCli(['check', '--config=custom.json', '--json', '--headed'], { check: checkSpy })
+    ).toBe(1);
+    expect(checkSpy).toHaveBeenLastCalledWith({
+      configPath: 'custom.json',
+      json: true,
+      headless: false,
+    });
+    expect(await runCli(['check'], { check: checkSpy })).toBe(2);
+  });
+
+  it('returns POSIX exit code 1 and writes to stderr on unknown commands or thrown runtime errors', async () => {
+    console.log('\n--- START TEST: Fatal Runtime Error & Unknown Command Exit Code 1 ---');
+    const stderrSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const unknownExit = await runCli(['unknown-subcommand']);
+    expect(unknownExit).toBe(1);
+    expect(stderrSpy).toHaveBeenCalled();
+
+    const failingCheck = vi.fn().mockRejectedValue(new Error('ERR_CONFIG_MISSING: Not found'));
+    const crashExit = await runCli(['check'], { check: failingCheck });
+    expect(crashExit).toBe(1);
+  });
+
+  it('executes compiled bin/uirig binary end-to-end for --version and --help', () => {
+    console.log('\n--- START TEST: End-to-End Compiled bin/uirig Execution ---');
+    const binPath = resolve(process.cwd(), 'bin/uirig');
+
+    const versionOutput = execFileSync(process.execPath, [binPath, '--version'], {
+      encoding: 'utf8',
+    });
+    expect(versionOutput.trim()).toBe(UIRIG_VERSION);
+
+    const helpOutput = execFileSync(process.execPath, [binPath, '--help'], {
+      encoding: 'utf8',
+    });
+    expect(helpOutput).toContain('uirig <command> [options]');
+    expect(helpOutput).toContain('POSIX EXIT CODES:');
+  });
+
+});
