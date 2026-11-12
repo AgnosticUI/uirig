@@ -25,15 +25,6 @@ export const DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE = 0.85;
 export const MIN_SURFACE_AUDIT_WIDTH_PX = 120;
 export const MIN_SURFACE_AUDIT_HEIGHT_PX = 60;
 
-export interface IDarkModeAuditOptions {
-  /** Maximum allowed WCAG relative luminance (0..1) for large surfaces in dark mode (default 0.85). */
-  maxSurfaceLuminance?: number;
-  /** Minimum WCAG 2.1 contrast ratio required for text in dark mode (default 4.5). */
-  minContrastRatio?: number;
-  /** Optional runtime ignore rules from `uirig.config.json`. */
-  ignoreRules?: IUirigIgnoreRule[];
-}
-
 export interface ISurfaceLuminanceSnapshot {
   selector: string;
   hostComponent?: string | null;
@@ -123,7 +114,6 @@ export function evaluateDarkModeSurfaceEntry(
 
   return null;
 }
-
 
 /**
  * Emulates dark mode on an isolated Playwright `Page` (`colorScheme: 'dark'` + `[data-theme="dark"]`),
