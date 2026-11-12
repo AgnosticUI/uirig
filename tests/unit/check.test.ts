@@ -1,6 +1,8 @@
 /**
  * tests/unit/check.test.ts
  * 1-to-1 unit & integration tests for `src/commands/check.ts`.
+ * Covers configuration loading, token scale validation, POSIX exit code resolution,
+ * zero-config local `.html` file execution, and concurrent Playwright runs.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -22,11 +24,14 @@ function createCleanViewportReport(): IViewportAuditReport {
     viewport: { name: 'desktop', width: 1440, height: 900 },
     tokenViolations: [],
     contrastViolations: [],
+    darkModeViolations: [],
     stressViolations: [],
     clsEvaluation: {
       maxSessionCls: 0.02,
       violation: null,
     },
+    domViolations: [],
+    runtimeErrors: [],
   };
 }
 
@@ -184,14 +189,16 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       <html>
         <head>
           <style>
-            body { margin: 0; padding: 16px; background: #ffffff; color: #111827; font-family: sans-serif; }
+            :root { --bg: #ffffff; --fg: #111827; }
+            :root[data-theme="dark"] { --bg: #0f172a; --fg: #f8fafc; }
+            body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font-family: sans-serif; }
             h1 { margin: 0 0 12px 0; font-size: 22px; }
             p { margin: 0; font-size: 16px; }
           </style>
         </head>
         <body>
           <h1>Zero-Config Standalone Preview</h1>
-          <p>Runs contrast, stress, and CLS checks automatically with no config file.</p>
+          <p>Runs contrast, dark-mode, stress, and CLS checks automatically with no config file.</p>
         </body>
       </html>`,
       'utf8'
@@ -210,12 +217,14 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalViewportsAudited).toBe(2);
     expect(report.summary.totalTokenViolations).toBe(0);
     expect(report.summary.totalContrastViolations).toBe(0);
+    expect(report.summary.totalDarkModeViolations).toBe(0);
     expect(report.summary.totalStressViolations).toBe(0);
     expect(report.summary.totalClsViolations).toBe(0);
     expect(report.results.at(0)?.url).toBe('./standalone.html');
   });
-  it('executes 3 isolated Playwright contexts concurrently and returns exitCode 0 for a compliant page', async () => {
-    console.log('[test:check] Running live 3-context parallel check on a compliant HTML fixture...');
+
+    it('executes isolated Playwright contexts concurrently and returns exitCode 0 for a compliant page', async () => {
+    console.log('[test:check] Running live parallel check on a compliant HTML fixture...');
     const compliantHtml = `<!DOCTYPE html>
       <html>
         <head>
@@ -224,12 +233,15 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
             main { padding: 16px; background-color: rgb(243, 244, 246); border-radius: 8px; }
             h1 { margin: 0 0 16px 0; font-size: 24px; color: rgb(17, 24, 39); }
             p { margin: 0; font-size: 16px; color: rgb(17, 24, 39); }
+            :root[data-theme="dark"] body { background-color: rgb(17, 24, 39); color: rgb(255, 255, 255); }
+            :root[data-theme="dark"] main { background-color: rgb(17, 24, 39); }
+            :root[data-theme="dark"] h1, :root[data-theme="dark"] p { color: rgb(255, 255, 255); }
           </style>
         </head>
         <body>
           <main>
             <h1>Compliant Header</h1>
-            <p>All tokens, contrast ratios, layout bounds, and CLS budgets pass cleanly.</p>
+            <p>All tokens, contrast ratios, dark-mode parity, layout bounds, and CLS budgets pass cleanly.</p>
           </main>
         </body>
       </html>`;
@@ -277,12 +289,44 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalViewportsAudited).toBe(1);
     expect(report.summary.totalTokenViolations).toBe(0);
     expect(report.summary.totalContrastViolations).toBe(0);
+    expect(report.summary.totalDarkModeViolations).toBe(0);
     expect(report.summary.totalStressViolations).toBe(0);
     expect(report.summary.totalClsViolations).toBe(0);
   });
 
-  it('detects structural overflow in Context 2 without polluting Context 1 read-only audits and returns exitCode 2', async () => {
-    console.log('[test:check] Running live 3-context parallel check on a stress-overflow fixture...');
+  it('catches dark-mode stranded light surfaces in Track 2 without polluting light-mode audits and returns exitCode 1', async () => {
+    console.log('[test:check] Running isolated dark-mode parity check on a light-only card...');
+    const lightOnlyCardHtml = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background-color: rgb(15, 23, 42); color: rgb(248, 250, 252); }
+            .stranded-card { width: 320px; height: 140px; padding: 16px; background-color: rgb(255, 255, 255); color: rgb(17, 24, 39); }
+          </style>
+        </head>
+        <body>
+          <div class="stranded-card">Stranded light card in dark mode</div>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(lightOnlyCardHtml);
+    activeServer = server;
+
+    const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+    const report = await executeCheckCommand({
+      target: url,
+      cwd: tempDir,
+      headless: true,
+      only: 'dark-mode',
+      reportOutputPath: reportOutput,
+    });
+
+    expect(report.exitCode).toBe(1);
+    expect(report.summary.totalDarkModeViolations).toBeGreaterThan(0);
+    expect(report.summary.totalContrastViolations).toBe(0);
+  });
+  it('detects structural overflow in stress track without polluting read-only audits and returns exitCode 2', async () => {
+    console.log('[test:check] Running live parallel check on a stress-overflow fixture...');
     const overflowHtml = `<!DOCTYPE html>
       <html>
         <head>

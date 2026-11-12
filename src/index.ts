@@ -5,7 +5,7 @@
  * - `uirig <url-or-file> [--only=<tool>] [--config=<path>] [--json] [--headed]` (zero-config instant check)
  * - `uirig init`
  * - `uirig check [<url-or-file>] [--only=<tool>] [--config=<path>] [--json] [--headed]`
- * - `uirig tokens | contrast | stress | cls [<url-or-file>] [--config=<path>] [--json] [--headed]`
+ * - `uirig tokens | contrast | dark-mode | stress | cls [<url-or-file>] [--config=<path>] [--json] [--headed]`
  * - `uirig manifest`
  * - `uirig --help` / `uirig --version`
  */
@@ -23,7 +23,13 @@ import { logTelemetry, paint } from './utils/formatter.js';
 
 export const UIRIG_VERSION = '0.1.0';
 
-const AUDIT_TOOL_NAMES = new Set<AuditToolName>(['tokens', 'contrast', 'stress', 'cls']);
+const AUDIT_TOOL_NAMES = new Set<AuditToolName>([
+  'tokens',
+  'contrast',
+  'dark-mode',
+  'stress',
+  'cls',
+]);
 
 export const CLI_HELP_TEXT = `
 ${paint('uirig', 'bold', 'cyan')} v${UIRIG_VERSION}: The first line of defense for AI-generated UIs and Web Components
@@ -37,13 +43,14 @@ ${paint('COMMANDS:', 'bold')}
   check [<url-or-file>]           Run verification engines concurrently in isolated contexts
   tokens [<url-or-file>]          Run only the shadow-piercing design token drift auditor
   contrast [<url-or-file>]        Run only the WCAG 2.1 rendered luminance contrast gate
+  dark-mode [<url-or-file>]       Run only the dark-mode theme parity & surface luminance gate
   stress [<url-or-file>]          Run only the +30% text-expansion geometric overflow fuzzer
   cls [<url-or-file>]             Run only the W3C session-window Cumulative Layout Shift monitor
   manifest                        Print ASCII repository tree blueprint (excluding blocklisted dirs)
 
-${paint('AUDIT OPTIONS (check / tokens / contrast / stress / cls):', 'bold')}
+${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / cls):', 'bold')}
   --config=<path>                 Path to uirig.config.json (also supports: --config <path>)
-  --only=<tool>                   Filter 'check' to one engine: tokens | contrast | stress | cls
+  --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls
   --json                          Route telemetry to stderr and emit machine-readable JSON to stdout
   --headed                        Launch Chromium with a visible browser window for local debugging
 
@@ -53,7 +60,7 @@ ${paint('GLOBAL OPTIONS:', 'bold')}
 
 ${paint('POSIX EXIT CODES:', 'bold')}
   0                               All geometric bounds, contrast ratios, and token checks passed
-  1                               Config error, design token drift, or WCAG contrast failure (< 4.5:1)
+  1                               Config error, design token drift, or WCAG/dark-mode contrast failure
   2                               Structural layout break (overflow/collision) or CLS budget breach
 `;
 
@@ -119,7 +126,7 @@ function parseAuditCommandArgs(
         return {
           command: 'unknown',
           rawCommand: rawSubcommand,
-          reason: `Invalid --only value '${toolValue}'. Expected one of: tokens, contrast, stress, cls.`,
+          reason: `Invalid --only value '${toolValue}'. Expected one of: tokens, contrast, dark-mode, stress, cls.`,
         };
       }
       only = toolValue;

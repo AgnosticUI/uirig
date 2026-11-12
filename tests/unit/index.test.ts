@@ -277,4 +277,26 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       headless: true,
     });
   });
+
+  it('parses standalone dark-mode subcommand and --only=dark-mode', () => {
+    console.log('\n--- START TEST: Standalone dark-mode Subcommand Parsing ---');
+    expect(parseCliArgs(['dark-mode', './dist/index.html', '--json'])).toEqual({
+      command: 'check',
+      target: './dist/index.html',
+      only: 'dark-mode',
+      configPath: undefined,
+      json: true,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['check', '--only=dark-mode'])).toEqual({
+      command: 'check',
+      target: undefined,
+      only: 'dark-mode',
+      configPath: undefined,
+      json: false,
+      headless: true,
+    });
+  });
+
 });

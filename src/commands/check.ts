@@ -23,6 +23,10 @@ import { logTelemetry, paint } from '../utils/formatter.js';
 import { formatAgenticJsonStream } from '../utils/agent-stream.js';
 import { writeGithubPrCommentReport, DEFAULT_PR_COMMENT_PATH } from '../utils/fs.js';
 import {
+  runDarkModeAudit,
+  DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
+} from '../core/dark-mode.js';
+import {
   isLocalFileTarget,
   startEphemeralStaticServer,
   type IEphemeralStaticServer,
@@ -378,10 +382,11 @@ export async function auditViewportInParallel(
   const viewportSize = { width: viewport.width, height: viewport.height };
   const runTokens = (!only || only === 'tokens') && tokenScale !== null;
   const runContrast = !only || only === 'contrast';
+  const runDarkMode = !only || only === 'dark-mode';
   const runStress = !only || only === 'stress';
   const runCls = !only || only === 'cls';
 
-  const activeScope = only ? `single engine (${only})` : '3 isolated contexts';
+  const activeScope = only ? `single engine (${only})` : '4 isolated contexts';
   logTelemetry(
     'check:dispatch',
     `Running ${activeScope} for ${paint(url, 'cyan')} @ ${paint(
@@ -391,7 +396,7 @@ export async function auditViewportInParallel(
     )}...`
   );
 
-  // Track 1: Read-Only Audits (`tokens` and/or `contrast`)
+  // Track 1: Read-Only Light-Mode Audits (`tokens` and/or `contrast`)
   const runReadOnlyTrack = async (): Promise<{
     tokenViolations: ITokenViolation[];
     contrastViolations: IContrastViolation[];
@@ -416,7 +421,26 @@ export async function auditViewportInParallel(
     }
   };
 
-  // Track 2: Mutated DOM Fuzzing (`stress`)
+  // Track 2: Emulated Dark-Mode Theme Parity Audit (`dark-mode`)
+  const runDarkModeTrack = async (): Promise<IDarkModeViolation[]> => {
+    if (!runDarkMode) {
+      return [];
+    }
+    const context = await browser.newContext({ viewport: viewportSize });
+    try {
+      const page = await context.newPage();
+      await page.goto(url, { waitUntil: 'networkidle' });
+      return await runDarkModeAudit(page, {
+        maxSurfaceLuminance:
+          budgets.darkModeMaxSurfaceLuminance ?? DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
+        ignoreRules,
+      });
+    } finally {
+      await context.close();
+    }
+  };
+
+  // Track 3: Mutated DOM Fuzzing (`stress`)
   const runStressTrack = async (): Promise<IGeometricViolation[]> => {
     if (!runStress) {
       return [];
@@ -435,7 +459,7 @@ export async function auditViewportInParallel(
     }
   };
 
-  // Track 3: Pre-Navigation Layout Shift Monitor (`cls`)
+  // Track 4: Pre-Navigation Layout Shift Monitor (`cls`)
   const runClsTrack = async (): Promise<IClsEvaluationResult> => {
     if (!runCls) {
       return { maxSessionCls: 0, violation: null };
@@ -451,8 +475,9 @@ export async function auditViewportInParallel(
     }
   };
 
-  const [readOnlyResult, stressViolations, clsEvaluation] = await Promise.all([
+  const [readOnlyResult, darkModeViolations, stressViolations, clsEvaluation] = await Promise.all([
     runReadOnlyTrack(),
+    runDarkModeTrack(),
     runStressTrack(),
     runClsTrack(),
   ]);
@@ -462,7 +487,7 @@ export async function auditViewportInParallel(
     viewport,
     tokenViolations: readOnlyResult.tokenViolations,
     contrastViolations: readOnlyResult.contrastViolations,
-    darkModeViolations: [],
+    darkModeViolations,
     stressViolations,
     clsEvaluation,
     domViolations: [],
