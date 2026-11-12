@@ -1,12 +1,14 @@
 /**
  * tests/unit/matrix.test.ts
  * Unit tests verifying `colorjs.io` WCAG 2.1 contrast evaluation, Porter-Duff
- * semi-transparent background compositing, and 4.5:1 legibility thresholds.
+ * semi-transparent background compositing, nearest passing token suggestions,
+ * and 4.5:1 legibility thresholds.
  */
 import { describe, it, expect } from 'vitest';
 import {
   compositeBackgroundStack,
   evaluateContrastEntry,
+  findNearestPassingColorToken,
   MIN_WCAG_AA_CONTRAST,
 } from '../../src/core/matrix.js';
 
@@ -25,14 +27,17 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
     expect(result).toBeNull();
   });
 
-  it('==> Should catch low-contrast light gray text on a white background (< 4.5:1)', () => {
-    console.log('\n--- START TEST: Low-Contrast Light Gray on White Failure ---');
+  it('==> Should catch low-contrast light gray text on a white background (< 4.5:1) and suggest nearest passing token', () => {
+    console.log('\n--- START TEST: Low-Contrast Light Gray on White Failure + Token Suggestion ---');
+
+    const tokenPalette = ['rgb(255, 255, 255)', 'rgb(148, 163, 184)', 'rgb(71, 85, 105)', 'rgb(15, 23, 42)'];
 
     const result = evaluateContrastEntry({
       selector: 'span.muted-caption',
       foregroundColor: 'rgb(180, 180, 180)',
       backgroundLayers: ['rgb(255, 255, 255)', 'rgba(0, 0, 0, 0)'],
       inShadowDom: false,
+      allowedColors: tokenPalette,
     });
 
     console.log('[!] Contrast violation caught:', JSON.stringify(result, null, 2));
@@ -41,6 +46,9 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
     expect(result?.selector).toBe('span.muted-caption');
     expect(result?.contrastRatio).toBeLessThan(MIN_WCAG_AA_CONTRAST);
     expect(result?.backgroundRgb).toBe('rgb(255, 255, 255)');
+    // rgb(148, 163, 184) fails 4.5:1 on white (~2.57:1), so nearest passing token is rgb(71, 85, 105) (~5.63:1)
+    expect(result?.suggestedToken).toBe('rgb(71, 85, 105)');
+    expect(findNearestPassingColorToken('rgb(180, 180, 180)', 'rgb(255, 255, 255)', ['rgb(255, 255, 255)'])).toBeUndefined();
   });
 
   it('==> Should accurately composite semi-transparent overlays over dark backdrops', () => {

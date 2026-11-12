@@ -19,6 +19,7 @@ import {
   createBrowserDomWalker,
   extractHostComponentFromSelector,
 } from '../utils/dom-walker.js';
+import Color from 'colorjs.io';
 
 export const DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE = 0.85;
 export const MIN_SURFACE_AUDIT_WIDTH_PX = 120;
@@ -42,13 +43,54 @@ export interface ISurfaceLuminanceSnapshot {
   inShadowDom: boolean;
 }
 
+export interface IDarkModeAuditOptions {
+  /** Maximum allowed WCAG relative luminance (0..1) for large surfaces in dark mode (default 0.85). */
+  maxSurfaceLuminance?: number;
+  /** Minimum WCAG 2.1 contrast ratio required for text in dark mode (default 4.5). */
+  minContrastRatio?: number;
+  /** Optional runtime ignore rules from `uirig.config.json`. */
+  ignoreRules?: IUirigIgnoreRule[];
+  /** Optional approved color tokens from `tokensPath` used to compute `suggestedToken` fixes. */
+  allowedColors?: string[];
+}
+
+/**
+ * Picks the darkest compliant surface token from `allowedColors` whose relative luminance
+ * stays at or below `maxSurfaceLuminance`.
+ */
+export function findNearestDarkSurfaceToken(
+  allowedColors: string[] = [],
+  maxSurfaceLuminance: number = DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE
+): string | undefined {
+  let bestToken: string | undefined;
+  let lowestLuminance = Number.POSITIVE_INFINITY;
+
+  for (const rawCandidate of allowedColors) {
+    try {
+      const candidate = new Color(rawCandidate).to('srgb');
+      if ((candidate.alpha ?? 1) < 1) {
+        continue;
+      }
+      if (candidate.luminance <= maxSurfaceLuminance && candidate.luminance < lowestLuminance) {
+        lowestLuminance = candidate.luminance;
+        bestToken = rawCandidate;
+      }
+    } catch {
+      // Ignore unparseable token entries
+    }
+  }
+
+  return bestToken;
+}
+
 /**
  * Pure evaluator that composites a surface's ancestor background stack and checks
  * whether its WCAG relative luminance exceeds `maxSurfaceLuminance` in dark mode.
  */
 export function evaluateDarkModeSurfaceEntry(
   entry: ISurfaceLuminanceSnapshot,
-  maxSurfaceLuminance: number = DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE
+  maxSurfaceLuminance: number = DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
+  allowedColors: string[] = []
 ): IDarkModeViolation | null {
   if (entry.width <= MIN_SURFACE_AUDIT_WIDTH_PX || entry.height <= MIN_SURFACE_AUDIT_HEIGHT_PX) {
     return null;
@@ -66,6 +108,7 @@ export function evaluateDarkModeSurfaceEntry(
       entry.hostComponent !== undefined
         ? entry.hostComponent
         : extractHostComponentFromSelector(entry.selector);
+    const suggestedToken = findNearestDarkSurfaceToken(allowedColors, maxSurfaceLuminance);
 
     return {
       violationType: 'stranded_light_surface',
@@ -73,6 +116,7 @@ export function evaluateDarkModeSurfaceEntry(
       hostComponent,
       backgroundRgb: `rgb(${r255}, ${g255}, ${b255})`,
       relativeLuminance: luminance,
+      ...(suggestedToken ? { suggestedToken } : {}),
       inShadowDom: entry.inShadowDom,
     };
   }
@@ -80,6 +124,12 @@ export function evaluateDarkModeSurfaceEntry(
   return null;
 }
 
+
+/**
+ * Emulates dark mode on an isolated Playwright `Page` (`colorScheme: 'dark'` + `[data-theme="dark"]`),
+ * runs rendered contrast checks, and audits large layout surfaces across Light & Shadow DOM
+ * for stranded bright-light backgrounds.
+ */
 /**
  * Emulates dark mode on an isolated Playwright `Page` (`colorScheme: 'dark'` + `[data-theme="dark"]`),
  * runs rendered contrast checks, and audits large layout surfaces across Light & Shadow DOM
@@ -93,6 +143,7 @@ export async function runDarkModeAudit(
     options.maxSurfaceLuminance ?? DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE;
   const minContrastRatio = options.minContrastRatio ?? MIN_WCAG_AA_CONTRAST;
   const ignoreRules = options.ignoreRules ?? [];
+  const allowedColors = options.allowedColors ?? [];
 
   logTelemetry(
     'dark-mode:audit',
@@ -116,7 +167,8 @@ export async function runDarkModeAudit(
     page,
     minContrastRatio,
     ignoreRules,
-    'dark-mode'
+    'dark-mode',
+    allowedColors
   );
   for (const failure of contrastFailures) {
     violations.push({
@@ -126,10 +178,10 @@ export async function runDarkModeAudit(
       foregroundRgb: failure.foregroundRgb,
       backgroundRgb: failure.backgroundRgb,
       contrastRatio: failure.contrastRatio,
+      ...(failure.suggestedToken ? { suggestedToken: failure.suggestedToken } : {}),
       inShadowDom: failure.inShadowDom,
     });
   }
-
   // 2. Crawl large visible surfaces with explicit non-transparent backgrounds across Light & Shadow DOM
   const surfaceSnapshots = await page.evaluate(
     ({
@@ -208,7 +260,11 @@ export async function runDarkModeAudit(
   );
 
   for (const surface of surfaceSnapshots) {
-    const surfaceViolation = evaluateDarkModeSurfaceEntry(surface, maxSurfaceLuminance);
+    const surfaceViolation = evaluateDarkModeSurfaceEntry(
+      surface,
+      maxSurfaceLuminance,
+      allowedColors
+    );
     if (surfaceViolation) {
       violations.push(surfaceViolation);
     }
@@ -222,4 +278,5 @@ export async function runDarkModeAudit(
 
   return violations;
 }
+
 

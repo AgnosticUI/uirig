@@ -35,9 +35,12 @@ export interface IContrastViolation {
   backgroundRgb: string;
   /** Calculated WCAG 2.1 contrast ratio rounded to 2 decimal places (e.g., 2.84). */
   contrastRatio: number;
+  /** Nearest passing color token from `tokensPath` when available. */
+  suggestedToken?: string;
   /** True if the offending text element resides inside an open ShadowRoot. */
   inShadowDom: boolean;
 }
+
 
 /**
  * Raw foreground and ancestor background layer snapshot extracted from a live text node.
@@ -70,6 +73,55 @@ function formatRgbString(color: Color): string {
   const g255 = Math.round(Math.min(1, Math.max(0, g)) * 255);
   const b255 = Math.round(Math.min(1, Math.max(0, b)) * 255);
   return `rgb(${r255}, ${g255}, ${b255})`;
+}
+
+/**
+ * Finds the perceptually closest color token from `allowedColors` (via CIEDE2000 `deltaE`)
+ * that achieves at least `minRatio` WCAG 2.1 contrast against `backdropColor`.
+ * Returns `undefined` when `allowedColors` is empty or no token passes contrast.
+ */
+export function findNearestPassingColorToken(
+  offendingColor: string,
+  backdropColor: string,
+  allowedColors: string[] = [],
+  minRatio: number = MIN_WCAG_AA_CONTRAST
+): string | undefined {
+  if (allowedColors.length === 0) {
+    return undefined;
+  }
+
+  let parsedOffending: Color;
+  let parsedBackdrop: Color;
+  try {
+    parsedOffending = new Color(offendingColor).to('srgb');
+    parsedBackdrop = new Color(backdropColor).to('srgb');
+  } catch {
+    return undefined;
+  }
+
+  let bestToken: string | undefined;
+  let lowestDeltaE = Number.POSITIVE_INFINITY;
+
+  for (const rawCandidate of allowedColors) {
+    try {
+      const candidate = new Color(rawCandidate).to('srgb');
+      if ((candidate.alpha ?? 1) < 1) {
+        continue;
+      }
+      const ratio = parsedBackdrop.contrast(candidate, 'WCAG21');
+      if (ratio >= minRatio) {
+        const distance = parsedOffending.deltaE(candidate, '2000');
+        if (distance < lowestDeltaE) {
+          lowestDeltaE = distance;
+          bestToken = rawCandidate;
+        }
+      }
+    } catch {
+      // Skip non-parseable token entries gracefully
+    }
+  }
+
+  return bestToken;
 }
 
 /**
@@ -138,6 +190,7 @@ export function evaluateContrastEntry(params: {
   backgroundLayers: string[];
   inShadowDom: boolean;
   minRatio?: number;
+  allowedColors?: string[];
 }): IContrastViolation | null {
   const threshold = params.minRatio ?? MIN_WCAG_AA_CONTRAST;
   const hostComponent =
@@ -164,18 +217,29 @@ export function evaluateContrastEntry(params: {
   const roundedRatio = Math.round(rawRatio * 100) / 100;
 
   if (rawRatio < threshold) {
+    const fgRgb = formatRgbString(resolvedFg);
+    const bgRgb = formatRgbString(resolvedBg);
+    const suggestedToken = findNearestPassingColorToken(
+      fgRgb,
+      bgRgb,
+      params.allowedColors,
+      threshold
+    );
+
     return {
       selector: params.selector,
       hostComponent,
-      foregroundRgb: formatRgbString(resolvedFg),
-      backgroundRgb: formatRgbString(resolvedBg),
+      foregroundRgb: fgRgb,
+      backgroundRgb: bgRgb,
       contrastRatio: roundedRatio,
+      ...(suggestedToken ? { suggestedToken } : {}),
       inShadowDom: params.inShadowDom,
     };
   }
 
   return null;
 }
+
 
 /**
  * Crawls a live Playwright Page across Light DOM and open ShadowRoot boundaries,
@@ -310,7 +374,8 @@ export async function auditPageContrast(
   page: Page,
   minRatio: number = MIN_WCAG_AA_CONTRAST,
   ignoreRules: IUirigIgnoreRule[] = [],
-  ruleName: string = 'contrast'
+  ruleName: string = 'contrast',
+  allowedColors: string[] = []
 ): Promise<IContrastViolation[]> {
   logTelemetry(
     'matrix:audit',
@@ -324,6 +389,7 @@ export async function auditPageContrast(
     const violation = evaluateContrastEntry({
       ...entry,
       minRatio,
+      allowedColors,
     });
     if (violation) {
       violations.push(violation);
