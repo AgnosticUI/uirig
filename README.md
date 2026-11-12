@@ -103,7 +103,7 @@ Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comm
 
    <!-- Exempt all engines on a third-party widget -->
    <section data-uirig-ignore="all">Legacy third-party embed</section>
-   ```
+  ```
 
 2. **In `uirig.config.json` (`ignore`):** Exempt specific selectors or route URLs (including trailing `*` wildcards) centrally without touching markup:
    ```json
