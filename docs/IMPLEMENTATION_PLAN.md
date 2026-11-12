@@ -53,10 +53,38 @@
 - [ ] **Task 6.2: LI Announcement**
   * **Action:** Craft a LinkedIn Announcement.
 
-### Phase 7: Add Tools
-- [ ] **Task 7.1: Determine Best ROI Tools To Add**
-  * **Action:** Review following for more tool ideas:
-    * 14 Design Tools: https://lnkd.in/p/gCpREqBe, 
-    * Add a `dsds` tool which: 1) checks you have a spec in your system, 2) checks it validates. See https://designsystemdocspec.org/quickstart
-    * Need an XSS tool that injects vectors and confirms they are either escaped when appropriate or disallowed entirely when appropriate.
-    * Other XSS related checks worthwhile in the same spirit?
+### Phase 7: MVP Security, Accuracy & High-ROI Tool Additions
+- [x] **Task 7.1: Determine Best ROI Tools To Add**
+  * **Action:** Evaluated candidate specifications and design engineering tools into `docs/ROADMAP_ROI_MATRIX.md`, electing 5 high-ROI additions for MVP and deferring lower-ROI/unstable-spec candidates to Post-MVP.
+- [ ] **Task 7.2: Live DOM XSS Canary Fuzzer & Prompt-Injection Shield (`uirig xss`)**
+  * **Why:** Static linters miss runtime sink execution inside Shadow DOM and cannot catch indirect AI prompt-injection traps hidden in rendered text.
+  * **Action:** Build `src/core/xss.ts` (and wire `uirig xss` + `check.ts`) to inject non-destructive canary vectors into inputs and URL query params (`window.__uirigXssTriggered`), flag `javascript:` URIs, `target="_blank"` missing `rel="noopener"`, missing clickjacking headers (`X-Frame-Options` / `CSP frame-ancestors`), and invisible prompt-injection traps (`font-size: 0px`, zero-width Unicode, text color matching background color).
+- [ ] **Task 7.3: Local `.html` File Target Support (`targetUrls: ["./dist/index.html"]`)**
+  * **Why:** AI prototyping agents and static site generators output standalone `.html` files; serving them automatically over an ephemeral `127.0.0.1` port removes manual dev-server setup friction.
+  * **Action:** Build `src/utils/static-server.ts` and integrate into `src/commands/check.ts` so local `.html` paths in `targetUrls` spin up and tear down an isolated HTTP server automatically.
+- [ ] **Task 7.4: Uncaught Runtime JS & Console Error Gate (`check.ts`)**
+  * **Why:** A page can pass static CSS and geometry checks while throwing an `Uncaught TypeError` on hydration that breaks interactivity.
+  * **Action:** Attach Playwright `page.on('pageerror')` and `console.error` listeners inside `src/commands/check.ts` to capture runtime script exceptions during navigation.
+- [ ] **Task 7.5: Geometric Stress Accuracy & Edge-Case Pack (`adversary.ts`)**
+  * **Why:** Real-world UIs break on space-free emails, squished flex avatars (`flex-shrink: 0` missing), `100vw` scrollbars, tiny tap targets, and stuck `opacity: 0` animations, while intentional `overflow-x: auto` code blocks should not trigger false positives.
+  * **Action:** Upgrade `src/core/adversary.ts` to exempt `overflow-x: auto/scroll` containers, enforce `24x24px` minimum tap-target boxes, inject unbreakable email stress strings, detect pre/post avatar aspect-ratio squishing, check vertical `scrollHeight > clientHeight` clipping, and flag `100vw` scrollbar bleed and stuck `opacity: 0` elements.
+- [ ] **Task 7.6: Unified Forms, ARIA References & Broken Media Gate (`uirig a11y`)**
+  * **Why:** AI-generated UIs frequently ship placeholder-only inputs without `<label>`, unlabeled icon-only buttons, broken `aria-labelledby` IDs, broken `<img>` tags (`naturalWidth === 0`), and unmuted autoplay media.
+  * **Action:** Build `src/core/a11y.ts` (and wire `uirig a11y` + `check.ts`) to run a single Light + Shadow DOM sweep verifying accessible names, ARIA/label ID resolution, valid image dimensions, and muted autoplay compliance.
+
+---
+
+## Post-MVP Backlog (v1.1 & v1.2 — Tracked in `docs/ROADMAP_ROI_MATRIX.md`)
+
+### v1.1 — Theme Parity, Internationalization & Token Ecosystem
+- [ ] **`DESIGN.md` Token Importer (`tokensPath: "./DESIGN.md"`):** Parse YAML frontmatter and interleaved ```` ```yaml ```` blocks (`colors`, `spacing`, `typography`, `rounded`) via `colorjs.io` (deferred from MVP to avoid `rem`-to-`px` and alias false positives).
+- [ ] **Dark-Mode Luminance Inversion Gate (`uirig dark-mode`):** Emulate `colorScheme: 'dark'` + `[data-theme="dark"]`, re-run `matrix.ts` contrast, and flag surfaces stranded at bright light luminance (`> 0.85`).
+- [ ] **RTL Mirror Overflow Gate (`uirig rtl`):** Load pages with `dir="rtl"` and reuse `adversary.ts` geometry math to catch horizontal scrollbars and clipped labels in Arabic/Hebrew layouts.
+- [ ] **Reduced-Motion & Layout-Thrashing Transition Gate (`uirig motion`):** Emulate `reducedMotion: 'reduce'` and flag `transition: all` or reflow-heavy `width`/`height`/`top`/`left` transitions.
+
+### v1.2 — Interactive State Fuzzers & External Spec Validators
+- [ ] **Keyboard Focus-Ring & Occlusion Gate (`uirig focus`):** Tab through controls and modals to verify `:focus-visible` style deltas, modal focus traps, and `elementFromPoint()` visibility behind sticky headers (WCAG 2.4.11).
+- [ ] **Unresponsive Stub-Button Detector (`uirig dead-click`):** Click visible buttons with `MutationObserver` + network/navigation listeners to catch fake AI-generated buttons with zero side effects.
+- [ ] **LLM Streaming Markdown Resilience (`uirig stream`):** Feed chunked partial Markdown/code tokens into chat containers to catch unclosed `<pre>` overflow and scroll-anchor jitter.
+- [ ] **Deceptive UI & Dark Pattern Scanner (`uirig dark-lint`):** Flag pre-checked marketing checkboxes and cookie banners lacking a "Reject All" button alongside "Accept All".
+- [ ] **Design System Doc Spec Validator (`uirig dsds`):** Validate DSDS YAML/JSON files once `designsystemdocspec.org` reaches `v1.0` stability (currently Draft `v0.23.1`).

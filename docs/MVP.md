@@ -1,67 +1,89 @@
-# Implementation Blueprint: uirig Scoped MVP
+# Implementation Plan: uirig — Scoped Architecture
 
-This document defines the focused Phase 1 engineering scope, core architectural compromises, and verification invariants required to ship **uirig**: a zero-config, framework-blind UI verification gate for CI/CD pipelines and **the deterministic verification engine for AI Design System Harnesses**.
+## Implementation Checklist
 
-While design tokens, `AGENTS.md` files, and Figma MCP servers give AI agents *context* on how to build UI, context alone cannot guarantee rendered quality. `uirig` closes the harness loop by providing fast, machine-readable, deterministic ground truth over live browser viewports—catching visual, geometric, and token drift without stuffing bulky style guides into LLM context windows.
+### Phase 1: Specifications & Documentation Design (MVP)
+- [x] Lock down 4-tool agnostic validation core scope definitions
+- [x] Refactor schemas, tolerance budgets, and treemaps inside docs/TECHNICAL_DESIGN_DOC.md
+- [x] Complete command syntax reference matrix inside README.md
 
-## 1. The 4-Tool High-Signal MVP Matrix
+### Phase 2: Workspace Environment Scaffolding (MVP)
+- [x] **Task 2.1: Environment Initialization**
+  * **Action:** Built `package.json` with `"type": "module"`, `tsconfig.json`, `tsconfig.build.json`, and global binary entrypoint `bin/uirig` -> `dist/index.js`.
+- [x] **Task 2.2: Local Dependency Acquisition**
+  * **Action:** Installed `typescript`, `vitest`, `playwright`, `colorjs.io`, `chokidar`, `ws`, and `@types/node`.
+- [x] **Task 2.3: Configuration Profile Footprint**
+  * **Action:** Generated schema parameters for `uirig.config.json` defining `targetUrls`, `tokensPath`, `viewports`, `clsMaxLimit`, `overflowPixelTolerance`, and `touchTargetMinSpacingPx`.
 
-To deliver immediate end-to-end design governance without code-generation fragility, the MVP focuses entirely on **four core commands** executed over a live running browser viewport:
+### Phase 3: Browser Telemetry Cores & Fuzzers (MVP)
+- [x] **Task 3.1: Shadow-Piercing Token Crawler (`uirig tokens`)**
+  * **Action:** Implemented `src/core/tokens.ts` + `tests/unit/tokens.test.ts` to recursively climb running viewports, piercing open Shadow DOM boundaries to evaluate computed styles framework-blindly against design token scales.
+- [x] **Task 3.2: Rendered Luminance Contrast Gate (`uirig contrast`)**
+  * **Action:** Implemented `src/core/matrix.ts` + `tests/unit/matrix.test.ts` with Porter-Duff Source-Over ancestor alpha compositing and WCAG 2.1 contrast calculation (`>= 4.5:1`) via `colorjs.io`.
+- [x] **Task 3.3: Geometric Invariant Overflow Rig (`uirig stress`)**
+  * **Action:** Implemented `src/core/adversary.ts` + `tests/unit/adversary.test.ts` with `+30%` pseudo-localization text expansion and Euclidean bounding-box checks for parent-child overflow, horizontal scrollbars, and touch-target spacing.
+- [x] **Task 3.4: Layout Shift Monitor Core (`uirig cls`)**
+  * **Action:** Implemented `src/core/cls.ts` + `tests/unit/cls.test.ts` with pre-navigation `PerformanceObserver` (`layout-shift`) and W3C 1s/5s session-window scoring against `clsMaxLimit`.
 
-```text
-                       [uirig MVP Execution Suite]
-                                    │
-                         uirig check --config=uirig.config.json
-                                    │
-         ┌──────────────────────────┼──────────────────────────┐
-         ▼                          ▼                          ▼
-   uirig tokens               uirig contrast               uirig stress
-   Audits runtime computed    Verifies legible text via   Fuzzes DOM elements 
-   styles against JSON scale  computed luminance contrast  with expansion copy 
-   via shadow-piercing hooks  directly on rendered pixels  to catch parent breaches
-         │                          │                          │
-         └──────────────────────────┼──────────────────────────┘
-                                    ▼
-                                uirig cls
-                                Tracks unexpected vertical component
-                                shifts during render layout cycles
-```
+### Phase 4: Local Spot Checking Test Bed
+- [x] **Task 4.1: Isolated Vite + Lit Sandbox Initialization**
+  * **Action:** Scaffolded Vite + Lit TypeScript sandbox in `playground/` and excluded `playground/` + `ANNOUNCEMENTS/` in `src/core/crawler.ts`.
+- [x] **Task 4.2: Local AgnosticUI CLI Component, Token & Dark-Mode Toggle Installation**
+  * **Action:** Installed local AgnosticUI Lit Web Components (`button`, `card`, `input`), `ag-tokens.css` / `ag-tokens-dark.css`, and `#theme-toggle` (`playground/src/theme-toggle.ts`).
+- [x] **Task 4.3: Baseline & Adversarial Test Fixture Assembly**
+  * **Action:** Built compliant and adversarial fixtures in `playground/index.html`, `playground/src/main.ts`, and `playground/src/cls-trap.ts`.
+- [x] **Task 4.4: Live `uirig` 4-Tool Spot-Check Verification**
+  * **Action:** Verified all 4 tools end-to-end against live AgnosticUI Web Components (`playground/src/spot-check.ts`, `tests/integration/playground-spotcheck.test.ts`) and added shared ANSI terminal styler (`src/utils/formatter.ts`).
+
+### Phase 5: CI/CD Orchestration & Reporting (MVP)
+- [x] **Task 5.1: Isolated Parallel Context Dispatcher**
+  * **Action:** Implemented `src/commands/check.ts` + `tests/unit/check.test.ts` launching a single Chromium instance and running isolated `BrowserContext` sessions concurrently with POSIX exit codes (`0`, `1`, `2`).
+- [x] **Task 5.2: Markdown PR Comment Reporter**
+  * **Action:** Implemented `src/utils/fs.ts` + `tests/unit/fs.test.ts` synthesizing evaluation results into `.uirig/github_pr_comment.md`.
+- [x] **Task 5.3: Agentic JSON Tool Stream Output Generator**
+  * **Action:** Implemented `src/utils/agent-stream.ts` + `tests/unit/agent-stream.test.ts` and `logTelemetry()` `stderr` routing in `src/utils/formatter.ts`, emitting deterministic JSON with `remediationAdvice` to `stdout` when `--json` is set.
+- [x] **Task 5.4: Retrofit `uirig init` to Emit `.uirig/SKILL.md`**
+  * **Action:** Updated `src/commands/init.ts` + `tests/unit/init.test.ts` to scaffold `.uirig/SKILL.md` alongside `uirig.config.json` and `.uirig/session.json`.
+- [x] **Task 5.5: Design System Harness Agent Recipe (`AGENTS.md`)**
+  * **Action:** Created root `AGENTS.md` with the zero-bloat post-edit `npx uirig check --json` verification loop.
+- [x] **Task 5.6: Root CLI Entry Router (`src/index.ts` + `bin/uirig`)**
+  * **Action:** Implemented `src/index.ts`, `bin/uirig`, and `tests/unit/index.test.ts` supporting `init`, `check`, `tokens`, `contrast`, `stress`, `cls`, `manifest`, `--only`, `--config`, `--json`, and `--headed`.
+
+### Phase 6: Documentation MVP
+- [x] **Task 6.1: `README.md`**
+  * **Action:** Completed `README.md` with value proposition, 4-tool table, setup instructions, CLI reference, CI/CD workflow, Git pre-commit hook, and AI Design System Harness loop.
+- [x] **Task 6.2: LinkedIn Announcement & Repo Hygiene**
+  * **Action:** Created `ANNOUNCEMENTS/2026-11-12-mvp-launch.md` and `.gitignore`.
+
+### Phase 7: MVP Security, Accuracy & High-ROI Tool Additions
+- [x] **Task 7.1: Determine Best ROI Tools To Add**
+  * **Action:** Evaluated candidate specifications and design engineering tools into `docs/ROADMAP_ROI_MATRIX.md`, electing 5 high-ROI additions for MVP and deferring lower-ROI/unstable-spec candidates to Post-MVP.
+- [ ] **Task 7.2: Live DOM XSS Canary Fuzzer & Prompt-Injection Shield (`uirig xss`)**
+  * **Why:** Static linters miss runtime sink execution inside Shadow DOM and cannot catch indirect AI prompt-injection traps hidden in rendered text.
+  * **Action:** Build `src/core/xss.ts` (and wire `uirig xss` + `check.ts`) to inject non-destructive canary vectors into inputs and URL query params (`window.__uirigXssTriggered`), flag `javascript:` URIs, `target="_blank"` missing `rel="noopener"`, missing clickjacking headers (`X-Frame-Options` / `CSP frame-ancestors`), and invisible prompt-injection traps (`font-size: 0px`, zero-width Unicode, text color matching background color).
+- [ ] **Task 7.3: Local `.html` File Target Support (`targetUrls: ["./dist/index.html"]`)**
+  * **Why:** AI prototyping agents and static site generators output standalone `.html` files; serving them automatically over an ephemeral `127.0.0.1` port removes manual dev-server setup friction.
+  * **Action:** Build `src/utils/static-server.ts` and integrate into `src/commands/check.ts` so local `.html` paths in `targetUrls` spin up and tear down an isolated HTTP server automatically.
+- [ ] **Task 7.4: Uncaught Runtime JS & Console Error Gate (`check.ts`)**
+  * **Why:** A page can pass static CSS and geometry checks while throwing an `Uncaught TypeError` on hydration that breaks interactivity.
+  * **Action:** Attach Playwright `page.on('pageerror')` and `console.error` listeners inside `src/commands/check.ts` to capture runtime script exceptions during navigation.
+- [ ] **Task 7.5: Geometric Stress Accuracy & Edge-Case Pack (`adversary.ts`)**
+  * **Why:** Real-world UIs break on space-free emails, squished flex avatars (`flex-shrink: 0` missing), `100vw` scrollbars, tiny tap targets, and stuck `opacity: 0` animations, while intentional `overflow-x: auto` code blocks should not trigger false positives.
+  * **Action:** Upgrade `src/core/adversary.ts` to exempt `overflow-x: auto/scroll` containers, enforce `24x24px` minimum tap-target boxes, inject unbreakable email stress strings, detect pre/post avatar aspect-ratio squishing, check vertical `scrollHeight > clientHeight` clipping, and flag `100vw` scrollbar bleed and stuck `opacity: 0` elements.
+- [ ] **Task 7.6: Unified Forms, ARIA References & Broken Media Gate (`uirig a11y`)**
+  * **Why:** AI-generated UIs frequently ship placeholder-only inputs without `<label>`, unlabeled icon-only buttons, broken `aria-labelledby` IDs, broken `<img>` tags (`naturalWidth === 0`), and unmuted autoplay media.
+  * **Action:** Build `src/core/a11y.ts` (and wire `uirig a11y` + `check.ts`) to run a single Light + Shadow DOM sweep verifying accessible names, ARIA/label ID resolution, valid image dimensions, and muted autoplay compliance.
 
 ---
 
-## 2. Command Specifications & Telemetry Mechanics
+## Post-MVP Backlog (v1.1 & v1.2 — Tracked in `docs/ROADMAP_ROI_MATRIX.md`)
 
-### 2.1 uirig tokens (Design System Drift Auditor)
-*   **Description:** Audits the running application to catch hardcoded styles, unauthorized color hexes, or arbitrary layout margins that bypass design system rules.
-*   **The Mechanics:** Launches an isolated browser context, opens the target URL, and runs a recursive shadow-piercing tree walker that visits every visible DOM node (including components inside an open Shadow DOM). It evaluates `window.getComputedStyle(element)`. If any color, padding metric, font-size value, or border-radius falls outside the permitted scale defined in `uirig.config.json`, compilation blocks with an error.
+### v1.1 — Theme Parity, Internationalization & Token Ecosystem
+- [ ] **`DESIGN.md` Token Importer (`tokensPath: "./DESIGN.md"`):** Parse YAML frontmatter and interleaved ```` ```yaml ```` blocks (`colors`, `spacing`, `typography`, `rounded`) via `colorjs.io` (deferred from MVP to avoid `rem`-to-`px` and alias false positives).
+- [ ] **Dark-Mode Luminance Inversion Gate (`uirig dark-mode`):** Emulate `colorScheme: 'dark'` + `[data-theme="dark"]`, re-run `matrix.ts` contrast, and flag surfaces stranded at bright light luminance (`> 0.85`).
+- [ ] **RTL Mirror Overflow Gate (`uirig rtl`):** Load pages with `dir="rtl"` and reuse `adversary.ts` geometry math to catch horizontal scrollbars and clipped labels in Arabic/Hebrew layouts.
+- [ ] **Reduced-Motion & Layout-Thrashing Transition Gate (`uirig motion`):** Emulate `reducedMotion: 'reduce'` and flag `transition: all` or reflow-heavy `width`/`height`/`top`/`left` transitions.
 
-### 2.2 uirig contrast (Rendered Pixel Contrast Gate)
-*   **Description:** Enforces accessible, WCAG-compliant typography text legibility across all running application viewports.
-*   **The Mechanics:** Inspects elements via Playwright. Rather than guessing contrast by reading code text strings, it reads the element's actual rendered foreground color and resolves its nearest non-transparent ancestor element's background color. It runs relative luminance calculations ($Y = 0.2126R + 0.7152G + 0.0722B$). If any pair yields a contrast ratio below 4.5:1, it logs a violation.
-
-### 2.3 uirig stress (Geometric Invariant Fuzzer)
-*   **Description:** Tests layout durability against data expansion stress entirely via geometric coordinate calculation rules—completely eliminating noisy screenshot pixel diffs.
-*   **The Mechanics:** Injects a pseudo-localization string configuration (+30% character tracking) into running text element targets. It monitors element boxes via native browser `getBoundingClientRect()` loops, logging structural breaks under three strict conditions, governed by the `overflowPixelTolerance` safety buffer:
-    1.  **Container Overflow:** A child node's right or bottom bounding coordinate breaches its parent container's bounding parameters past the allowed pixel tolerance.
-    2.  **Rogue Scrollbar:** The global document scroll width breaks window containment parameters (`document.documentElement.scrollWidth > window.innerWidth`).
-    3.  **Touch Target Collision:** Interactive target fields overlap or map closer than the minimum safety rim threshold.
-
-### 2.4 uirig cls (Cumulative Layout Shift Monitor)
-*   **Description:** Tracks visual layout instability and layout shifts during initial paint and rendering cycles.
-*   **The Mechanics:** Instantiates a native browser `PerformanceObserver` instance inside the Playwright context targeting `layout-shift` entries. It records positional changes across vertical render intervals. If the accumulated layout shift metric breaks the configured `clsMaxLimit` threshold budget, it fails the build.
-
----
-
-## 3. High-Signal MVP Technical Stack & CI/CD Contract
-
-*   **Runtime Engine:** Node.js 22+ LTS Stable Releases
-*   **Automation Driver Context:** Playwright Core v1.64+ (Headless browser configuration layers)
-*   **System Configuration Identity:** Single configuration architecture file (`uirig.config.json`)
-*   **Agentic Harness Contract (`--json`):** Streams structured, zero-bloat JSON violation tokens (`remediationAdvice`, offending selectors, and measured deltas) directly to `stdout`, enabling coding agents to run `uirig check --json` as a self-healing post-edit verification loop.
-
----
-
-## 4. POSIX Exit Code Diagnostics
-*   `0`: Operational Success (All geometric bounds, contrast ratios, and token drift checks passed).
-*   `1`: Critical Configuration Error, broken syntax, or WCAG contrast failure below 4.5:1.
-*   `2`: Layout boundary collapse, horizontal scrollbar leak, or CLS threshold budget breach verified by the fuzzer rigs.
+### v1.2 — Interactive State Fuzzers & External Spec Validators
+- [ ] **Keyboard Focus-Ring & Occlusion Gate (`uirig focus`):** Tab through controls and modals to verify `:focus-visible` style deltas, modal focus traps, and `elementFromPoint()` visibility behind sticky headers (WCAG 2.4.11).
+- [ ] **Unresponsive Stub-Button Detector (`uirig dead-click`):** Click visible buttons with `MutationObserver` + network/navigation listeners to catch fake AI-generated buttons with zero side effects.
