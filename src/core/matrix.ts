@@ -7,8 +7,7 @@
 
 import Color from 'colorjs.io';
 import type { Page } from 'playwright';
-import { formatTelemetryLog, paint } from '../utils/formatter.js';
-
+import { logTelemetry, paint } from '../utils/formatter.js';
 
 /**
  * WCAG 2.1 Level AA minimum contrast ratio required for standard body text.
@@ -174,12 +173,11 @@ export function evaluateContrastEntry(params: {
 export async function extractTextContrastSnapshots(
   page: Page
 ): Promise<IExtractedTextContrastEntry[]> {
-  console.log(
-    formatTelemetryLog(
-      'matrix:crawler',
-      'Dispatching shadow-piercing contrast walker into browser sandbox...'
-    )
+  logTelemetry(
+    'matrix:crawler',
+    'Dispatching shadow-piercing contrast walker into browser sandbox...'
   );
+
   const snapshots = await page.evaluate((): IExtractedTextContrastEntry[] => {
     const results: IExtractedTextContrastEntry[] = [];
 
@@ -287,17 +285,16 @@ export async function extractTextContrastSnapshots(
     traverseRoot(document, '', false);
     return results;
   });
-
-  console.log(
-    formatTelemetryLog(
-      'matrix:crawler',
-      `Extracted ${paint(
-        String(snapshots.length),
-        'bold',
-        'cyan'
-      )} visible text elements for contrast audit.`
-    )
+  
+  logTelemetry(
+    'matrix:crawler',
+    `Extracted ${paint(
+      String(snapshots.length),
+      'bold',
+      'cyan'
+    )} visible text elements for contrast audit.`
   );
+
 
   return snapshots;
 }
@@ -315,12 +312,11 @@ export async function auditPageContrast(
   page: Page,
   minRatio: number = MIN_WCAG_AA_CONTRAST
 ): Promise<IContrastViolation[]> {
-  console.log(
-    formatTelemetryLog(
-      'matrix:audit',
-      `Starting rendered luminance contrast audit (threshold: ${paint(`${minRatio}:1`, 'bold', 'cyan')})...`
-    )
+  logTelemetry(
+    'matrix:audit',
+    `Starting rendered luminance contrast audit (threshold: ${paint(`${minRatio}:1`, 'bold', 'cyan')})...`
   );
+
   const entries = await extractTextContrastSnapshots(page);
   const violations: IContrastViolation[] = [];
 
@@ -339,8 +335,7 @@ export async function auditPageContrast(
       ? paint(String(violations.length), 'bold', 'red')
       : paint('0', 'bold', 'green');
 
-  console.log(
-    formatTelemetryLog('matrix:audit', `Contrast audit complete. Violations detected: ${countBadge}`)
-  );
+  logTelemetry('matrix:audit', `Contrast audit complete. Violations detected: ${countBadge}`);
+
   return violations;
 }

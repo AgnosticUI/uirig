@@ -15,7 +15,8 @@ import { crawlPageTokens, type ITokenScaleConfig, type ITokenViolation } from '.
 import { auditPageContrast, type IContrastViolation } from '../core/matrix.js';
 import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
 import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '../core/cls.js';
-import { formatTelemetryLog, paint } from '../utils/formatter.js';
+import { logTelemetry, paint } from '../utils/formatter.js';
+import { formatAgenticJsonStream } from '../utils/agent-stream.js';
 import { writeGithubPrCommentReport, DEFAULT_PR_COMMENT_PATH } from '../utils/fs.js';
 
 /**
@@ -98,9 +99,7 @@ export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
 export function loadUirigConfig(
   configPath: string = resolve(process.cwd(), 'uirig.config.json')
 ): IUirigConfig {
-  console.log(
-    formatTelemetryLog('check:config', `Loading configuration from ${paint(configPath, 'cyan')}...`)
-  );
+  logTelemetry('check:config', `Loading configuration from ${paint(configPath, 'cyan')}...`);
 
   if (!existsSync(configPath)) {
     throw new Error(
@@ -173,12 +172,11 @@ export function loadUirigConfig(
  */
 export function loadTokenScale(tokensPath: string, configFilePath: string): ITokenScaleConfig {
   const resolvedTokensPath = resolve(dirname(configFilePath), tokensPath);
-  console.log(
-    formatTelemetryLog(
-      'check:tokens',
-      `Loading design token scale from ${paint(resolvedTokensPath, 'cyan')}...`
-    )
+  logTelemetry(
+    'check:tokens',
+    `Loading design token scale from ${paint(resolvedTokensPath, 'cyan')}...`
   );
+
 
   if (!existsSync(resolvedTokensPath)) {
     throw new Error(`ERR_TOKENS_MISSING: Token scale file not found at ${resolvedTokensPath}.`);
@@ -258,16 +256,15 @@ export async function auditViewportInParallel(
   budgets: IThresholdBudgets
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
-  console.log(
-    formatTelemetryLog(
-      'check:dispatch',
-      `Spawning 3 isolated contexts for ${paint(url, 'cyan')} @ ${paint(
-        `${viewport.name} (${viewport.width}x${viewport.height})`,
-        'bold',
-        'green'
-      )}...`
-    )
+  logTelemetry(
+    'check:dispatch',
+    `Spawning 3 isolated contexts for ${paint(url, 'cyan')} @ ${paint(
+      `${viewport.name} (${viewport.width}x${viewport.height})`,
+      'bold',
+      'green'
+    )}...`
   );
+
 
   // Track 1: Read-Only Audits (`tokens` + `contrast`)
   const runReadOnlyTrack = async (): Promise<{
@@ -336,6 +333,9 @@ export async function auditViewportInParallel(
  * `(url, viewport)` targets through `auditViewportInParallel()`, synthesizes the standalone
  * Markdown PR comment report to `.uirig/github_pr_comment.md`, and returns the complete
  * report with deterministic POSIX exit code (`0`, `1`, or `2`).
+ *
+ * When `options.json` is `true`, sets `UIRIG_JSON_MODE=1` so `logTelemetry()` routes
+ * diagnostic logs to `stderr`, keeping `stdout` 100% pure for `formatAgenticJsonStream()`.
  */
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
@@ -362,11 +362,9 @@ export async function executeCheckCommand(
       options.tokenScaleOverride ?? loadTokenScale(config.tokensPath, resolvedConfigPath);
 
     const headless = options.headless ?? true;
-    console.log(
-      formatTelemetryLog(
-        'check:browser',
-        `Launching single Chromium instance (headless=${String(headless)})...`
-      )
+    logTelemetry(
+      'check:browser',
+      `Launching single Chromium instance (headless=${String(headless)})...`
     );
     browser = await chromium.launch({ headless });
 
@@ -410,13 +408,16 @@ export async function executeCheckCommand(
     // Synthesize standalone GitHub PR comment Markdown report to disk
     writeGithubPrCommentReport(executionReport, resolvedReportPath);
 
-    const exitBadge =
-      exitCode === 0
-        ? paint('0 (PASS)', 'bold', 'green')
-        : paint(`${exitCode} (FAIL)`, 'bold', 'red');
-    console.log(
-      formatTelemetryLog('check:complete', `Audit finished. POSIX Exit Code: ${exitBadge}`)
-    );
+    if (options.json) {
+      // Emit raw machine-readable JSON directly to stdout for AI Design System Harnesses
+      process.stdout.write(`${formatAgenticJsonStream(executionReport)}\n`);
+    } else {
+      const exitBadge =
+        exitCode === 0
+          ? paint('0 (PASS)', 'bold', 'green')
+          : paint(`${exitCode} (FAIL)`, 'bold', 'red');
+      logTelemetry('check:complete', `Audit finished. POSIX Exit Code: ${exitBadge}`);
+    }
 
     return executionReport;
   } finally {
@@ -432,3 +433,4 @@ export async function executeCheckCommand(
     }
   }
 }
+

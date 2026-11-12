@@ -1,8 +1,12 @@
 /**
  * src/utils/formatter.ts
- * Typographic console styler and diagnostic telemetry badge formatter.
- * Provides zero-dependency ANSI color helpers that automatically honor
- * `NO_COLOR` and programmatic JSON stream mode (`UIRIG_JSON_MODE`).
+ * Typographic console styler and diagnostic telemetry stream router.
+ * Provides:
+ * 1. Zero-dependency ANSI color helpers that automatically honor `NO_COLOR`
+ *    and programmatic JSON stream mode (`UIRIG_JSON_MODE`).
+ * 2. Unix-compliant telemetry routing (`logTelemetry`) that writes to `stdout`
+ *    during normal CLI runs and routes to `stderr` when `UIRIG_JSON_MODE` is active,
+ *    keeping `stdout` 100% pure for machine-readable JSON without global monkey-patching.
  */
 
 /**
@@ -24,6 +28,14 @@ export const ANSI_CODES = {
 export type AnsiStyle = keyof typeof ANSI_CODES;
 
 /**
+ * Returns true when `UIRIG_JSON_MODE` is enabled (`'1'` or `'true'`), indicating
+ * that `stdout` is reserved exclusively for machine-readable JSON payloads.
+ */
+export function isJsonStreamMode(): boolean {
+  return process.env.UIRIG_JSON_MODE === '1' || process.env.UIRIG_JSON_MODE === 'true';
+}
+
+/**
  * Determines whether ANSI escape codes should be suppressed.
  * Honors the cross-platform `NO_COLOR` standard (https://no-color.org)
  * as well as `UIRIG_JSON_MODE=1` when streaming raw JSON to AI agents.
@@ -32,7 +44,7 @@ export function isColorDisabled(): boolean {
   if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== '') {
     return true;
   }
-  if (process.env.UIRIG_JSON_MODE === '1' || process.env.UIRIG_JSON_MODE === 'true') {
+  if (isJsonStreamMode()) {
     return true;
   }
   return false;
@@ -41,10 +53,6 @@ export function isColorDisabled(): boolean {
 /**
  * Wraps a string in one or more ANSI escape sequences, automatically appending
  * `\x1b[0m` reset codes. Returns the plain unstyled string if color is disabled.
- *
- * @param text - The text content to style.
- * @param styles - One or more style keys from `ANSI_CODES` (e.g., `'bold'`, `'cyan'`).
- * @returns The ANSI-styled string, or plain `text` when color output is disabled.
  */
 export function paint(text: string, ...styles: AnsiStyle[]): string {
   if (styles.length === 0 || isColorDisabled()) {
@@ -55,9 +63,7 @@ export function paint(text: string, ...styles: AnsiStyle[]): string {
 }
 
 /**
- * Maps each core telemetry domain prefix to a distinct, high-contrast ANSI color
- * so every tool in the 4-tool MVP suite (`tokens`, `matrix`, `adversary`, `cls`)
- * is immediately distinguishable in terminal output.
+ * Maps each core telemetry domain prefix to a distinct, high-contrast ANSI color.
  */
 function resolveTagStyles(tag: string): AnsiStyle[] {
   if (tag.startsWith('tokens:')) {
@@ -80,14 +86,25 @@ function resolveTagStyles(tag: string): AnsiStyle[] {
 
 /**
  * Formats a structured runtime telemetry line with a color-coded `[domain:stage]`
- * badge and clean message body for consistent console logging across all `uirig` tools.
- *
- * @param tag - Telemetry domain tag without brackets (e.g., `'tokens:audit'`, `'cls:monitor'`).
- * @param message - Descriptive log message body.
- * @returns Formatted single-line string ready for `console.log()`.
+ * badge and clean message body.
  */
 export function formatTelemetryLog(tag: string, message: string): string {
   const tagStyles = resolveTagStyles(tag);
   const styledBadge = paint(`[${tag}]`, ...tagStyles);
   return `${styledBadge} ${message}`;
+}
+
+/**
+ * Emits a structured runtime telemetry line to the appropriate Unix stream:
+ * - Normal mode: writes to `stdout` via `console.log()`.
+ * - JSON stream mode (`UIRIG_JSON_MODE=1`): routes to `stderr` via `console.error()`,
+ *   keeping `stdout` 100% pure for `JSON.parse()` consumers without mutating globals.
+ */
+export function logTelemetry(tag: string, message: string): void {
+  const formattedLine = formatTelemetryLog(tag, message);
+  if (isJsonStreamMode()) {
+    console.error(formattedLine);
+  } else {
+    console.log(formattedLine);
+  }
 }

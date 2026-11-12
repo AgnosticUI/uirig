@@ -7,8 +7,7 @@
  */
 
 import type { Page } from 'playwright';
-import { formatTelemetryLog, paint } from '../utils/formatter.js';
-
+import { logTelemetry, paint } from '../utils/formatter.js';
 
 /**
  * Axis-aligned bounding box coordinates matching browser `DOMRect` geometry.
@@ -209,17 +208,14 @@ export async function runGeometricStressAudit(
   const touchTargetMinSpacingPx = options.touchTargetMinSpacingPx ?? 24;
   const expansionRatio = options.expansionRatio ?? 0.3;
 
-  console.log(
-    formatTelemetryLog(
-      'adversary:stress',
-      `Injecting ${paint(
-        `+${Math.round(expansionRatio * 100)}%`,
-        'bold',
-        'yellow'
-      )} pseudo-localization expansion & measuring bounds...`
-    )
+  logTelemetry(
+    'adversary:stress',
+    `Injecting ${paint(
+      `+${Math.round(expansionRatio * 100)}%`,
+      'bold',
+      'yellow'
+    )} pseudo-localization expansion & measuring bounds...`
   );
-
 
   const snapshot = await page.evaluate((ratio: number): IStressDomSnapshot => {
     const nonVisualTags = new Set([
@@ -426,11 +422,11 @@ export async function runGeometricStressAudit(
     violations.length > 0
       ? paint(String(violations.length), 'bold', 'red')
       : paint('0', 'bold', 'green');
-  console.log(
-    formatTelemetryLog(
-      'adversary:stress',
-      `Stress audit complete. Violations detected: ${countBadge}`
-    )
+
+  logTelemetry(
+    'adversary:stress',
+    `Stress audit complete. Violations detected: ${countBadge}`
   );
+
   return violations;
 }

@@ -6,7 +6,7 @@
 
 // Import only the TypeScript type for Playwright's Page so zero runtime bundle weight is added
 import type { Page } from 'playwright';
-import { formatTelemetryLog, paint } from '../utils/formatter.js';
+import { logTelemetry, paint } from '../utils/formatter.js';
 
 /**
  * Defines the approved design system values that rendered DOM elements are allowed to use.
@@ -152,11 +152,9 @@ export function validateComputedStyleEntry(
  * @returns An array of extracted style snapshots across both Light DOM and Shadow DOM.
  */
 export async function extractShadowPiercingStyles(page: Page): Promise<IExtractedElementStyles[]> {
-  console.log(
-    formatTelemetryLog(
-      'tokens:crawler',
-      'Dispatching recursive shadow-piercing TreeWalker into browser sandbox...'
-    )
+  logTelemetry(
+    'tokens:crawler',
+    'Dispatching recursive shadow-piercing TreeWalker into browser sandbox...'
   );
 
 
@@ -247,16 +245,15 @@ export async function extractShadowPiercingStyles(page: Page): Promise<IExtracte
   });
 
   const shadowCount = extractedNodes.filter((n) => n.inShadowDom).length;
-  console.log(
-    formatTelemetryLog(
-      'tokens:crawler',
-      `Extracted ${paint(String(extractedNodes.length), 'bold', 'cyan')} visible elements (${paint(
-        String(shadowCount),
-        'bold',
-        'magenta'
-      )} inside open Shadow DOM).`
-    )
+  logTelemetry(
+    'tokens:crawler',
+    `Extracted ${paint(String(extractedNodes.length), 'bold', 'cyan')} visible elements (${paint(
+      String(shadowCount),
+      'bold',
+      'magenta'
+    )} inside open Shadow DOM).`
   );
+
 
   return extractedNodes;
 }
@@ -279,7 +276,7 @@ export async function crawlPageTokens(
   page: Page,
   scale: ITokenScaleConfig
 ): Promise<ITokenViolation[]> {
-  console.log(formatTelemetryLog('tokens:audit', 'Starting full viewport design token crawl...'));
+  logTelemetry('tokens:audit', 'Starting full viewport design token crawl...');
 
   // Step 1: Extract live computed styles across Light DOM and open ShadowRoots
   const extractedEntries = await extractShadowPiercingStyles(page);
@@ -295,8 +292,8 @@ export async function crawlPageTokens(
     allViolations.length > 0
       ? paint(String(allViolations.length), 'bold', 'red')
       : paint('0', 'bold', 'green');
-  console.log(
-    formatTelemetryLog('tokens:audit', `Crawl complete. Total violations detected: ${countBadge}`)
-  );
+
+  logTelemetry('tokens:audit', `Crawl complete. Total violations detected: ${countBadge}`);
+
   return allViolations;
 }

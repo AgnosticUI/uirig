@@ -7,8 +7,7 @@
  */
 
 import type { Page } from 'playwright';
-import { formatTelemetryLog, paint } from '../utils/formatter.js';
-
+import { logTelemetry, paint } from '../utils/formatter.js';
 
 /**
  * Default maximum Cumulative Layout Shift (CLS) score allowed before failing the build.
@@ -180,11 +179,9 @@ export function evaluateClsSamples(
  * @param page - An active Playwright Page instance prior to navigation/content injection.
  */
 export async function prepareClsObserver(page: Page): Promise<void> {
-  console.log(
-    formatTelemetryLog(
-      'cls:monitor',
-      'Injecting pre-navigation layout-shift PerformanceObserver...'
-    )
+  logTelemetry(
+    'cls:monitor',
+    'Injecting pre-navigation layout-shift PerformanceObserver...'
   );
 
   const installObserverFn = () => {
@@ -237,13 +234,10 @@ export async function collectPageCls(
   clsMaxLimit: number = DEFAULT_CLS_MAX_LIMIT,
   settleDelayMs: number = 350
 ): Promise<IClsEvaluationResult> {
-  console.log(
-    formatTelemetryLog(
-      'cls:monitor',
-      `Waiting ${paint(`${settleDelayMs}ms`, 'bold', 'blue')} for fonts & async layout shifts to settle...`
-    )
+  logTelemetry(
+    'cls:monitor',
+    `Waiting ${paint(`${settleDelayMs}ms`, 'bold', 'blue')} for fonts & async layout shifts to settle...`
   );
-
 
   // Allow late-injected banners, async hydration, and web fonts to complete initial layout
   await page.waitForTimeout(settleDelayMs);
@@ -341,25 +335,22 @@ export async function collectPageCls(
     });
   });
 
-// At the end of collectPageCls():
-  console.log(
-    formatTelemetryLog(
-      'cls:monitor',
-      `Collected ${paint(String(samples.length), 'bold', 'cyan')} raw layout-shift entries from browser.`
-    )
+  logTelemetry(
+    'cls:monitor',
+    `Collected ${paint(String(samples.length), 'bold', 'cyan')} raw layout-shift entries from browser.`
   );
+
   const evaluation = evaluateClsSamples(samples, clsMaxLimit);
   const clsScoreStyled = evaluation.violation
     ? paint(String(evaluation.maxSessionCls), 'bold', 'red')
     : paint(String(evaluation.maxSessionCls), 'bold', 'green');
-  console.log(
-    formatTelemetryLog(
-      'cls:monitor',
-      `Evaluation complete. Max session CLS: ${clsScoreStyled} (budget: ${paint(
-        String(clsMaxLimit),
-        'cyan'
-      )})`
-    )
+
+    logTelemetry(
+    'cls:monitor',
+    `Evaluation complete. Max session CLS: ${clsScoreStyled} (budget: ${paint(
+      String(clsMaxLimit),
+      'cyan'
+    )})`
   );
 
   return evaluation;

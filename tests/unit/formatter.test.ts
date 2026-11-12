@@ -2,22 +2,25 @@
  * tests/unit/formatter.test.ts
  * 1-to-1 unit tests for `src/utils/formatter.ts`.
  * Verifies ANSI escape code wrapping, `NO_COLOR` / `UIRIG_JSON_MODE` suppression,
- * and domain-specific telemetry badge styling across all 4 core tools.
+ * domain-specific telemetry badge styling, and `stdout` vs. `stderr` stream routing.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
   ANSI_CODES,
   isColorDisabled,
   paint,
   formatTelemetryLog,
+  logTelemetry,
 } from '../../src/utils/formatter.js';
 
-describe('formatter.ts — Terminal Styler & Telemetry Formatter', () => {
+describe('formatter.ts — Terminal Styler & Telemetry Stream Router', () => {
   const originalNoColor = process.env.NO_COLOR;
   const originalJsonMode = process.env.UIRIG_JSON_MODE;
 
   afterEach(() => {
+    vi.restoreAllMocks();
+
     if (originalNoColor === undefined) {
       delete process.env.NO_COLOR;
     } else {
@@ -85,5 +88,25 @@ describe('formatter.ts — Terminal Styler & Telemetry Formatter', () => {
     expect(matrixLog).toContain(ANSI_CODES.cyan);
     expect(adversaryLog).toContain(ANSI_CODES.yellow);
     expect(clsLog).toContain(ANSI_CODES.blue);
+  });
+
+  it('routes logTelemetry to stdout normally and to stderr when UIRIG_JSON_MODE is active', () => {
+    delete process.env.NO_COLOR;
+    delete process.env.UIRIG_JSON_MODE;
+
+    console.log('\n--- START TEST: Unix stdout vs. stderr Telemetry Stream Routing ---');
+    const stdoutLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stderrLogSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Normal CLI mode -> console.log (stdout)
+    logTelemetry('check:dispatch', 'Normal run');
+    expect(stdoutLogSpy).toHaveBeenCalledTimes(1);
+    expect(stderrLogSpy).not.toHaveBeenCalled();
+
+    // Agentic JSON mode -> console.error (stderr), leaving stdout completely untouched
+    process.env.UIRIG_JSON_MODE = '1';
+    logTelemetry('check:dispatch', 'Agentic JSON run');
+    expect(stdoutLogSpy).toHaveBeenCalledTimes(1);
+    expect(stderrLogSpy).toHaveBeenCalledWith('[check:dispatch] Agentic JSON run');
   });
 });
