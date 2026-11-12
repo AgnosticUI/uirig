@@ -28,7 +28,18 @@ import {
   type IEphemeralStaticServer,
 } from '../utils/static-server.js';
 import type { IUirigIgnoreRule } from '../utils/ignore.js';
+import type {
+  IDarkModeViolation,
+  IDomIntegrityViolation,
+  IRuntimeErrorViolation,
+} from '../interfaces/locator.js';
 
+/**
+ * Deterministic POSIX exit codes enforced by `uirig check`:
+ * - `0`: All token, contrast, dark-mode parity, geometric stress, CLS, DOM, and runtime checks passed.
+ * - `1`: Configuration/token load error, design token drift, WCAG/dark-mode contrast failure, DOM violation, or runtime JS error.
+ * - `2`: Structural layout break (overflow, horizontal scrollbar, touch collision) or CLS budget breach.
+ */
 export type PosixExitCode = 0 | 1 | 2;
 
 export interface IViewportConfig {
@@ -53,16 +64,21 @@ export interface IUirigConfig {
   ignore?: IUirigIgnoreRule[];
 }
 
-export type AuditToolName = 'tokens' | 'contrast' | 'stress' | 'cls';
+export type AuditToolName = 'tokens' | 'contrast' | 'dark-mode' | 'stress' | 'cls' | 'dom';
 
 export interface ICheckCommandOptions {
+  /** Optional positional `<url-or-file>` target for zero-config or single-target overrides. */
   target?: string;
   configPath?: string;
   json?: boolean;
   headless?: boolean;
+  /** Optional single-engine filter. Runs all enabled engines when omitted. */
   only?: AuditToolName;
+  /** Optional inline token scale override (useful for programmatic calls & tests). */
   tokenScaleOverride?: ITokenScaleConfig;
+  /** Optional custom output path for the Markdown PR comment report (defaults to `.uirig/github_pr_comment.md`). */
   reportOutputPath?: string;
+  /** Optional working directory override for resolving relative paths in tests. */
   cwd?: string;
 }
 
@@ -71,8 +87,11 @@ export interface IViewportAuditReport {
   viewport: IViewportConfig;
   tokenViolations: ITokenViolation[];
   contrastViolations: IContrastViolation[];
+  darkModeViolations?: IDarkModeViolation[];
   stressViolations: IGeometricViolation[];
   clsEvaluation: IClsEvaluationResult;
+  domViolations?: IDomIntegrityViolation[];
+  runtimeErrors?: IRuntimeErrorViolation[];
 }
 
 export interface ICheckExecutionReport {
@@ -85,11 +104,18 @@ export interface ICheckExecutionReport {
     totalViewportsAudited: number;
     totalTokenViolations: number;
     totalContrastViolations: number;
+    totalDarkModeViolations?: number;
     totalStressViolations: number;
     totalClsViolations: number;
+    totalDomViolations?: number;
+    totalRuntimeErrors?: number;
   };
 }
 
+/**
+ * Sensible built-in defaults used when running `npx uirig <url-or-file>` without
+ * a `uirig.config.json` file on disk.
+ */
 export const ZERO_CONFIG_DEFAULTS: Omit<IUirigConfig, 'targetUrls'> = {
   tokensPath: undefined,
   thresholdBudgets: {
@@ -105,6 +131,10 @@ export const ZERO_CONFIG_DEFAULTS: Omit<IUirigConfig, 'targetUrls'> = {
   ignore: [],
 };
 
+/**
+ * Fallback built-in token scale used only when `tokensPath` is omitted or explicitly
+ * configured to use defaults, ensuring zero-config runs remain resilient.
+ */
 export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
   colors: ['rgb(255, 255, 255)', 'rgb(0, 0, 0)', 'rgb(17, 24, 39)', 'rgb(243, 244, 246)'],
   spacing: ['0px', '4px', '8px', '12px', '16px', '20px', '24px', '32px'],
@@ -112,6 +142,10 @@ export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
   radii: ['0px', '4px', '6px', '8px', '16px', '9999px'],
 };
 
+/**
+ * Reads and validates `uirig.config.json` from disk.
+ * Throws descriptive `ERR_CONFIG_*` errors so CLI callers can exit with POSIX code `1`.
+ */
 export function loadUirigConfig(
   configPath: string = resolve(process.cwd(), 'uirig.config.json')
 ): IUirigConfig {
@@ -204,6 +238,10 @@ export function loadUirigConfig(
   };
 }
 
+/**
+ * Resolves the active `IUirigConfig` for a run, supporting explicit `--config`,
+ * default `uirig.config.json`, and zero-config positional `<url-or-file>` runs.
+ */
 export function resolveExecutionConfig(
   options: ICheckCommandOptions,
   cwd: string
@@ -245,6 +283,10 @@ export function resolveExecutionConfig(
   throw new Error(`ERR_CONFIG_MISSING: Configuration file not found at ${defaultConfigPath}.`);
 }
 
+/**
+ * Loads and validates the approved design token scale JSON referenced by `tokensPath`.
+ * Resolves relative paths against the directory containing `uirig.config.json`.
+ */
 export function loadTokenScale(tokensPath: string, configFilePath: string): ITokenScaleConfig {
   const resolvedTokensPath = resolve(dirname(configFilePath), tokensPath);
   logTelemetry(
@@ -289,28 +331,41 @@ export function loadTokenScale(tokensPath: string, configFilePath: string): ITok
   };
 }
 
+/**
+ * Evaluates an array of viewport audit reports and determines the deterministic
+ * POSIX exit code for CI/CD pipelines (`0` = pass, `1` = policy/integrity/runtime, `2` = stress/CLS).
+ */
 export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExitCode {
   let hasStructuralOrClsFailure = false;
-  let hasTokenOrContrastFailure = false;
+  let hasPolicyOrIntegrityFailure = false;
 
   for (const report of results) {
     if (report.stressViolations.length > 0 || report.clsEvaluation.violation !== null) {
       hasStructuralOrClsFailure = true;
     }
-    if (report.tokenViolations.length > 0 || report.contrastViolations.length > 0) {
-      hasTokenOrContrastFailure = true;
+    if (
+      report.tokenViolations.length > 0 ||
+      report.contrastViolations.length > 0 ||
+      (report.darkModeViolations?.length ?? 0) > 0 ||
+      (report.domViolations?.length ?? 0) > 0 ||
+      (report.runtimeErrors?.length ?? 0) > 0
+    ) {
+      hasPolicyOrIntegrityFailure = true;
     }
   }
 
   if (hasStructuralOrClsFailure) {
     return 2;
   }
-  if (hasTokenOrContrastFailure) {
+  if (hasPolicyOrIntegrityFailure) {
     return 1;
   }
   return 0;
 }
-
+/**
+ * Audits a single `(url, viewport)` target across isolated Playwright `BrowserContext`
+ * sessions running concurrently (`Promise.all`) inside one shared Chromium browser.
+ */
 export async function auditViewportInParallel(
   browser: Browser,
   url: string,
@@ -336,6 +391,7 @@ export async function auditViewportInParallel(
     )}...`
   );
 
+  // Track 1: Read-Only Audits (`tokens` and/or `contrast`)
   const runReadOnlyTrack = async (): Promise<{
     tokenViolations: ITokenViolation[];
     contrastViolations: IContrastViolation[];
@@ -360,6 +416,7 @@ export async function auditViewportInParallel(
     }
   };
 
+  // Track 2: Mutated DOM Fuzzing (`stress`)
   const runStressTrack = async (): Promise<IGeometricViolation[]> => {
     if (!runStress) {
       return [];
@@ -378,6 +435,7 @@ export async function auditViewportInParallel(
     }
   };
 
+  // Track 3: Pre-Navigation Layout Shift Monitor (`cls`)
   const runClsTrack = async (): Promise<IClsEvaluationResult> => {
     if (!runCls) {
       return { maxSessionCls: 0, violation: null };
@@ -404,11 +462,17 @@ export async function auditViewportInParallel(
     viewport,
     tokenViolations: readOnlyResult.tokenViolations,
     contrastViolations: readOnlyResult.contrastViolations,
+    darkModeViolations: [],
     stressViolations,
     clsEvaluation,
+    domViolations: [],
+    runtimeErrors: [],
   };
 }
 
+/**
+ * Main orchestration entry point for `uirig check` and `uirig <url-or-file>`.
+ */
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
 ): Promise<ICheckExecutionReport> {
@@ -482,11 +546,17 @@ export async function executeCheckCommand(
       totalViewportsAudited: results.length,
       totalTokenViolations: results.reduce((sum, r) => sum + r.tokenViolations.length, 0),
       totalContrastViolations: results.reduce((sum, r) => sum + r.contrastViolations.length, 0),
+      totalDarkModeViolations: results.reduce(
+        (sum, r) => sum + (r.darkModeViolations?.length ?? 0),
+        0
+      ),
       totalStressViolations: results.reduce((sum, r) => sum + r.stressViolations.length, 0),
       totalClsViolations: results.reduce(
         (sum, r) => sum + (r.clsEvaluation.violation ? 1 : 0),
         0
       ),
+      totalDomViolations: results.reduce((sum, r) => sum + (r.domViolations?.length ?? 0), 0),
+      totalRuntimeErrors: results.reduce((sum, r) => sum + (r.runtimeErrors?.length ?? 0), 0),
     };
 
     const executionReport: ICheckExecutionReport = {
@@ -498,9 +568,11 @@ export async function executeCheckCommand(
       summary,
     };
 
+    // Synthesize standalone GitHub PR comment Markdown report to disk
     writeGithubPrCommentReport(executionReport, resolvedReportPath);
 
     if (options.json) {
+      // Emit raw machine-readable JSON directly to stdout for AI Design System Harnesses
       process.stdout.write(`${formatAgenticJsonStream(executionReport)}\n`);
     } else {
       const exitBadge =

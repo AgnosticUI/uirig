@@ -26,8 +26,11 @@ function buildSampleReport(passing: boolean): ICheckExecutionReport {
         totalViewportsAudited: 1,
         totalTokenViolations: 0,
         totalContrastViolations: 0,
+        totalDarkModeViolations: 0,
         totalStressViolations: 0,
         totalClsViolations: 0,
+        totalDomViolations: 0,
+        totalRuntimeErrors: 0,
       },
       results: [
         {
@@ -35,8 +38,11 @@ function buildSampleReport(passing: boolean): ICheckExecutionReport {
           viewport: { name: 'desktop', width: 1440, height: 900 },
           tokenViolations: [],
           contrastViolations: [],
+          darkModeViolations: [],
           stressViolations: [],
           clsEvaluation: { maxSessionCls: 0.01, violation: null },
+          domViolations: [],
+          runtimeErrors: [],
         },
       ],
     };
@@ -51,8 +57,11 @@ function buildSampleReport(passing: boolean): ICheckExecutionReport {
       totalViewportsAudited: 1,
       totalTokenViolations: 1,
       totalContrastViolations: 1,
+      totalDarkModeViolations: 0,
       totalStressViolations: 1,
       totalClsViolations: 1,
+      totalDomViolations: 0,
+      totalRuntimeErrors: 0,
     },
     results: [
       {
@@ -75,6 +84,7 @@ function buildSampleReport(passing: boolean): ICheckExecutionReport {
             inShadowDom: false,
           },
         ],
+        darkModeViolations: [],
         stressViolations: [
           {
             violationType: 'container_overflow',
@@ -93,6 +103,8 @@ function buildSampleReport(passing: boolean): ICheckExecutionReport {
             offendingSelectors: ['img.un-sized-hero'],
           },
         },
+        domViolations: [],
+        runtimeErrors: [],
       },
     ],
   };
@@ -115,11 +127,13 @@ describe('fs.ts — Markdown PR Comment Reporter', () => {
 
     expect(md).toContain('✅ **PASSED**');
     expect(md).toContain('| **1. Design Tokens** (`tokens`) | 0 | ✅ Pass |');
-    expect(md).toContain('| **4. Layout Shift** (`cls`) | 0 | ✅ Pass |');
+    expect(md).toContain('| **3. Dark-Mode Parity** (`dark-mode`) | 0 | ✅ Pass |');
+    expect(md).toContain('| **5. Layout Shift** (`cls`) | 0 | ✅ Pass |');
+    expect(md).toContain('| **6. DOM Integrity** (`dom`) | 0 | ✅ Pass |');
     expect(md).not.toContain('### 🔍 Violation Breakdown by Viewport');
   });
 
-  it('formats detailed violation tables across all 4 engines and escapes pipe characters', () => {
+  it('formats detailed violation tables across all engines and escapes pipe characters', () => {
     console.log('[test:fs] Testing failing PR comment Markdown formatting and pipe escaping...');
     const md = formatGithubPrCommentMarkdown(buildSampleReport(false));
 

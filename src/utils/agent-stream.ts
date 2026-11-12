@@ -1,31 +1,38 @@
 /**
  * src/utils/agent-stream.ts
  * Agentic JSON Tool Stream Output Generator.
- * Single Responsibility: Translates heterogeneous violation structures from all 4
- * core audit engines (`tokens`, `contrast`, `stress`, `cls`) into a flat, uniform
- * `IAgenticViolation` stream with deterministic `remediationAdvice` for AI agents.
+ * Single Responsibility: Translates heterogeneous violation structures from all
+ * core audit engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`, `runtime`)
+ * into a flat, uniform `IAgenticViolation` stream with Shadow host attribution and
+ * deterministic `remediationAdvice` for AI agents.
  */
 
 import type { ICheckExecutionReport, IViewportAuditReport } from '../commands/check.js';
+import type { UirigEngineName } from '../interfaces/locator.js';
+import { extractHostComponentFromSelector } from './dom-walker.js';
 
 /**
  * Unified, flat violation contract consumed by AI coding agents (Claude Code, Cursor, Codex).
  */
 export interface IAgenticViolation {
-  /** Which of the 4 core engines caught the defect. */
-  engine: 'tokens' | 'contrast' | 'stress' | 'cls';
+  /** Which core engine caught the defect. */
+  engine: UirigEngineName;
   /** Machine-readable defect category (e.g., 'token_drift', 'contrast_drop', 'container_overflow', 'cls_breach'). */
   violationType: string;
   /** Target URL where the violation occurred. */
   url: string;
   /** Viewport profile label and dimensions (e.g., 'mobile (375x812)'). */
   viewport: string;
+  /** Enclosing Web Component custom element tag when inside an open ShadowRoot (e.g., 'ag-button'). */
+  hostComponent: string | null;
   /** CSS or Shadow-DOM-piercing selector path (`host >> shadow-root >> inner`). */
   selector: string;
   /** True when the offending node lives inside an open ShadowRoot. */
   inShadowDom: boolean;
   /** Human- and machine-readable measurement showing how far the value drifted from budget. */
   measuredDelta: string;
+  /** Nearest passing design token when available. */
+  suggestedToken?: string;
   /** Actionable, deterministic fix instruction so the LLM can patch the UI immediately. */
   remediationAdvice: string;
 }
@@ -43,9 +50,9 @@ export interface IAgenticJsonStreamPayload {
 }
 
 /**
- * Normalizes a single viewport audit report across all 4 engines (`tokens`, `contrast`,
- * `stress`, `cls`) into a flat array of `IAgenticViolation` items with deterministic
- * `remediationAdvice`.
+ * Normalizes a single viewport audit report across all engines (`tokens`, `contrast`,
+ * `dark-mode`, `stress`, `cls`, `dom`, `runtime`) into a flat array of `IAgenticViolation`
+ * items with Shadow host attribution and deterministic `remediationAdvice`.
  */
 export function normalizeViewportViolations(
   viewportReport: IViewportAuditReport
@@ -55,11 +62,17 @@ export function normalizeViewportViolations(
 
   // 1. Normalize Design Token Drift (`tokens`)
   for (const tokenViolation of viewportReport.tokenViolations) {
+    const hostComponent =
+      tokenViolation.hostComponent !== undefined
+        ? tokenViolation.hostComponent
+        : extractHostComponentFromSelector(tokenViolation.selector);
+
     normalized.push({
       engine: 'tokens',
       violationType: 'token_drift',
       url: viewportReport.url,
       viewport: viewportLabel,
+      hostComponent,
       selector: tokenViolation.selector,
       inShadowDom: tokenViolation.inShadowDom,
       measuredDelta: `${tokenViolation.property}: ${tokenViolation.actualValue}`,
@@ -69,18 +82,67 @@ export function normalizeViewportViolations(
 
   // 2. Normalize Rendered Luminance Contrast Drops (`contrast`)
   for (const contrastViolation of viewportReport.contrastViolations) {
+    const hostComponent =
+      contrastViolation.hostComponent !== undefined
+        ? contrastViolation.hostComponent
+        : extractHostComponentFromSelector(contrastViolation.selector);
+
     normalized.push({
       engine: 'contrast',
       violationType: 'contrast_drop',
       url: viewportReport.url,
       viewport: viewportLabel,
+      hostComponent,
       selector: contrastViolation.selector,
       inShadowDom: contrastViolation.inShadowDom,
       measuredDelta: `contrast ${contrastViolation.contrastRatio.toFixed(2)}:1 (required >= 4.50:1)`,
       remediationAdvice: `Adjust foreground (${contrastViolation.foregroundRgb}) or background (${contrastViolation.backgroundRgb}) on '${contrastViolation.selector}' so computed WCAG contrast reaches at least 4.50:1.`,
     });
   }
-  // 3. Normalize Geometric Stress Breaches (`stress`)
+
+  // 3. Normalize Dark-Mode Theme Parity Violations (`dark-mode`)
+  for (const darkViolation of viewportReport.darkModeViolations ?? []) {
+    const hostComponent =
+      darkViolation.hostComponent !== undefined
+        ? darkViolation.hostComponent
+        : extractHostComponentFromSelector(darkViolation.selector);
+
+    const tokenSuffix = darkViolation.suggestedToken
+      ? ` Consider applying '${darkViolation.suggestedToken}'.`
+      : '';
+
+    if (darkViolation.violationType === 'stranded_light_surface') {
+      const lum = darkViolation.relativeLuminance?.toFixed(2) ?? 'high';
+      normalized.push({
+        engine: 'dark-mode',
+        violationType: 'stranded_light_surface',
+        url: viewportReport.url,
+        viewport: viewportLabel,
+        hostComponent,
+        selector: darkViolation.selector,
+        inShadowDom: darkViolation.inShadowDom,
+        measuredDelta: `luminance ${lum} in dark mode (${darkViolation.backgroundRgb})`,
+        suggestedToken: darkViolation.suggestedToken,
+        remediationAdvice: `Replace bright hardcoded background (${darkViolation.backgroundRgb}) on '${darkViolation.selector}' with a semantic dark-mode surface token.${tokenSuffix}`,
+      });
+    } else {
+      const ratio = darkViolation.contrastRatio?.toFixed(2) ?? '0.00';
+      normalized.push({
+        engine: 'dark-mode',
+        violationType: 'dark_mode_contrast_drop',
+        url: viewportReport.url,
+        viewport: viewportLabel,
+        hostComponent,
+        selector: darkViolation.selector,
+        inShadowDom: darkViolation.inShadowDom,
+        measuredDelta: `dark-mode contrast ${ratio}:1 (required >= 4.50:1)`,
+        suggestedToken: darkViolation.suggestedToken,
+        remediationAdvice: `Adjust dark-mode foreground (${darkViolation.foregroundRgb ?? 'text'}) or background (${darkViolation.backgroundRgb}) on '${darkViolation.selector}' to reach >= 4.50:1.${tokenSuffix}`,
+      });
+    }
+  }
+
+    // 4. Normalize Geometric Stress Breaches (`stress`)
   for (const stressViolation of viewportReport.stressViolations) {
     let remediationAdvice = '';
 
@@ -99,6 +161,7 @@ export function normalizeViewportViolations(
       violationType: stressViolation.violationType,
       url: viewportReport.url,
       viewport: viewportLabel,
+      hostComponent: extractHostComponentFromSelector(stressViolation.selector),
       selector: stressViolation.selector,
       inShadowDom: stressViolation.inShadowDom,
       measuredDelta: `+${stressViolation.measuredLeakPixels}px`,
@@ -106,7 +169,7 @@ export function normalizeViewportViolations(
     });
   }
 
-  // 4. Normalize Cumulative Layout Shift Budget Breaches (`cls`)
+  // 5. Normalize Cumulative Layout Shift Budget Breaches (`cls`)
   const clsViolation = viewportReport.clsEvaluation.violation;
   if (clsViolation !== null) {
     const selectorsList =
@@ -120,10 +183,46 @@ export function normalizeViewportViolations(
       violationType: 'cls_breach',
       url: viewportReport.url,
       viewport: viewportLabel,
+      hostComponent: extractHostComponentFromSelector(primarySelector),
       selector: primarySelector,
       inShadowDom: primarySelector.includes('>> shadow-root >>'),
       measuredDelta: `CLS ${clsViolation.measuredClsScore.toFixed(3)} (max ${clsViolation.clsMaxLimit.toFixed(3)})`,
       remediationAdvice: `Reserve explicit width/height or min-height dimensions for shifting elements (${selectorsList}) so session-window CLS (${clsViolation.measuredClsScore.toFixed(3)}) stays at or below ${clsViolation.clsMaxLimit.toFixed(3)}.`,
+    });
+  }
+
+  // 6. Normalize DOM & Markup Integrity Violations (`dom`)
+  for (const domViolation of viewportReport.domViolations ?? []) {
+    const hostComponent =
+      domViolation.hostComponent !== undefined
+        ? domViolation.hostComponent
+        : extractHostComponentFromSelector(domViolation.selector);
+
+    normalized.push({
+      engine: 'dom',
+      violationType: domViolation.rule,
+      url: viewportReport.url,
+      viewport: viewportLabel,
+      hostComponent,
+      selector: domViolation.selector,
+      inShadowDom: domViolation.inShadowDom,
+      measuredDelta: domViolation.detail,
+      remediationAdvice: `Fix '${domViolation.rule}' on '${domViolation.selector}': ${domViolation.detail}`,
+    });
+  }
+
+  // 7. Normalize Uncaught Runtime JS & Console Errors (`runtime`)
+  for (const runtimeErr of viewportReport.runtimeErrors ?? []) {
+    normalized.push({
+      engine: 'runtime',
+      violationType: runtimeErr.source,
+      url: viewportReport.url,
+      viewport: viewportLabel,
+      hostComponent: null,
+      selector: runtimeErr.location ?? 'window',
+      inShadowDom: false,
+      measuredDelta: runtimeErr.message,
+      remediationAdvice: `Resolve uncaught runtime error (${runtimeErr.source}): ${runtimeErr.message}`,
     });
   }
 

@@ -45,9 +45,13 @@ function escapeMarkdownCell(value: string): string {
  */
 export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): string {
   const passed = report.exitCode === 0;
+  const darkModeCount = report.summary.totalDarkModeViolations ?? 0;
+  const domCount = report.summary.totalDomViolations ?? 0;
+  const runtimeCount = report.summary.totalRuntimeErrors ?? 0;
+
   const statusBanner = passed
-    ? '✅ **PASSED** — All design tokens, contrast ratios, geometric stress bounds, and CLS budgets passed.'
-    : `❌ **FAILED (POSIX Exit Code ${report.exitCode})** — UI verification violations detected across ${report.summary.totalViewportsAudited} viewport(s).`;
+    ? '✅ **PASSED**: All design tokens, contrast ratios, dark-mode parity, geometric stress bounds, CLS budgets, and DOM integrity checks passed.'
+    : `❌ **FAILED (POSIX Exit Code ${report.exitCode})**: UI verification violations detected across ${report.summary.totalViewportsAudited} viewport(s).`;
 
   const lines: string[] = [
     '## 🛡️ `uirig` UI Verification Gate Report',
@@ -64,11 +68,20 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
     `| **2. WCAG 2.1 Contrast** (\`contrast\`) | ${report.summary.totalContrastViolations} | ${
       report.summary.totalContrastViolations === 0 ? '✅ Pass' : '❌ Fail'
     } |`,
-    `| **3. Geometric Stress** (\`stress\`) | ${report.summary.totalStressViolations} | ${
+    `| **3. Dark-Mode Parity** (\`dark-mode\`) | ${darkModeCount} | ${
+      darkModeCount === 0 ? '✅ Pass' : '❌ Fail'
+    } |`,
+    `| **4. Geometric Stress** (\`stress\`) | ${report.summary.totalStressViolations} | ${
       report.summary.totalStressViolations === 0 ? '✅ Pass' : '❌ Fail'
     } |`,
-    `| **4. Layout Shift** (\`cls\`) | ${report.summary.totalClsViolations} | ${
+    `| **5. Layout Shift** (\`cls\`) | ${report.summary.totalClsViolations} | ${
       report.summary.totalClsViolations === 0 ? '✅ Pass' : '❌ Fail'
+    } |`,
+    `| **6. DOM Integrity** (\`dom\`) | ${domCount} | ${
+      domCount === 0 ? '✅ Pass' : '❌ Fail'
+    } |`,
+    `| **7. Runtime JS Errors** (\`runtime\`) | ${runtimeCount} | ${
+      runtimeCount === 0 ? '✅ Pass' : '❌ Fail'
     } |`,
     '',
   ];
@@ -78,8 +91,11 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
     (r) =>
       r.tokenViolations.length > 0 ||
       r.contrastViolations.length > 0 ||
+      (r.darkModeViolations?.length ?? 0) > 0 ||
       r.stressViolations.length > 0 ||
-      r.clsEvaluation.violation !== null
+      r.clsEvaluation.violation !== null ||
+      (r.domViolations?.length ?? 0) > 0 ||
+      (r.runtimeErrors?.length ?? 0) > 0
   );
 
   if (failingViewports.length > 0) {
@@ -87,7 +103,7 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
 
     for (const vpReport of failingViewports) {
       lines.push(
-        `#### \`${escapeMarkdownCell(vpReport.url)}\` — **${escapeMarkdownCell(
+        `#### \`${escapeMarkdownCell(vpReport.url)}\`: **${escapeMarkdownCell(
           vpReport.viewport.name
         )}** (${vpReport.viewport.width}x${vpReport.viewport.height})`,
         ''
@@ -126,6 +142,28 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
         }
         lines.push('');
       }
+      if ((vpReport.darkModeViolations?.length ?? 0) > 0) {
+        lines.push(
+          '**Dark-Mode Theme Parity Failures (`dark-mode`):**',
+          '',
+          '| Type | Selector | Detail | Background | Shadow DOM |',
+          '| :--- | :--- | :---: | :--- | :---: |'
+        );
+        for (const v of vpReport.darkModeViolations ?? []) {
+          const detail =
+            v.violationType === 'stranded_light_surface'
+              ? `Luminance **${v.relativeLuminance?.toFixed(2) ?? 'high'}** (> 0.85)`
+              : `**${v.contrastRatio?.toFixed(2) ?? '0.00'}:1** (< 4.5:1)`;
+          lines.push(
+            `| \`${escapeMarkdownCell(v.violationType)}\` | \`${escapeMarkdownCell(
+              v.selector
+            )}\` | ${detail} | \`${escapeMarkdownCell(v.backgroundRgb)}\` | ${
+              v.inShadowDom ? 'Yes' : 'No'
+            } |`
+          );
+        }
+        lines.push('');
+      }
 
       if (vpReport.stressViolations.length > 0) {
         lines.push(
@@ -137,7 +175,7 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
         for (const v of vpReport.stressViolations) {
           const relatedCell = v.relatedSelector
             ? `\`${escapeMarkdownCell(v.relatedSelector)}\``
-            : '—';
+            : 'N/A';
           lines.push(
             `| \`${escapeMarkdownCell(v.violationType)}\` | \`${escapeMarkdownCell(
               v.selector
@@ -161,6 +199,38 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
           `- **Shifted Selectors:** ${selectorsText}`,
           ''
         );
+      }
+
+      if ((vpReport.domViolations?.length ?? 0) > 0) {
+        lines.push(
+          '**DOM & Markup Integrity Failures (`dom`):**',
+          '',
+          '| Rule | Selector | Detail | Shadow DOM |',
+          '| :--- | :--- | :--- | :---: |'
+        );
+        for (const v of vpReport.domViolations ?? []) {
+          lines.push(
+            `| \`${escapeMarkdownCell(v.rule)}\` | \`${escapeMarkdownCell(
+              v.selector
+            )}\` | ${escapeMarkdownCell(v.detail)} | ${v.inShadowDom ? 'Yes' : 'No'} |`
+          );
+        }
+        lines.push('');
+      }
+
+      if ((vpReport.runtimeErrors?.length ?? 0) > 0) {
+        lines.push(
+          '**Uncaught Runtime JS Errors (`runtime`):**',
+          '',
+          '| Source | Message |',
+          '| :--- | :--- |'
+        );
+        for (const err of vpReport.runtimeErrors ?? []) {
+          lines.push(
+            `| \`${escapeMarkdownCell(err.source)}\` | \`${escapeMarkdownCell(err.message)}\` |`
+          );
+        }
+        lines.push('');
       }
     }
   }
