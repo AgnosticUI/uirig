@@ -46,3 +46,17 @@
   * **Action:** Update the existing `src/commands/init.ts` scaffolder so that running `uirig init` automatically generates `.uirig/SKILL.md` alongside `uirig.config.json`, giving teams immediate agent-ready instructions on first run.
 - [ ] **Task 5.5: Design System Harness Agent Recipe (`AGENTS.md` / CLI Snippet)**
   * **Action:** Define the lightweight agent recipe and optional `AGENTS.md` integration snippet that teaches AI coding agents (Claude Code, Cursor, Codex) how to invoke `uirig check --json` after UI edits and self-correct violations without context bloat.
+
+### Phase 6: Documentation MVP
+- [ ] **Task 6.1: README.md**
+  * **Action:** Complete `README.md`. Should explain what the tool is and why it is of value. Common use cases (CI/CD, git pre-commit hook, and CLI usage patterns). Full setup instructions. How to use `uirig` for common use cases. Etc. etc.
+- [ ] **Task 6.2: LI Announcement**
+  * **Action:** Craft a LinkedIn Announcement.
+
+### Phase 7: Add Tools
+- [ ] **Task 7.1: Determine Best ROI Tools To Add**
+  * **Action:** Review following for more tool ideas:
+    * 14 Design Tools: https://lnkd.in/p/gCpREqBe, 
+    * Add a `dsds` tool which: 1) checks you have a spec in your system, 2) checks it validates. See https://designsystemdocspec.org/quickstart
+    * Need an XSS tool that injects vectors and confirms they are either escaped when appropriate or disallowed entirely when appropriate.
+    * Other XSS related checks worthwhile in the same spirit?
