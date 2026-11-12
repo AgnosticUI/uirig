@@ -90,13 +90,29 @@ npx uirig init
 }
 ```
 
-### Bundler-Proof Element Escape Hatches
-Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comments, you can exempt intentional one-off overrides directly in markup (including across Shadow DOM boundaries):
+### Bundler-Proof Rule Escape Hatches
+Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comments, you can exempt intentional one-off overrides in two ways:
 
-```html
-<div data-uirig-ignore="tokens">Intentional one-off hero gradient</div>
-<section data-uirig-ignore="all">Legacy third-party widget</section>
-```
+1. **In Markup (`data-uirig-ignore`):** Add `data-uirig-ignore` to an element, ancestor container, or Web Component host. Exemptions cascade down to child elements and across open `ShadowRoot` boundaries:
+   ```html
+   <!-- Exempt a single rule -->
+   <div data-uirig-ignore="tokens">Intentional one-off hero gradient</div>
+
+   <!-- Exempt multiple comma-separated rules -->
+   <ag-card data-uirig-ignore="tokens, dark-mode">Custom promotional card</ag-card>
+
+   <!-- Exempt all engines on a third-party widget -->
+   <section data-uirig-ignore="all">Legacy third-party embed</section>
+   ```
+
+2. **In `uirig.config.json` (`ignore`):** Exempt specific selectors or route URLs (including trailing `*` wildcards) centrally without touching markup:
+   ```json
+   "ignore": [
+     { "rule": "tokens", "selector": ".legacy-embed" },
+     { "rule": "contrast", "url": "http://localhost:5173/admin/*" },
+     { "rule": "all", "selector": "#third-party-chat" }
+   ]
+   ```
 
 ---
 
