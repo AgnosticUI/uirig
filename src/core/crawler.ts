@@ -29,6 +29,7 @@ export const BLOCKLIST_DIRECTORIES = new Set([
   'dist',
   'build',
   'docs_old',
+  'ANNOUNCEMENTS',
   'playground',
 ]);
 

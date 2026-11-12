@@ -1,24 +1,24 @@
-# LinkedIn Announcement — `uirig` MVP Launch (2026-11-12)
+# LinkedIn
 
-AI coding agents, `AGENTS.md` files, and Figma MCP servers give LLMs great *context* on how to build UI.
+𝘂𝗶𝗿𝗶𝗴 𝗶𝘀 𝗹𝗶𝘃𝗲 — 𝗔 𝗱𝗲𝘁𝗲𝗿𝗺𝗶𝗻𝗶𝘀𝘁𝗶𝗰, 𝗳𝗿𝗮𝗺𝗲𝘄𝗼𝗿𝗸-𝗯𝗹𝗶𝗻𝗱 𝗨𝗜 𝘃𝗲𝗿𝗶𝗳𝗶𝗰𝗮𝘁𝗶𝗼𝗻 𝗴𝗮𝘁𝗲
+AI coding agents, AGENTS.md files, and Figma MCP servers give LLMs great context on how to build UI. Context alone does not guarantee rendered quality. uirig audits your live running viewports inside isolated headless Chromium contexts to catch design drift and layout breaks without brittle screenshot diffs.
 
-Context alone doesn't guarantee rendered quality.
+▸ 𝘀𝗵𝗮𝗱𝗼𝘄-𝗽𝗶𝗲𝗿𝗰𝗶𝗻𝗴 𝘁𝗼𝗸𝗲𝗻 𝗮𝘂𝗱𝗶𝘁𝘀
+The uirig tokens check recursively walks Light DOM and open ShadowRoot boundaries. It evaluates live getComputedStyle() values against your approved color, spacing, font-size, and border-radius scales.
 
-Static CSS linters miss computed runtime styles and Web Component Shadow DOM internals. Visual screenshot diffs drown teams in noisy 2px anti-aliasing false positives.
+▸ 𝗿𝗲𝗻𝗱𝗲𝗿𝗲𝗱 𝗹𝘂𝗺𝗶𝗻𝗮𝗻𝗰𝗲 𝗰𝗼𝗻𝘁𝗿𝗮𝘀𝘁 𝗴𝗮𝘁𝗲
+The uirig contrast engine composites ancestor alpha layers (Porter-Duff Source-Over) and verifies true WCAG 2.1 contrast ratios (>= 4.5:1) directly on rendered text via colorjs.io.
 
-That's why I built **`uirig`**—an open-source, zero-config, framework-blind UI verification gate for CI/CD pipelines and AI Design System Harnesses.
+▸ +𝟯𝟬% 𝘁𝗲𝘅𝘁-𝗲𝘅𝗽𝗮𝗻𝘀𝗶𝗼𝗻 𝘀𝘁𝗿𝗲𝘀𝘀 𝗳𝘂𝘇𝘇𝗲𝗿
+The uirig stress rig injects pseudo-localization copy into live DOM nodes and checks Euclidean bounding boxes for parent-child container overflow, horizontal scrollbars, and crowded touch targets.
 
-`uirig` spins up isolated headless Chromium contexts and audits your live running viewports across four deterministic checks:
+▸ 𝘀𝗲𝘀𝘀𝗶𝗼𝗻-𝘄𝗶𝗻𝗱𝗼𝘄 𝗖𝗟𝗦 𝗺𝗼𝗻𝗶𝘁𝗼𝗿
+The uirig cls gate attaches a pre-navigation PerformanceObserver and enforces Google's W3C 1s/5s session-window Cumulative Layout Shift budgets.
 
-1. **`uirig tokens`** — Pierces open Shadow DOM boundaries to catch hardcoded colors, spacing, font sizes, and border radii that drift from your design token scale.
-2. **`uirig contrast`** — Composites ancestor alpha layers (Porter-Duff Source-Over) and verifies true WCAG 2.1 luminance contrast (`>= 4.5:1`) on rendered text.
-3. **`uirig stress`** — Injects `+30%` pseudo-localization text expansion and checks Euclidean bounding boxes for container overflow, horizontal scrollbars, and crowded touch targets.
-4. **`uirig cls`** — Attaches a pre-navigation `PerformanceObserver` and enforces W3C session-window Cumulative Layout Shift budgets.
+▸ 𝗰𝗹𝗼𝘀𝗲𝗱-𝗹𝗼𝗼𝗽 𝗔𝗜 𝗵𝗮𝗿𝗻𝗲𝘀𝘀 𝗶𝗻𝘁𝗲𝗴𝗿𝗮𝘁𝗶𝗼𝗻
+Running npx uirig check --json routes diagnostic logs to stderr and streams normalized violations with concrete remediationAdvice and POSIX exit codes (0, 1, 2) to stdout—so agents like Claude Code, Cursor, and Codex can self-heal UI regressions until everything passes.
 
-And when run with `--json` (`npx uirig check --json`), `uirig` streams clean, normalized violations with concrete `remediationAdvice` and deterministic POSIX exit codes (`0`, `1`, `2`) directly to `stdout`—giving coding agents like Claude Code, Cursor, and Codex a closed-loop self-healing gate until the UI actually passes.
+▸ 𝘁𝗲𝘀𝘁𝗲𝗱, 𝗱𝗼𝗰𝘂𝗺𝗲𝗻𝘁𝗲𝗱, 𝗮𝗻𝗱 𝗳𝗿𝗮𝗺𝗲𝘄𝗼𝗿𝗸-𝗯𝗹𝗶𝗻𝗱
+Ships with a 70-test Vitest + Playwright suite, standalone GitHub PR Markdown reporting, and .uirig/SKILL.md scaffolding via uirig init.
 
-Zero bulky style guides stuffed into your LLM context window. Just fast, deterministic ground truth in a real browser.
-
-Check it out, try it on your design system or web app, and let me know what checks you'd add next!
-
-#DesignSystems #FrontendEngineering #WebComponents #Playwright #AIEngineering #DevTools #Accessibility #OpenSource
+#DesignSystems #FrontendEngineering #WebComponents #Playwright #AIEngineering #ContextEngineering #DevTools #Accessibility #OpenSource
