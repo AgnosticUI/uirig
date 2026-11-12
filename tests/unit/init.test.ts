@@ -3,7 +3,8 @@
  * 1-to-1 unit tests for `src/commands/init.ts`.
  * Verifies:
  * 1. Scaffolding of `uirig.config.json`, `.uirig/session.json`, and `.uirig/SKILL.md`.
- * 2. Content integrity of `.uirig/SKILL.md` for AI Design System Harnesses.
+ * 2. Content integrity of `DEFAULT_UIRIG_CONFIG` (including dark-mode budget and ignore rules)
+ *    and `.uirig/SKILL.md` (6-engine suite, zero-config CLI, Shadow host & token remediation).
  * 3. Idempotent behavior (re-running `uirig init` does not overwrite existing files).
  */
 
@@ -51,10 +52,17 @@ describe('init.ts — Workspace & Agent Skill Scaffolder', () => {
     expect(parsedConfig.thresholdBudgets.clsMaxLimit).toBe(
       DEFAULT_UIRIG_CONFIG.thresholdBudgets.clsMaxLimit
     );
+    expect(parsedConfig.thresholdBudgets.darkModeMaxSurfaceLuminance).toBe(0.85);
+    expect(parsedConfig.ignore).toEqual([]);
 
     const skillContent = readFileSync(skillPath, 'utf8');
     expect(skillContent).toBe(DEFAULT_UIRIG_SKILL_MD);
     expect(skillContent).toContain('npx uirig check --json');
+    expect(skillContent).toContain('npx uirig ./dist/index.html --json');
+    expect(skillContent).toContain('dark-mode');
+    expect(skillContent).toContain('dom');
+    expect(skillContent).toContain('hostComponent');
+    expect(skillContent).toContain('suggestedToken');
     expect(skillContent).toContain('remediationAdvice');
   });
 

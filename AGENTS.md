@@ -1,27 +1,39 @@
-# AGENTS.md — `uirig` Design System Harness Instructions
+# AGENTS.md: `uirig` Design System Harness Instructions
 
-This repository uses **`uirig`** as its deterministic, live-viewport UI verification gate.
+This repository uses **`uirig`** as its deterministic, live-viewport UI verification gate (acting as a fast **first line of defense** for AI-generated UIs and Web Components before heavier audits like `axe-core` or Lighthouse run).
 
 ## Mandatory Post-Edit UI Verification Loop
 
 Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI styles:
 
-1. **Verify the local dev server is reachable** on the URL(s) listed in `uirig.config.json` (`targetUrls`).
-2. **Run the deterministic JSON verification gate:**
-   ```bash
-   npx uirig check --json
-   ```
-3. **Evaluate the POSIX exit code and JSON `stdout` payload:**
-   - **Exit Code `0` (`"passed": true`):** All 4 engines (`tokens`, `contrast`, `stress`, `cls`) passed. You may finish your task.
-   - **Exit Code `1`:** Design token drift (`token_drift`) or WCAG 2.1 contrast failure (`contrast_drop` < 4.5:1).
-   - **Exit Code `2`:** Structural layout break (`container_overflow`, `horizontal_scrollbar`, `touch_target_collision`) or Cumulative Layout Shift budget breach (`cls_breach`).
-4. **Self-Heal & Re-Verify:**
-   - Inspect each item in `violations[]` (`engine`, `selector`, `inShadowDom`, `measuredDelta`, `remediationAdvice`).
-   - Patch the offending CSS or component template directly using `remediationAdvice`.
-   - Re-run `npx uirig check --json` until `exitCode` is `0`.
+1. **Run the deterministic JSON verification gate:**
+   - If `uirig.config.json` is configured and your dev server is running:
+     ```bash
+     npx uirig check --json
+     ```
+   - Or target a live URL or standalone `.html` file directly (zero-config mode):
+     ```bash
+     npx uirig http://localhost:5173 --json
+     npx uirig ./dist/index.html --json
+     ```
+2. **Evaluate the POSIX exit code and JSON `stdout` payload:**
+   - **Exit Code `0` (`"status": "pass"`):** All 6 engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`) and runtime JS error checks passed. You may finish your task.
+   - **Exit Code `1`:** Design token drift (`tokens`), light/dark WCAG contrast failure (`contrast`, `dark-mode`), structural DOM/ARIA/hygiene violation (`dom`), or uncaught runtime JS error.
+   - **Exit Code `2`:** Structural layout break (`stress`: container overflow, `100vw` scrollbar bleed, squished avatar, `<24px` tap target) or Cumulative Layout Shift budget breach (`cls`).
+3. **Self-Heal & Re-Verify:**
+   - Inspect each deduplicated entry in `violations[]`:
+     - `engine` & `rule`
+     - `hostComponent` (the enclosing Web Component tag, e.g., `ag-button`)
+     - `offendingSelectorPath` (including `::shadow` boundaries)
+     - `occurrenceCount`
+     - `suggestedToken` (nearest passing design token when available)
+     - `remediationAdvice`
+   - Patch the offending CSS or component template directly using `suggestedToken` and `remediationAdvice`.
+   - Re-run `npx uirig check --json` (or `npx uirig <target> --json`) until `exitCode` is `0`.
 
 ## Ground Rules for AI Agents
 
-- **Do not bypass `uirig.config.json` budgets** (`clsMaxLimit`, `overflowPixelTolerance`, `touchTargetMinSpacingPx`) to silence failures—fix the underlying layout or token usage.
-- **Shadow DOM paths:** Selectors formatted as `host-tag >> shadow-root >> inner-selector` indicate an element inside an open `ShadowRoot`.
-- **Full skill reference:** See `.uirig/SKILL.md` for detailed telemetry schemas.
+- **Do not bypass `uirig.config.json` budgets** (`clsMaxLimit`, `overflowPixelTolerance`, `touchTargetMinSpacingPx`, `darkModeMaxSurfaceLuminance`) or sprinkle `data-uirig-ignore` attributes to silence legitimate failures. Fix the underlying layout, contrast, or token usage instead.
+- **Prefer design tokens over raw values:** When `suggestedToken` is present in a violation, apply the semantic CSS custom property rather than hardcoding hex colors or pixel values.
+- **Shadow DOM paths:** Selectors formatted as `host-tag::shadow > inner-selector` indicate an element inside an open `ShadowRoot` owned by `hostComponent`.
+- **Full skill reference:** See `.uirig/SKILL.md` for detailed telemetry schemas and engine rules.

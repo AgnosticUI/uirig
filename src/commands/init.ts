@@ -2,7 +2,7 @@
  * src/commands/init.ts
  * CLI command controller initializing workspace sandbox structures.
  * Scaffolds:
- * 1. `uirig.config.json` (unified configuration & threshold budgets)
+ * 1. `uirig.config.json` (unified configuration, threshold budgets & ignore rules)
  * 2. `.uirig/session.json` (immutable SHA-256 transaction ledger)
  * 3. `.uirig/SKILL.md` (agent-ready self-healing verification loop instructions)
  */
@@ -21,42 +21,50 @@ export const DEFAULT_UIRIG_CONFIG = {
     clsMaxLimit: 0.1,
     overflowPixelTolerance: 2,
     touchTargetMinSpacingPx: 24,
+    darkModeMaxSurfaceLuminance: 0.85,
   },
   viewports: [
     { name: 'mobile', width: 375, height: 812 },
     { name: 'desktop', width: 1440, height: 900 },
   ],
+  ignore: [],
 };
 
 /**
  * Agent-ready skill manual emitted to `.uirig/SKILL.md` on `uirig init`.
  * Teaches AI coding agents (Claude Code, Cursor, Codex) how to execute
- * `uirig check --json` after UI edits and self-correct violations without context bloat.
+ * `uirig` after UI edits and self-correct violations without context bloat.
  */
 export const DEFAULT_UIRIG_SKILL_MD = `---
 name: uirig-ui-verification
-description: Deterministic live-viewport UI quality gate for design tokens, WCAG 2.1 contrast, +30% text-expansion stress overflow, and Cumulative Layout Shift (CLS).
+description: First-line-of-defense live-viewport UI quality gate for design tokens, light/dark contrast parity, geometric stress overflow, CLS, and DOM markup integrity.
 ---
 
-# \`uirig\` — Deterministic UI Verification Gate
+# \`uirig\`: Deterministic UI Verification Gate
 
-Run \`uirig\` after modifying HTML, CSS, Web Components, or UI templates to verify rendered quality in a real headless browser without screenshot diffs.
+Run \`uirig\` after modifying HTML, CSS, Web Components, or UI templates to verify rendered quality in a real headless browser before running heavier audits (\`axe-core\`, Lighthouse).
 
 ## Closed-Loop Self-Healing Workflow
 
-1. **Ensure the local dev server is running** on the URL(s) configured in \`uirig.config.json\` (\`targetUrls\`).
-2. **Execute the deterministic JSON verification gate:**
-   \`\`\`bash
-   npx uirig check --json
-   \`\`\`
-3. **Inspect \`stdout\` JSON & POSIX Exit Code:**
-   - \`0\` (\`passed: true\`): All 4 engines (\`tokens\`, \`contrast\`, \`stress\`, \`cls\`) passed. Task is complete.
-   - \`1\`: Design token drift (\`token_drift\`) or WCAG 2.1 contrast failure (\`contrast_drop\` < 4.5:1).
-   - \`2\`: Structural layout break (\`container_overflow\`, \`horizontal_scrollbar\`, \`touch_target_collision\`) or CLS budget breach (\`cls_breach\`).
-4. **Patch & Re-Verify:**
-   - Iterate over \`violations[]\` in the JSON output.
-   - Use \`selector\`, \`inShadowDom\`, \`measuredDelta\`, and \`remediationAdvice\` to fix each defect in source CSS/components.
-   - Re-run \`npx uirig check --json\` until \`exitCode\` is \`0\`.
+1. **Execute the deterministic JSON verification gate:**
+   - Using \`uirig.config.json\` (when dev server is running):
+     \`\`\`bash
+     npx uirig check --json
+     \`\`\`
+   - Or directly against a URL or standalone \`.html\` file (zero-config mode):
+     \`\`\`bash
+     npx uirig http://localhost:5173 --json
+     npx uirig ./dist/index.html --json
+     \`\`\`
+2. **Inspect \`stdout\` JSON & POSIX Exit Code:**
+   - \`0\` (\`status: "pass"\`): All 6 engines (\`tokens\`, \`contrast\`, \`dark-mode\`, \`stress\`, \`cls\`, \`dom\`) and runtime JS checks passed. Task is complete.
+   - \`1\`: Design token drift (\`tokens\`), light/dark WCAG contrast failure (\`contrast\`, \`dark-mode\`), DOM/ARIA/hygiene violation (\`dom\`), or uncaught runtime JS error.
+   - \`2\`: Structural layout break (\`stress\`: container overflow, \`100vw\` scrollbar bleed, squished avatar, \`<24px\` tap target) or CLS budget breach (\`cls\`).
+3. **Patch & Re-Verify:**
+   - Iterate over deduplicated entries in \`violations[]\`.
+   - Use \`hostComponent\`, \`offendingSelectorPath\`, \`suggestedToken\`, and \`remediationAdvice\` to patch source CSS or component templates.
+   - Prefer \`suggestedToken\` CSS custom properties over hardcoded values whenever provided.
+   - Re-run \`npx uirig check --json\` (or \`npx uirig <target> --json\`) until \`exitCode\` is \`0\`.
 `;
 
 /**
