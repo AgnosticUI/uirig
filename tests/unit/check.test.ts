@@ -1,17 +1,20 @@
 /**
  * tests/unit/check.test.ts
- * 1-to-1 unit tests for `src/commands/check.ts`.
- * Covers configuration loading, token scale validation, and POSIX exit code resolution.
+ * 1-to-1 unit & integration tests for `src/commands/check.ts`.
+ * Covers configuration loading, token scale validation, POSIX exit code resolution,
+ * and concurrent 3-context Playwright execution against local HTTP fixtures.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { createServer, type Server } from 'http';
 import {
   loadUirigConfig,
   loadTokenScale,
   evaluatePosixExitCode,
+  executeCheckCommand,
   type IViewportAuditReport,
 } from '../../src/commands/check.js';
 
@@ -29,14 +32,35 @@ function createCleanViewportReport(): IViewportAuditReport {
   };
 }
 
-describe('check.ts (Micro-Chunk 1) — Config Loader & POSIX Exit Code Evaluator', () => {
+function startFixtureServer(html: string): Promise<{ server: Server; url: string }> {
+  return new Promise((resolveServer) => {
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    });
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address !== null ? address.port : 0;
+      resolveServer({ server, url: `http://127.0.0.1:${port}` });
+    });
+  });
+}
+
+describe('check.ts — Isolated Parallel Context Dispatcher', () => {
   let tempDir: string;
+  let activeServer: Server | null = null;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'uirig-check-test-'));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    if (activeServer) {
+      await new Promise<void>((resolveClose) => {
+        activeServer?.close(() => resolveClose());
+      });
+      activeServer = null;
+    }
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -152,4 +176,125 @@ describe('check.ts (Micro-Chunk 1) — Config Loader & POSIX Exit Code Evaluator
     };
     expect(evaluatePosixExitCode([clsFail])).toBe(2);
   });
+
+    it('executes 3 isolated Playwright contexts concurrently and returns exitCode 0 for a compliant page', async () => {
+    console.log('[test:check] Running live 3-context parallel check on a compliant HTML fixture...');
+    const compliantHtml = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background-color: rgb(255, 255, 255); color: rgb(17, 24, 39); font-size: 16px; }
+            main { padding: 16px; background-color: rgb(243, 244, 246); border-radius: 8px; }
+            h1 { margin: 0 0 16px 0; font-size: 24px; color: rgb(17, 24, 39); }
+            p { margin: 0; font-size: 16px; color: rgb(17, 24, 39); }
+          </style>
+        </head>
+        <body>
+          <main>
+            <h1>Compliant Header</h1>
+            <p>All tokens, contrast ratios, layout bounds, and CLS budgets pass cleanly.</p>
+          </main>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(compliantHtml);
+    activeServer = server;
+
+    const tokensFile = join(tempDir, 'tokens.json');
+    const configFile = join(tempDir, 'uirig.config.json');
+
+    writeFileSync(
+      tokensFile,
+      JSON.stringify({
+        colors: ['rgb(255, 255, 255)', 'rgb(17, 24, 39)', 'rgb(243, 244, 246)'],
+        spacing: ['0px', '16px'],
+        fontSizes: ['16px', '24px'],
+        radii: ['0px', '8px'],
+      }),
+      'utf8'
+    );
+
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: [url],
+        tokensPath: './tokens.json',
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1024, height: 768 }],
+      }),
+      'utf8'
+    );
+
+    const report = await executeCheckCommand({ configPath: configFile, headless: true });
+
+    expect(report.exitCode).toBe(0);
+    expect(report.summary.totalViewportsAudited).toBe(1);
+    expect(report.summary.totalTokenViolations).toBe(0);
+    expect(report.summary.totalContrastViolations).toBe(0);
+    expect(report.summary.totalStressViolations).toBe(0);
+    expect(report.summary.totalClsViolations).toBe(0);
+  });
+
+  it('detects structural overflow in Context 2 without polluting Context 1 read-only audits and returns exitCode 2', async () => {
+    console.log('[test:check] Running live 3-context parallel check on a stress-overflow fixture...');
+    const overflowHtml = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background-color: rgb(255, 255, 255); color: rgb(17, 24, 39); font-size: 16px; }
+            .cramped-box { width: 120px; padding: 8px; background-color: rgb(243, 244, 246); border-radius: 4px; }
+            .nowrap-label { display: inline-block; white-space: nowrap; font-size: 16px; color: rgb(17, 24, 39); }
+          </style>
+        </head>
+        <body>
+          <div class="cramped-box">
+            <span class="nowrap-label">Expanding Text Label</span>
+          </div>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(overflowHtml);
+    activeServer = server;
+
+    const tokensFile = join(tempDir, 'tokens.json');
+    const configFile = join(tempDir, 'uirig.config.json');
+
+    writeFileSync(
+      tokensFile,
+      JSON.stringify({
+        colors: ['rgb(255, 255, 255)', 'rgb(17, 24, 39)', 'rgb(243, 244, 246)'],
+        spacing: ['0px', '8px', '16px'],
+        fontSizes: ['16px'],
+        radii: ['0px', '4px'],
+      }),
+      'utf8'
+    );
+
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: [url],
+        tokensPath: './tokens.json',
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1024, height: 768 }],
+      }),
+      'utf8'
+    );
+
+    const report = await executeCheckCommand({ configPath: configFile, headless: true, json: true });
+
+    expect(report.exitCode).toBe(2);
+    expect(report.summary.totalTokenViolations).toBe(0);
+    expect(report.summary.totalContrastViolations).toBe(0);
+    expect(report.summary.totalStressViolations).toBeGreaterThan(0);
+  });
 });
+

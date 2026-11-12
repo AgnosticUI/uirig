@@ -1,16 +1,20 @@
 /**
  * src/commands/check.ts
  * Isolated Parallel Context Dispatcher (uirig check).
- * Orchestrates concurrent headless browser validation runs across all 4 core engines
- * (`tokens`, `contrast`, `stress`, `cls`) and maps violations to POSIX exit codes.
+ * Launches a single Playwright Chromium instance and orchestrates 3 isolated
+ * BrowserContext sessions concurrently (`Promise.all`) per target URL/viewport
+ * so read-only audits (`tokens`, `contrast`), mutated DOM fuzzing (`stress`),
+ * and pre-navigation `PerformanceObserver` monitoring (`cls`) execute without
+ * cross-tool pollution or multiple browser startup overhead.
  */
 
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
-import type { ITokenScaleConfig, ITokenViolation } from '../core/tokens.js';
-import type { IContrastViolation } from '../core/matrix.js';
-import type { IGeometricViolation } from '../core/adversary.js';
-import type { IClsEvaluationResult } from '../core/cls.js';
+import { chromium, type Browser } from 'playwright';
+import { crawlPageTokens, type ITokenScaleConfig, type ITokenViolation } from '../core/tokens.js';
+import { auditPageContrast, type IContrastViolation } from '../core/matrix.js';
+import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
+import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '../core/cls.js';
 import { formatTelemetryLog, paint } from '../utils/formatter.js';
 
 /**
@@ -45,6 +49,8 @@ export interface ICheckCommandOptions {
   configPath?: string;
   json?: boolean;
   headless?: boolean;
+  /** Optional inline token scale override (useful for programmatic calls & tests). */
+  tokenScaleOverride?: ITokenScaleConfig;
 }
 
 export interface IViewportAuditReport {
@@ -84,14 +90,13 @@ export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
 /**
  * Reads and validates `uirig.config.json` from disk.
  * Throws descriptive `ERR_CONFIG_*` errors so CLI callers can exit with POSIX code `1`.
- *
- * @param configPath - Path to `uirig.config.json` (defaults to `./uirig.config.json`).
- * @returns Validated `IUirigConfig` object.
  */
 export function loadUirigConfig(
   configPath: string = resolve(process.cwd(), 'uirig.config.json')
 ): IUirigConfig {
-  console.log(formatTelemetryLog('check:config', `Loading configuration from ${paint(configPath, 'cyan')}...`));
+  console.log(
+    formatTelemetryLog('check:config', `Loading configuration from ${paint(configPath, 'cyan')}...`)
+  );
 
   if (!existsSync(configPath)) {
     throw new Error(
@@ -121,7 +126,9 @@ export function loadUirigConfig(
   }
 
   if (typeof candidate.tokensPath !== 'string' || candidate.tokensPath.trim().length === 0) {
-    throw new Error(`ERR_CONFIG_SCHEMA: 'tokensPath' must be a valid file path string in ${configPath}.`);
+    throw new Error(
+      `ERR_CONFIG_SCHEMA: 'tokensPath' must be a valid file path string in ${configPath}.`
+    );
   }
 
   if (!Array.isArray(candidate.viewports) || candidate.viewports.length === 0) {
@@ -159,15 +166,14 @@ export function loadUirigConfig(
 /**
  * Loads and validates the approved design token scale JSON referenced by `tokensPath`.
  * Resolves relative paths against the directory containing `uirig.config.json`.
- *
- * @param tokensPath - Relative or absolute path to the token scale JSON file.
- * @param configFilePath - Path to `uirig.config.json` used as the base directory for relative resolution.
- * @returns Validated `ITokenScaleConfig`.
  */
 export function loadTokenScale(tokensPath: string, configFilePath: string): ITokenScaleConfig {
   const resolvedTokensPath = resolve(dirname(configFilePath), tokensPath);
   console.log(
-    formatTelemetryLog('check:tokens', `Loading design token scale from ${paint(resolvedTokensPath, 'cyan')}...`)
+    formatTelemetryLog(
+      'check:tokens',
+      `Loading design token scale from ${paint(resolvedTokensPath, 'cyan')}...`
+    )
   );
 
   if (!existsSync(resolvedTokensPath)) {
@@ -209,13 +215,7 @@ export function loadTokenScale(tokensPath: string, configFilePath: string): ITok
 
 /**
  * Evaluates an array of viewport audit reports and determines the deterministic
- * POSIX exit code for CI/CD pipelines:
- * - Returns `2` if any viewport recorded geometric stress violations OR a CLS budget breach.
- * - Returns `1` if any viewport recorded WCAG contrast violations OR design token drift.
- * - Returns `0` if every viewport passed all 4 checks cleanly.
- *
- * @param results - Completed per-viewport audit reports.
- * @returns Deterministic POSIX exit code (`0`, `1`, or `2`).
+ * POSIX exit code for CI/CD pipelines (`0` = pass, `1` = token/contrast, `2` = stress/CLS).
  */
 export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExitCode {
   let hasStructuralOrClsFailure = false;
@@ -237,4 +237,183 @@ export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExi
     return 1;
   }
   return 0;
+}
+/**
+ * Audits a single `(url, viewport)` target across 3 isolated Playwright `BrowserContext`
+ * sessions running concurrently (`Promise.all`) inside one shared Chromium browser:
+ *
+ * - **Context 1 (Read-Only):** Runs `crawlPageTokens()` + `auditPageContrast()` without DOM mutation.
+ * - **Context 2 (Mutated Fuzzing):** Runs `runGeometricStressAudit()` (+30% pseudo-localization).
+ * - **Context 3 (CLS Monitor):** Installs `prepareClsObserver()` prior to `page.goto()` and runs `collectPageCls()`.
+ */
+export async function auditViewportInParallel(
+  browser: Browser,
+  url: string,
+  viewport: IViewportConfig,
+  tokenScale: ITokenScaleConfig,
+  budgets: IThresholdBudgets
+): Promise<IViewportAuditReport> {
+  const viewportSize = { width: viewport.width, height: viewport.height };
+  console.log(
+    formatTelemetryLog(
+      'check:dispatch',
+      `Spawning 3 isolated contexts for ${paint(url, 'cyan')} @ ${paint(
+        `${viewport.name} (${viewport.width}x${viewport.height})`,
+        'bold',
+        'green'
+      )}...`
+    )
+  );
+
+  // Track 1: Read-Only Audits (`tokens` + `contrast`)
+  const runReadOnlyTrack = async (): Promise<{
+    tokenViolations: ITokenViolation[];
+    contrastViolations: IContrastViolation[];
+  }> => {
+    const context = await browser.newContext({ viewport: viewportSize });
+    try {
+      const page = await context.newPage();
+      await page.goto(url, { waitUntil: 'networkidle' });
+      const tokenViolations = await crawlPageTokens(page, tokenScale);
+      const contrastViolations = await auditPageContrast(page);
+      return { tokenViolations, contrastViolations };
+    } finally {
+      await context.close();
+    }
+  };
+
+  // Track 2: Mutated DOM Fuzzing (`stress`)
+  const runStressTrack = async (): Promise<IGeometricViolation[]> => {
+    const context = await browser.newContext({ viewport: viewportSize });
+    try {
+      const page = await context.newPage();
+      await page.goto(url, { waitUntil: 'networkidle' });
+      return await runGeometricStressAudit(page, {
+        overflowPixelTolerance: budgets.overflowPixelTolerance,
+        touchTargetMinSpacingPx: budgets.touchTargetMinSpacingPx,
+      });
+    } finally {
+      await context.close();
+    }
+  };
+
+  // Track 3: Pre-Navigation Layout Shift Monitor (`cls`)
+  const runClsTrack = async (): Promise<IClsEvaluationResult> => {
+    const context = await browser.newContext({ viewport: viewportSize });
+    try {
+      const page = await context.newPage();
+      await prepareClsObserver(page);
+      await page.goto(url, { waitUntil: 'networkidle' });
+      return await collectPageCls(page, budgets.clsMaxLimit);
+    } finally {
+      await context.close();
+    }
+  };
+
+  const [readOnlyResult, stressViolations, clsEvaluation] = await Promise.all([
+    runReadOnlyTrack(),
+    runStressTrack(),
+    runClsTrack(),
+  ]);
+
+  return {
+    url,
+    viewport,
+    tokenViolations: readOnlyResult.tokenViolations,
+    contrastViolations: readOnlyResult.contrastViolations,
+    stressViolations,
+    clsEvaluation,
+  };
+}
+
+/**
+ * Main orchestration entry point for `uirig check`.
+ * Loads configuration, launches a single Chromium browser binary, runs all configured
+ * `(url, viewport)` targets through `auditViewportInParallel()`, computes aggregate counts
+ * and POSIX exit code (`0`, `1`, or `2`), and guarantees browser teardown.
+ */
+export async function executeCheckCommand(
+  options: ICheckCommandOptions = {}
+): Promise<ICheckExecutionReport> {
+  const resolvedConfigPath = resolve(
+    process.cwd(),
+    options.configPath ?? 'uirig.config.json'
+  );
+  const previousJsonMode = process.env.UIRIG_JSON_MODE;
+
+  if (options.json) {
+    process.env.UIRIG_JSON_MODE = '1';
+  }
+
+  let browser: Browser | null = null;
+
+  try {
+    const config = loadUirigConfig(resolvedConfigPath);
+    const tokenScale =
+      options.tokenScaleOverride ?? loadTokenScale(config.tokensPath, resolvedConfigPath);
+
+    const headless = options.headless ?? true;
+    console.log(
+      formatTelemetryLog(
+        'check:browser',
+        `Launching single Chromium instance (headless=${String(headless)})...`
+      )
+    );
+    browser = await chromium.launch({ headless });
+
+    const results: IViewportAuditReport[] = [];
+
+    for (const url of config.targetUrls) {
+      for (const viewport of config.viewports) {
+        const viewportReport = await auditViewportInParallel(
+          browser,
+          url,
+          viewport,
+          tokenScale,
+          config.thresholdBudgets
+        );
+        results.push(viewportReport);
+      }
+    }
+
+    const exitCode = evaluatePosixExitCode(results);
+
+    const summary = {
+      totalViewportsAudited: results.length,
+      totalTokenViolations: results.reduce((sum, r) => sum + r.tokenViolations.length, 0),
+      totalContrastViolations: results.reduce((sum, r) => sum + r.contrastViolations.length, 0),
+      totalStressViolations: results.reduce((sum, r) => sum + r.stressViolations.length, 0),
+      totalClsViolations: results.reduce(
+        (sum, r) => sum + (r.clsEvaluation.violation ? 1 : 0),
+        0
+      ),
+    };
+
+    const exitBadge =
+      exitCode === 0
+        ? paint('0 (PASS)', 'bold', 'green')
+        : paint(`${exitCode} (FAIL)`, 'bold', 'red');
+    console.log(
+      formatTelemetryLog('check:complete', `Audit finished. POSIX Exit Code: ${exitBadge}`)
+    );
+
+    return {
+      timestamp: new Date().toISOString(),
+      configPath: resolvedConfigPath,
+      exitCode,
+      results,
+      summary,
+    };
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+    if (options.json) {
+      if (previousJsonMode === undefined) {
+        delete process.env.UIRIG_JSON_MODE;
+      } else {
+        process.env.UIRIG_JSON_MODE = previousJsonMode;
+      }
+    }
+  }
 }
