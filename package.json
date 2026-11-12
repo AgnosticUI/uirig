@@ -23,8 +23,8 @@
     "typecheck:playground": "tsc --noEmit -p playground/tsconfig.json",
     "typecheck:all": "npm run typecheck && npm run typecheck:playground",
     "playground:dev": "vite playground",
-    "playground:spotcheck": "vitest run tests/integration/playground-spotcheck.test.ts",
-    "playground:inspect": "UIRIG_HEADED=1 vitest run tests/integration/playground-spotcheck.test.ts",
+    "playground:test": "vitest run tests/integration/playground-spotcheck.test.ts",
+    "playground:test:headed": "UIRIG_HEADED=1 vitest run tests/integration/playground-spotcheck.test.ts",
     "playwright:verbose": "DEBUG=pw:protocol npx playwright test"
   },
   "keywords": [

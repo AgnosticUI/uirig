@@ -132,6 +132,24 @@ npx uirig check --json
 ```
 Each item in `violations[]` includes `engine`, `selector`, `inShadowDom`, `measuredDelta`, and actionable `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
 
+### 4. Local Development & Playground
+
+Complete the [Prerequisites](#prerequisites) and [Local Setup](#local-setup) steps first, then use the scripts below to develop and verify changes locally:
+
+```bash
+# Typecheck and run the unit test suite
+npm run typecheck:all && npm test
+
+# Start the interactive Vite + Lit playground
+npm run playground:dev
+
+# Run end-to-end playground verification (headless)
+npm run playground:test
+
+# Run end-to-end playground verification with a visible browser window
+npm run playground:test:headed
+```
+
 ---
 
 ## License
