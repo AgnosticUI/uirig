@@ -7,7 +7,7 @@
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { dirname, resolve } from 'path';
 import type { ICheckExecutionReport } from '../commands/check.js';
-import { formatTelemetryLog, paint } from './formatter.js';
+import { logTelemetry, paint } from './formatter.js';
 
 /**
  * Default relative path where `uirig check` writes the standalone GitHub PR comment artifact.
@@ -187,11 +187,9 @@ export function writeGithubPrCommentReport(
 ): string {
   const markdown = formatGithubPrCommentMarkdown(report);
   atomicWriteFile(outputPath, markdown);
-  console.log(
-    formatTelemetryLog(
-      'fs:reporter',
-      `Wrote Markdown PR comment report to ${paint(outputPath, 'cyan')}`
-    )
+  logTelemetry(
+    'fs:reporter',
+    `Wrote Markdown PR comment report to ${paint(outputPath, 'cyan')}`
   );
   return outputPath;
 }
