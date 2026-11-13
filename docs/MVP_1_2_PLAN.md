@@ -18,7 +18,7 @@
 
 ## Task 1.2.1 — Issue #3: Restore Colored `stderr` Telemetry Under `--json`
 
-* **GitHub Issue:** https://github.com
+* **GitHub Issue:** https://github.com/AgnosticUI/uirig/issues/3
 * **Problem Statement:** Running `npx @rlevin/uirig <target> --json` strips all ANSI color codes from terminal output (`isColorDisabled()` currently returns `true` whenever `UIRIG_JSON_MODE` is enabled).
 * **Architectural Rationale ("The Why"):**
   * Diagnostic telemetry (`logTelemetry()`) already routes to `stderr` (`console.error`) when `UIRIG_JSON_MODE` is active, while `formatAgenticJsonStream()` writes strictly to `stdout` (`process.stdout.write`) and never invokes `paint()`.
@@ -34,7 +34,7 @@
 
 ## Task 1.2.2 — Issue #4: Expose Structured Console Violation Report in Core CLI
 
-* **GitHub Issue:** https://github.com
+* **GitHub Issue:** https://github.com/AgnosticUI/uirig/issues/4
 * **Problem Statement:** Outside of `playground/vite.config.ts` (`uirigAutoSpotCheckPlugin`), standard CLI runs (`npx @rlevin/uirig <target>`) print only aggregate violation counts (`Violations detected: 274`) without showing the offending CSS/Shadow-DOM selectors or measured deltas unless the user opens `.uirig/github_pr_comment.md` or parses `--json`.
 * **Architectural Rationale ("The Why"):**
   * Developers iterating locally need immediate, scannable feedback on *which* selector failed and *why* (e.g., `div#contrast-token-trap (2.31:1 < 4.5:1)`).
@@ -48,7 +48,7 @@
 
 ## Task 1.2.3 — Issue #5: Add `--selectors` (`-s`) Flag for Component-Scoped Audits
 
-* **GitHub Issue:** https://github.com
+* **GitHub Issue:** https://github.com/AgnosticUI/uirig/issues/5
 * **Problem Statement:** Auditing an entire page (`npx @rlevin/uirig http://localhost:5173`) produces noisy output (e.g., 274 hits across global navs, footers, or legacy widgets) when a developer or AI agent is iterating on one specific component or region.
 * **Architectural Rationale ("The Why"):**
   * Scoping audits via `--selectors "#foo, .bar, [data-qux='yo']"` (and repeatable `-s "#foo" -s ".bar"`) lets developers isolate a single Web Component, card, or form without modifying `uirig.config.json`.
@@ -73,7 +73,7 @@
 
 ## Task 1.2.4 — Issue #2: Repo-Wide Audit of `npx uirig` -> `npx @rlevin/uirig`
 
-* **GitHub Issue:** https://github.com
+* **GitHub Issue:** https://github.com/AgnosticUI/uirig/issues/2
 * **Problem Statement:** Now that the package is published under the scoped npm name `@rlevin/uirig`, remaining `npx uirig` references in documentation, CLI help text, and generated `.uirig/SKILL.md` templates can fail or resolve to an unintended unscoped package name when external users run `npx`.
 * **Architectural Rationale ("The Why"):**
   * Performing this sweep **after** Tasks 1.2.1–1.2.3 ensures we update `README.md`, `AGENTS.md`, `src/commands/init.ts`, and `src/index.ts` in one pass—simultaneously switching `npx uirig` -> `npx @rlevin/uirig` and documenting `--verbose` and `--selectors` (`-s`).
