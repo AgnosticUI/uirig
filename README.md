@@ -1,4 +1,4 @@
-# `uirig`
+# `uirig` (`@rlevin/uirig`)
 
 **The first line of defense for AI-generated UIs and Web Components.**
 
@@ -13,25 +13,27 @@
 * **Catches Design-System Drift `axe` Misses:** `axe` won't tell you that an AI agent hardcoded `#3b82f6` instead of `--ag-color-primary`, or that `+30%` longer German translation copy overflowed `<ag-card>`.
 * **Pierces Web Component Shadow DOMs:** `Lighthouse` won't climb inside a Lit or Stencil `ShadowRoot` to tell a coding agent *which custom element* (`hostComponent`) broke dark-mode contrast or layout bounds.
 * **Zero Screenshot Diff Flakiness:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast, and W3C session-window CLS scores instead of noisy pixel diffs.
-* **Zero-Config First Run:** Point `npx uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required.
+* **Zero-Config First Run:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required.
 * **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout`.
 
 ---
 
 ## Quick Start (Zero Config)
 
-Run `uirig` immediately against any running URL or local `.html` file (no `uirig.config.json` required):
+Run `uirig` immediately against any running URL or local `.html` file (no installation or `uirig.config.json` required):
 
 ```bash
 # Audit a live dev server
-npx uirig http://localhost:5173
+npx @rlevin/uirig http://localhost:5173
 
 # Audit a standalone AI-generated HTML file (auto-served on an ephemeral local port)
-npx uirig ./dist/index.html
+npx @rlevin/uirig ./dist/index.html
 
 # Stream deduplicated JSON remediation diffs for an AI coding agent
-npx uirig http://localhost:5173 --json
+npx @rlevin/uirig http://localhost:5173 --json
 ```
+
+*(If `@rlevin/uirig` is already installed in your repository's `node_modules`, you can run `npx uirig ...` directly.)*
 
 ---
 
@@ -56,7 +58,7 @@ npx uirig http://localhost:5173 --json
 * **Playwright Chromium browser binary**
 
 ```bash
-npm install -D uirig
+npm install -D @rlevin/uirig
 npx playwright install chromium
 ```
 
@@ -103,7 +105,7 @@ Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comm
 
    <!-- Exempt all engines on a third-party widget -->
    <section data-uirig-ignore="all">Legacy third-party embed</section>
-  ```
+   ```
 
 2. **In `uirig.config.json` (`ignore`):** Exempt specific selectors or route URLs (including trailing `*` wildcards) centrally without touching markup:
    ```json
@@ -118,7 +120,9 @@ Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comm
 
 ## CLI Command Reference
 
-### Instant Target Run (`npx uirig <url-or-file> [options]`)
+*(Replace `npx uirig` with `npx @rlevin/uirig` when running without a local `node_modules` install.)*
+
+### Instant Target Run (`npx @rlevin/uirig <url-or-file> [options]`)
 Runs all 6 verification engines against a single URL or local `.html` path using `uirig.config.json` if present, or sensible built-in defaults if not.
 
 ### `uirig check [options]`
@@ -164,7 +168,7 @@ Each deduplicated entry in `violations[]` includes `engine`, `hostComponent`, `o
 - name: Run uirig UI verification gate
   run: |
     npm run build
-    npx uirig ./dist/index.html
+    npx @rlevin/uirig ./dist/index.html
 ```
 On every `uirig check` run, `.uirig/github_pr_comment.md` is generated and ready to post onto Pull Requests.
 
