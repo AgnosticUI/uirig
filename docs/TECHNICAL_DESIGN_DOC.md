@@ -95,7 +95,7 @@ The fundamental state tracking ledger enforcing chronological synchronization in
 
 ```json
 {
-  "\$schema": "http://json-schema.org",
+  "$schema": "http://json-schema.org",
   "title": "uirigSessionManifest",
   "type": "object",
   "properties": {
@@ -132,7 +132,7 @@ The fundamental state tracking ledger enforcing chronological synchronization in
           },
           "variantName": { "type": "string" },
           "filePointer": { "type": "string" },
-          "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}\$" },
+          "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "timestamp": { "type": "string", "format": "date-time" },
           "status": { "type": "string", "enum": ["stable", "active", "drifting"] }
         },
@@ -151,7 +151,7 @@ Optional when passing a direct target (`npx uirig <url-or-file>`), and used in C
 
 ```json
 {
-  "\$schema": "https://json-schema.org",
+  "$schema": "https://json-schema.org",
   "title": "uirigConfigurationProfile",
   "type": "object",
   "properties": {

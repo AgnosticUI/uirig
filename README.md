@@ -73,7 +73,7 @@ npx uirig init
 
 ```json
 {
-  "\$schema": "https://json-schema.org",
+  "$schema": "https://json-schema.org",
   "targetUrls": ["http://localhost:5173"],
   "tokensPath": "./config/default_tokens.json",
   "thresholdBudgets": {
