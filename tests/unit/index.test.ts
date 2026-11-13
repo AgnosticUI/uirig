@@ -3,7 +3,8 @@
  * 1-to-1 unit tests for `src/index.ts`.
  * Verifies:
  * 1. Pure CLI argument parsing (`parseCliArgs`) across `init`, `manifest`, `check`,
- *    direct zero-config `<url-or-file>` targets, `--config`, `--verbose`, `--json`, `--headed`, `--help`, `--version`, and invalid flags.
+ *    direct zero-config `<url-or-file>` targets, `--selectors` / `-s`, `--config`,
+ *    `--verbose`, `--json`, `--headed`, `--help`, `--version`, and invalid flags.
  * 2. Subcommand-specific `--help` topic parsing and `renderHelpText(topic?)` output for all 9 commands.
  * 3. Command dispatching and deterministic POSIX exit codes (`0`, `1`, `2`) in `runCli()`.
  */
@@ -51,6 +52,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: undefined,
       only: undefined,
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: false,
@@ -63,6 +65,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: undefined,
       only: undefined,
+      selectors: undefined,
       configPath: './custom.json',
       verbose: true,
       json: true,
@@ -73,6 +76,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: undefined,
       only: undefined,
+      selectors: undefined,
       configPath: 'dir/uirig.config.json',
       verbose: false,
       json: false,
@@ -86,6 +90,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: 'http://localhost:5173',
       only: undefined,
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: false,
@@ -96,6 +101,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: './dist/index.html',
       only: undefined,
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: true,
@@ -106,6 +112,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: './dist/index.html',
       only: 'contrast',
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: false,
@@ -116,6 +123,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: 'https://example.com',
       only: undefined,
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: false,
@@ -123,7 +131,35 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     });
   });
 
-    it('returns command=unknown with descriptive reason on invalid commands or missing flag values', () => {
+    it('parses --selectors and -s flags (comma-separated, repeatable, equals syntax) and rejects empty values', () => {
+    console.log('\n--- START TEST: --selectors / -s Flag Parsing & Deduplication ---');
+    expect(parseCliArgs(['check', '--selectors=#hero, .card, [data-qux="a, b"]'])).toEqual({
+      command: 'check',
+      target: undefined,
+      only: undefined,
+      selectors: ['#hero', '.card', '[data-qux="a, b"]'],
+      configPath: undefined,
+      verbose: false,
+      json: false,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['tokens', './dist/index.html', '-s', 'ag-button', '-s=.badge', '-s', 'ag-button'])).toEqual({
+      command: 'check',
+      target: './dist/index.html',
+      only: 'tokens',
+      selectors: ['ag-button', '.badge'],
+      configPath: undefined,
+      verbose: false,
+      json: false,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['check', '--selectors=']).command).toBe('unknown');
+    expect(parseCliArgs(['check', '-s']).command).toBe('unknown');
+  });
+
+  it('returns command=unknown with descriptive reason on invalid commands or missing flag values', () => {
     console.log('\n--- START TEST: Invalid Command & Missing Flag Value Detection ---');
     const badCmd = parseCliArgs(['deploy']);
     expect(badCmd.command).toBe('unknown');
@@ -172,13 +208,15 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
 
     expect(await runCli(['check'], { check: checkSpy })).toBe(0);
     expect(
-      await runCli(['check', '--config=custom.json', '--verbose', '--json', '--headed'], {
-        check: checkSpy,
-      })
+      await runCli(
+        ['check', '--config=custom.json', '-s', '#card, .btn', '--verbose', '--json', '--headed'],
+        { check: checkSpy }
+      )
     ).toBe(1);
     expect(checkSpy).toHaveBeenLastCalledWith({
       target: undefined,
       configPath: 'custom.json',
+      selectors: ['#card', '.btn'],
       verbose: true,
       json: true,
       only: undefined,
@@ -190,6 +228,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     expect(checkSpy).toHaveBeenLastCalledWith({
       target: './dist/index.html',
       configPath: undefined,
+      selectors: undefined,
       verbose: false,
       json: true,
       only: undefined,
@@ -197,7 +236,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     });
   });
 
-  it('returns POSIX exit code 1 and writes to stderr on unknown commands or thrown runtime errors', async () => {
+    it('returns POSIX exit code 1 and writes to stderr on unknown commands or thrown runtime errors', async () => {
     console.log('\n--- START TEST: Fatal Runtime Error & Unknown Command Exit Code 1 ---');
     const stderrSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -232,6 +271,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: undefined,
       only: 'tokens',
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: true,
@@ -242,6 +282,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: undefined,
       only: 'contrast',
+      selectors: undefined,
       configPath: 'custom.json',
       verbose: true,
       json: false,
@@ -252,6 +293,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: undefined,
       only: 'stress',
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: false,
@@ -262,6 +304,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: undefined,
       only: 'cls',
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: false,
@@ -272,6 +315,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: './dist/index.html',
       only: 'dark-mode',
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: true,
@@ -282,6 +326,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: './dist/index.html',
       only: 'dom',
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: true,
@@ -292,6 +337,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       command: 'check',
       target: undefined,
       only: 'contrast',
+      selectors: undefined,
       configPath: undefined,
       verbose: false,
       json: false,
@@ -312,6 +358,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       target: undefined,
       configPath: undefined,
       only: 'contrast',
+      selectors: undefined,
       verbose: true,
       json: false,
       headless: true,

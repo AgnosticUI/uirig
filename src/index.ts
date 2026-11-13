@@ -2,10 +2,10 @@
  * src/index.ts
  * Main system entry point and zero-dependency CLI argument parser/router for `uirig`.
  * Supports:
- * - `uirig <url-or-file> [--only=<tool>] [--config=<path>] [--verbose] [--json] [--headed]`
+ * - `uirig <url-or-file> [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]`
  * - `uirig init`
- * - `uirig check [<url-or-file>] [--only=<tool>] [--config=<path>] [--verbose] [--json] [--headed]`
- * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--config=<path>] [--verbose] [--json] [--headed]`
+ * - `uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]`
+ * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]`
  * - `uirig manifest`
  * - `uirig --help` / `uirig <command> --help` / `uirig --version`
  */
@@ -20,6 +20,7 @@ import {
 } from './commands/check.js';
 import { executeManifestCommand } from './commands/manifest.js';
 import { logTelemetry, paint } from './utils/formatter.js';
+import { parseSelectorList } from './utils/scope.js';
 
 export const UIRIG_VERSION = '0.1.0';
 
@@ -42,11 +43,12 @@ interface ISubcommandHelpSpec {
 }
 
 const SHARED_AUDIT_OPTIONS = [
-  '--config=<path>     Path to uirig.config.json (also supports: --config <path>)',
-  '--verbose           Print individual failing selectors and details beneath each engine',
-  '--json              Route diagnostic logs to stderr and emit deduplicated JSON to stdout',
-  '--headed            Launch Chromium with a visible browser window for local inspection',
-  '-h, --help          Show this command help page',
+  '-s, --selectors=<csv>  Filter element checks to matching CSS selectors (repeatable)',
+  '--config=<path>        Path to uirig.config.json (also supports: --config <path>)',
+  '--verbose              Print individual failing selectors and details beneath each engine',
+  '--json                 Route diagnostic logs to stderr and emit deduplicated JSON to stdout',
+  '--headed               Launch Chromium with a visible browser window for local inspection',
+  '-h, --help             Show this command help page',
 ];
 
 const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
@@ -66,14 +68,14 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   check: {
     summary: 'Run all 6 verification engines concurrently across configured or direct targets in isolated contexts.',
-    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
     mechanics: [
       'Launches a single headless Chromium instance and isolates each (url, viewport) pair in a fresh BrowserContext.',
       'Automatically serves local .html files on an ephemeral 127.0.0.1 HTTP server when given a file path.',
       'Captures uncaught runtime pageerror and console.error exceptions and writes .uirig/github_pr_comment.md.',
     ],
     options: [
-      '--only=<tool>       Filter execution to one engine: tokens | contrast | dark-mode | stress | cls | dom',
+      '--only=<tool>          Filter execution to one engine: tokens | contrast | dark-mode | stress | cls | dom',
       ...SHARED_AUDIT_OPTIONS,
     ],
     exitCodes: [
@@ -83,13 +85,13 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     ],
     examples: [
       'npx @rlevin/uirig check',
-      'npx @rlevin/uirig check ./dist/index.html --verbose',
+      'npx @rlevin/uirig check ./dist/index.html --selectors="#hero, .card" --verbose',
       'npx @rlevin/uirig check --only=dark-mode --json',
     ],
   },
   tokens: {
     summary: 'Audit Light DOM and open ShadowRoot computed styles against your design token scale.',
-    usage: 'uirig tokens [<url-or-file>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
     mechanics: [
       'Climbs Light DOM and nested Web Component ShadowRoot trees to inspect rendered colors, spacing, font sizes, and radii.',
       'Attributes violations to the nearest custom element hostComponent and respects data-uirig-ignore="tokens".',
@@ -100,13 +102,13 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       '1                   Hardcoded off-scale values detected or config error',
     ],
     examples: [
-      'npx @rlevin/uirig tokens http://localhost:5173 --verbose',
+      'npx @rlevin/uirig tokens http://localhost:5173 --selectors="ag-button" --verbose',
       'npx @rlevin/uirig tokens --config=./uirig.config.json --json',
     ],
   },
   contrast: {
     summary: 'Verify WCAG 2.1 AA rendered luminance contrast (>= 4.5:1) using Porter-Duff alpha compositing.',
-    usage: 'uirig contrast [<url-or-file>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
     mechanics: [
       'Walks Light DOM and ShadowRoot.host ancestors to composite translucent backgrounds before computing luminance contrast.',
       'Computes the nearest passing design system color token (suggestedToken) when tokensPath is configured.',
@@ -117,13 +119,14 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       '1                   One or more text nodes fell below required contrast ratios',
     ],
     examples: [
-      'npx @rlevin/uirig contrast ./dist/index.html --verbose',
+      'npx @rlevin/uirig contrast ./dist/index.html -s "#pricing" --verbose',
       'npx @rlevin/uirig contrast http://localhost:5173 --json',
     ],
   },
-  'dark-mode': {
+
+    'dark-mode': {
     summary: 'Emulate dark color scheme / [data-theme="dark"] and audit dark contrast & un-inverted bright surfaces.',
-    usage: 'uirig dark-mode [<url-or-file>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
     mechanics: [
       'Forces prefers-color-scheme: dark and toggles data-theme="dark" on <html> inside an isolated browser context.',
       'Re-runs Porter-Duff contrast checks and flags large surfaces stranded above 0.85 relative luminance.',
@@ -140,7 +143,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   stress: {
     summary: 'Fuzz text with +30% expansion and space-free strings to catch layout overflow, bleed, and tiny tap targets.',
-    usage: 'uirig stress [<url-or-file>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
     mechanics: [
       'Injects +30% longer copy and unbreakable email/URL tokens to test flex/grid resilience and container clipping.',
       'Checks horizontal scrollbar bleed (100vw), squished avatars, stuck opacity: 0 elements, and 24x24px minimum tap targets.',
@@ -174,7 +177,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   dom: {
     summary: 'Audit Light + Shadow DOM for broken ARIA/label IDs, broken media, unsafe links, and prompt-injection traps.',
-    usage: 'uirig dom [<url-or-file>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
     mechanics: [
       'Verifies aria-labelledby / label[for] ID resolution, accessible names on controls, and loaded <img> dimensions.',
       'Flags javascript: URIs, target="_blank" without rel="noopener", and invisible AI prompt-injection text.',
@@ -200,6 +203,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     examples: ['npx @rlevin/uirig manifest'],
   },
 };
+
 export const CLI_HELP_TEXT = `
 ${paint('uirig', 'bold', 'cyan')} v${UIRIG_VERSION}: The first line of defense for AI-generated UIs and Web Components
 
@@ -219,6 +223,7 @@ ${paint('COMMANDS:', 'bold')}
   manifest                        Print ASCII repository tree blueprint (excluding blocklisted dirs)
 
 ${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / cls / dom):', 'bold')}
+  -s, --selectors=<csv>           Filter element checks to matching CSS selectors (repeatable)
   --config=<path>                 Path to uirig.config.json (also supports: --config <path>)
   --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls | dom
   --verbose                       Print individual failing selectors and details beneath each engine
@@ -235,11 +240,6 @@ ${paint('POSIX EXIT CODES:', 'bold')}
   2                               Structural layout break (overflow/collision) or CLS budget breach
 `;
 
-/**
- * Renders either the top-level CLI help banner or an ANSI-styled subcommand manual
- * when a valid topic (`init`, `check`, `tokens`, `contrast`, `dark-mode`, `stress`,
- * `cls`, `dom`, `manifest`) is supplied.
- */
 export function renderHelpText(topic?: string): string {
   if (!topic) {
     return CLI_HELP_TEXT.trim();
@@ -283,6 +283,7 @@ export type ParsedCliCommand =
       command: 'check';
       target?: string;
       only?: AuditToolName;
+      selectors?: string[];
       configPath?: string;
       verbose: boolean;
       json: boolean;
@@ -290,10 +291,6 @@ export type ParsedCliCommand =
     }
   | { command: 'unknown'; rawCommand: string; reason: string };
 
-/**
- * Determines whether a positional CLI argument looks like a direct HTTP(S) URL
- * or local `.html` / path target (e.g. `http://localhost:5173`, `./dist/index.html`).
- */
 export function isDirectTargetArg(arg: string): boolean {
   const trimmed = arg.trim();
   if (!trimmed || trimmed.startsWith('-')) {
@@ -308,10 +305,6 @@ export function isDirectTargetArg(arg: string): boolean {
   );
 }
 
-/**
- * Parses shared audit flags (`--config`, `--only`, `--verbose`, `--json`, `--headed`) and optional
- * positional `<url-or-file>` target for `uirig <target>`, `uirig check`, and standalone engines.
- */
 function parseAuditCommandArgs(
   rawSubcommand: string,
   restArgs: string[],
@@ -321,6 +314,7 @@ function parseAuditCommandArgs(
   let target: string | undefined = initialTarget;
   let configPath: string | undefined;
   let only: AuditToolName | undefined = presetOnly;
+  const collectedSelectors: string[] = [];
   let verbose = false;
   let json = false;
   let headless = true;
@@ -334,6 +328,38 @@ function parseAuditCommandArgs(
       verbose = true;
     } else if (token === '--headed') {
       headless = false;
+    } else if (token.startsWith('--selectors=') || token.startsWith('-s=')) {
+      const rawVal = token.startsWith('--selectors=')
+        ? token.slice('--selectors='.length)
+        : token.slice('-s='.length);
+      const parsed = parseSelectorList(rawVal);
+      if (parsed.length === 0) {
+        return {
+          command: 'unknown',
+          rawCommand: rawSubcommand,
+          reason: 'Missing CSS selector value after --selectors=',
+        };
+      }
+      collectedSelectors.push(...parsed);
+    } else if (token === '--selectors' || token === '-s') {
+      const nextToken = restArgs.at(i + 1);
+      if (!nextToken || nextToken.startsWith('-')) {
+        return {
+          command: 'unknown',
+          rawCommand: rawSubcommand,
+          reason: `Missing CSS selector value after ${token}`,
+        };
+      }
+      const parsed = parseSelectorList(nextToken);
+      if (parsed.length === 0) {
+        return {
+          command: 'unknown',
+          rawCommand: rawSubcommand,
+          reason: `Empty CSS selector value after ${token}`,
+        };
+      }
+      collectedSelectors.push(...parsed);
+      i++;
     } else if (token.startsWith('--only=')) {
       const toolValue = token.slice('--only='.length).trim() as AuditToolName;
       if (!AUDIT_TOOL_NAMES.has(toolValue)) {
@@ -379,10 +405,14 @@ function parseAuditCommandArgs(
     }
   }
 
+  const uniqueSelectors =
+    collectedSelectors.length > 0 ? Array.from(new Set(collectedSelectors)) : undefined;
+
   return {
     command: 'check',
     target,
     only,
+    selectors: uniqueSelectors,
     configPath,
     verbose,
     json,
@@ -390,10 +420,6 @@ function parseAuditCommandArgs(
   };
 }
 
-/**
- * Pure CLI argument parser that converts `process.argv.slice(2)` into a strongly
- * typed `ParsedCliCommand` discriminated union.
- */
 export function parseCliArgs(argv: string[]): ParsedCliCommand {
   if (argv.length === 0) {
     return { command: 'help' };
@@ -453,9 +479,6 @@ export interface ICliCommandHandlers {
   check?: typeof executeCheckCommand;
 }
 
-/**
- * Executes a parsed CLI command sequence and resolves to a deterministic POSIX exit code.
- */
 export async function runCli(
   argv: string[],
   handlers: ICliCommandHandlers = {}
@@ -495,6 +518,7 @@ export async function runCli(
       target: parsed.target,
       configPath: parsed.configPath,
       only: parsed.only,
+      selectors: parsed.selectors,
       verbose: parsed.verbose,
       json: parsed.json,
       headless: parsed.headless,
