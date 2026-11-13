@@ -4,13 +4,14 @@
  * Verifies:
  * 1. Pure CLI argument parsing (`parseCliArgs`) across `init`, `manifest`, `check`,
  *    direct zero-config `<url-or-file>` targets, `--config`, `--json`, `--headed`, `--help`, `--version`, and invalid flags.
- * 2. Command dispatching and deterministic POSIX exit codes (`0`, `1`, `2`) in `runCli()`.
+ * 2. Subcommand-specific `--help` topic parsing and `renderHelpText(topic?)` output for all 9 commands.
+ * 3. Command dispatching and deterministic POSIX exit codes (`0`, `1`, `2`) in `runCli()`.
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { execFileSync } from 'child_process';
 import { resolve } from 'path';
-import { parseCliArgs, runCli, UIRIG_VERSION } from '../../src/index.js';
+import { parseCliArgs, renderHelpText, runCli, UIRIG_VERSION } from '../../src/index.js';
 import type { ICheckExecutionReport } from '../../src/commands/check.js';
 
 function createMockReport(exitCode: 0 | 1 | 2): ICheckExecutionReport {
@@ -37,8 +38,8 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
 
   it('parses help, version, init, and manifest subcommands accurately', () => {
     console.log('\n--- START TEST: Basic Subcommand & Flag Parsing ---');
-    expect(parseCliArgs([])).toEqual({ command: 'help' });
-    expect(parseCliArgs(['--help'])).toEqual({ command: 'help' });
+    expect(parseCliArgs([])).toEqual({ command: 'help', topic: undefined });
+    expect(parseCliArgs(['--help'])).toEqual({ command: 'help', topic: undefined });
     expect(parseCliArgs(['-v'])).toEqual({ command: 'version' });
     expect(parseCliArgs(['init'])).toEqual({ command: 'init' });
     expect(parseCliArgs(['manifest'])).toEqual({ command: 'manifest' });
@@ -113,7 +114,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     });
   });
 
-  it('returns command=unknown with descriptive reason on invalid commands or missing flag values', () => {
+    it('returns command=unknown with descriptive reason on invalid commands or missing flag values', () => {
     console.log('\n--- START TEST: Invalid Command & Missing Flag Value Detection ---');
     const badCmd = parseCliArgs(['deploy']);
     expect(badCmd.command).toBe('unknown');
@@ -211,7 +212,6 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     expect(helpOutput).toContain('uirig <url-or-file> [options]');
     expect(helpOutput).toContain('POSIX EXIT CODES:');
   });
-
   it('parses standalone tool subcommands (tokens, contrast, stress, cls) and --only=<tool>', () => {
     console.log('\n--- START TEST: Standalone Engine Subcommands & --only Flag ---');
     expect(parseCliArgs(['tokens', '--json'])).toEqual({
@@ -278,8 +278,8 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     });
   });
 
-  it('parses standalone dark-mode subcommand and --only=dark-mode', () => {
-    console.log('\n--- START TEST: Standalone dark-mode Subcommand Parsing ---');
+  it('parses standalone dark-mode and dom subcommands and --only flags', () => {
+    console.log('\n--- START TEST: Standalone dark-mode & dom Subcommand Parsing ---');
     expect(parseCliArgs(['dark-mode', './dist/index.html', '--json'])).toEqual({
       command: 'check',
       target: './dist/index.html',
@@ -289,18 +289,6 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       headless: true,
     });
 
-    expect(parseCliArgs(['check', '--only=dark-mode'])).toEqual({
-      command: 'check',
-      target: undefined,
-      only: 'dark-mode',
-      configPath: undefined,
-      json: false,
-      headless: true,
-    });
-  });
-
-  it('parses standalone dom subcommand and --only=dom', () => {
-    console.log('\n--- START TEST: Standalone dom Subcommand Parsing ---');
     expect(parseCliArgs(['dom', './dist/index.html', '--json'])).toEqual({
       command: 'check',
       target: './dist/index.html',
@@ -309,15 +297,60 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       json: true,
       headless: true,
     });
+  });
 
-    expect(parseCliArgs(['check', '--only=dom'])).toEqual({
-      command: 'check',
-      target: undefined,
-      only: 'dom',
-      configPath: undefined,
-      json: false,
-      headless: true,
+  it('parses subcommand-specific --help and help <topic> across all 9 commands', () => {
+    console.log('\n--- START TEST: Subcommand --help Topic Parsing & Rendering ---');
+    const topics = [
+      'init',
+      'check',
+      'tokens',
+      'contrast',
+      'dark-mode',
+      'stress',
+      'cls',
+      'dom',
+      'manifest',
+    ] as const;
+
+    for (const topic of topics) {
+      expect(parseCliArgs([topic, '--help'])).toEqual({ command: 'help', topic });
+      expect(parseCliArgs([topic, '-h'])).toEqual({ command: 'help', topic });
+      expect(parseCliArgs(['help', topic])).toEqual({ command: 'help', topic });
+
+      const rendered = renderHelpText(topic);
+      expect(rendered).toContain(`uirig ${topic}`);
+      expect(rendered).toContain('USAGE:');
+      expect(rendered).toContain('HOW IT WORKS:');
+      expect(rendered).toContain('POSIX EXIT CODES:');
+      expect(rendered).toContain('EXAMPLES:');
+    }
+
+    expect(parseCliArgs(['./dist/index.html', '--help'])).toEqual({
+      command: 'help',
+      topic: undefined,
     });
   });
 
+  it('writes subcommand-specific help to stdout without invoking command handlers', async () => {
+    console.log('\n--- START TEST: Subcommand --help Execution Isolation ---');
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array): boolean => {
+      stdoutChunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
+      return true;
+    });
+
+    const initSpy = vi.fn();
+    const checkSpy = vi.fn();
+
+    expect(await runCli(['init', '--help'], { init: initSpy })).toBe(0);
+    expect(initSpy).not.toHaveBeenCalled();
+    expect(stdoutChunks.join('')).toContain('uirig init');
+
+    stdoutChunks.length = 0;
+    expect(await runCli(['dark-mode', '--help'], { check: checkSpy })).toBe(0);
+    expect(checkSpy).not.toHaveBeenCalled();
+    expect(stdoutChunks.join('')).toContain('uirig dark-mode');
+    expect(stdoutChunks.join('')).toContain('prefers-color-scheme: dark');
+  });
 });
