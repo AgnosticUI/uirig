@@ -2,11 +2,10 @@
  * src/utils/formatter.ts
  * Typographic console styler and diagnostic telemetry stream router.
  * Provides:
- * 1. Zero-dependency ANSI color helpers that automatically honor `NO_COLOR`
- *    and programmatic JSON stream mode (`UIRIG_JSON_MODE`).
+ * 1. Zero-dependency ANSI color helpers that honor the `NO_COLOR` standard.
  * 2. Unix-compliant telemetry routing (`logTelemetry`) that writes to `stdout`
- *    during normal CLI runs and routes to `stderr` when `UIRIG_JSON_MODE` is active,
- *    keeping `stdout` 100% pure for machine-readable JSON without global monkey-patching.
+ *    during normal CLI runs and routes colored diagnostics to `stderr` when
+ *    `UIRIG_JSON_MODE` is active, keeping `stdout` 100% pure for JSON consumers.
  */
 
 /**
@@ -37,14 +36,12 @@ export function isJsonStreamMode(): boolean {
 
 /**
  * Determines whether ANSI escape codes should be suppressed.
- * Honors the cross-platform `NO_COLOR` standard (https://no-color.org)
- * as well as `UIRIG_JSON_MODE=1` when streaming raw JSON to AI agents.
+ * Honors the cross-platform `NO_COLOR` standard (https://no-color.org).
+ * Does NOT disable color during `UIRIG_JSON_MODE`, because telemetry routes
+ * to `stderr` while `stdout` receives unstyled JSON payloads.
  */
 export function isColorDisabled(): boolean {
   if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== '') {
-    return true;
-  }
-  if (isJsonStreamMode()) {
     return true;
   }
   return false;
@@ -69,7 +66,7 @@ function resolveTagStyles(tag: string): AnsiStyle[] {
   if (tag.startsWith('tokens:')) {
     return ['bold', 'magenta'];
   }
-  if (tag.startsWith('matrix:')) {
+  if (tag.startsWith('matrix:') || tag.startsWith('dark-mode:')) {
     return ['bold', 'cyan'];
   }
   if (tag.startsWith('adversary:')) {
@@ -77,6 +74,9 @@ function resolveTagStyles(tag: string): AnsiStyle[] {
   }
   if (tag.startsWith('cls:')) {
     return ['bold', 'blue'];
+  }
+  if (tag.startsWith('dom:')) {
+    return ['bold', 'red'];
   }
   if (tag.startsWith('check')) {
     return ['bold', 'green'];
@@ -98,7 +98,7 @@ export function formatTelemetryLog(tag: string, message: string): string {
  * Emits a structured runtime telemetry line to the appropriate Unix stream:
  * - Normal mode: writes to `stdout` via `console.log()`.
  * - JSON stream mode (`UIRIG_JSON_MODE=1`): routes to `stderr` via `console.error()`,
- *   keeping `stdout` 100% pure for `JSON.parse()` consumers without mutating globals.
+ *   keeping `stdout` 100% pure for `JSON.parse()` consumers without stripping `stderr` colors.
  */
 export function logTelemetry(tag: string, message: string): void {
   const formattedLine = formatTelemetryLog(tag, message);

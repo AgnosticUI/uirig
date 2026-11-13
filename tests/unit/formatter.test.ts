@@ -1,7 +1,8 @@
 /**
  * tests/unit/formatter.test.ts
  * 1-to-1 unit tests for `src/utils/formatter.ts`.
- * Verifies ANSI escape code wrapping, `NO_COLOR` / `UIRIG_JSON_MODE` suppression,
+ * Verifies ANSI escape code wrapping, `NO_COLOR` suppression,
+ * preservation of ANSI colors on `stderr` during `UIRIG_JSON_MODE`,
  * domain-specific telemetry badge styling, and `stdout` vs. `stderr` stream routing.
  */
 
@@ -52,8 +53,9 @@ describe('formatter.ts — Terminal Styler & Telemetry Stream Router', () => {
     expect(paint('plain text')).toBe('plain text');
   });
 
-  it('suppresses all ANSI escape codes when NO_COLOR is set', () => {
+  it('suppresses all ANSI escape codes when NO_COLOR is set (even in JSON mode)', () => {
     process.env.NO_COLOR = '1';
+    process.env.UIRIG_JSON_MODE = '1';
 
     console.log('\n--- START TEST: NO_COLOR Environment Suppression ---');
     expect(isColorDisabled()).toBe(true);
@@ -63,34 +65,38 @@ describe('formatter.ts — Terminal Styler & Telemetry Stream Router', () => {
     );
   });
 
-  it('suppresses all ANSI escape codes when UIRIG_JSON_MODE is enabled', () => {
+  it('preserves ANSI color badges when UIRIG_JSON_MODE is enabled and NO_COLOR is unset', () => {
     delete process.env.NO_COLOR;
     process.env.UIRIG_JSON_MODE = '1';
 
-    console.log('\n--- START TEST: UIRIG_JSON_MODE Suppression ---');
-    expect(isColorDisabled()).toBe(true);
-    expect(formatTelemetryLog('matrix:audit', 'Contrast check')).toBe(
-      '[matrix:audit] Contrast check'
-    );
+    console.log('\n--- START TEST: Preserve ANSI Colors Under UIRIG_JSON_MODE ---');
+    expect(isColorDisabled()).toBe(false);
+    const styled = formatTelemetryLog('matrix:audit', 'Contrast check');
+    expect(styled).toContain(ANSI_CODES.cyan);
+    expect(styled).toContain(ANSI_CODES.reset);
   });
 
-  it('applies distinct color badges for all 4 core telemetry domains', () => {
+  it('applies distinct color badges for core telemetry domains', () => {
     delete process.env.NO_COLOR;
     delete process.env.UIRIG_JSON_MODE;
 
     console.log('\n--- START TEST: Distinct Domain Badge Colors ---');
     const tokensLog = formatTelemetryLog('tokens:audit', 'Crawl started');
     const matrixLog = formatTelemetryLog('matrix:audit', 'Contrast started');
+    const darkModeLog = formatTelemetryLog('dark-mode:audit', 'Dark mode started');
     const adversaryLog = formatTelemetryLog('adversary:stress', 'Stress started');
     const clsLog = formatTelemetryLog('cls:monitor', 'CLS started');
+    const domLog = formatTelemetryLog('dom:audit', 'DOM check started');
 
     expect(tokensLog).toContain(ANSI_CODES.magenta);
     expect(matrixLog).toContain(ANSI_CODES.cyan);
+    expect(darkModeLog).toContain(ANSI_CODES.cyan);
     expect(adversaryLog).toContain(ANSI_CODES.yellow);
     expect(clsLog).toContain(ANSI_CODES.blue);
+    expect(domLog).toContain(ANSI_CODES.red);
   });
 
-  it('routes logTelemetry to stdout normally and to stderr when UIRIG_JSON_MODE is active', () => {
+  it('routes logTelemetry to stdout normally and colored logs to stderr when UIRIG_JSON_MODE is active', () => {
     delete process.env.NO_COLOR;
     delete process.env.UIRIG_JSON_MODE;
 
@@ -103,10 +109,12 @@ describe('formatter.ts — Terminal Styler & Telemetry Stream Router', () => {
     expect(stdoutLogSpy).toHaveBeenCalledTimes(1);
     expect(stderrLogSpy).not.toHaveBeenCalled();
 
-    // Agentic JSON mode -> console.error (stderr), leaving stdout completely untouched
+    // Agentic JSON mode -> console.error (stderr) with ANSI colors preserved, leaving stdout untouched
     process.env.UIRIG_JSON_MODE = '1';
     logTelemetry('check:dispatch', 'Agentic JSON run');
     expect(stdoutLogSpy).toHaveBeenCalledTimes(1);
-    expect(stderrLogSpy).toHaveBeenCalledWith('[check:dispatch] Agentic JSON run');
+    expect(stderrLogSpy).toHaveBeenCalledWith(
+      `${ANSI_CODES.bold}${ANSI_CODES.green}[check:dispatch]${ANSI_CODES.reset} Agentic JSON run`
+    );
   });
 });
