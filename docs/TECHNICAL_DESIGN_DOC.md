@@ -36,12 +36,13 @@ uirig/
 │   │   ├── browser.ts              # Headless automation driver token contracts
 │   │   ├── config.ts               # Configuration mapping boundaries & ignore rules
 │   │   └── locator.ts              # Component-attributed violation & agent stream contracts
-│   └── utils/                      # Low-overhead utility primitives
-│       ├── agent-stream.ts         # Violation deduplication & token-aware JSON stream builder
-│       ├── formatter.ts            # Typographic console styler and stderr telemetry router
-│       ├── fs.ts                   # Atomic filesystem handlers and markdown PR comment writers
-│       ├── ignore.ts               # Runtime data-uirig-ignore & config ignore rule matcher
-│       └── static-server.ts        # Ephemeral 127.0.0.1 HTTP server for local .html targets
+    └── utils/                      # Low-overhead utility primitives
+        ├── agent-stream.ts         # Violation deduplication & token-aware JSON stream builder
+        ├── dom-walker.ts           # Shared Light + Shadow DOM traversal & selector builder
+        ├── formatter.ts            # Typographic console styler and stderr telemetry router
+        ├── fs.ts                   # Atomic filesystem handlers and markdown PR comment writers
+        ├── ignore.ts               # Runtime data-uirig-ignore & config ignore rule matcher
+        └── static-server.ts        # Ephemeral 127.0.0.1 HTTP server for local .html targets
 ├── tsconfig.json                   # ESM compilation target settings
 └── tests/                          # Automated local testing validation manifest
     ├── unit/                       # Core math, Shadow DOM, and CLI unit tests
