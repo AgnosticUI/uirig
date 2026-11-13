@@ -7,12 +7,12 @@
 
 ## Execution Order & Dependency Rationale
 
-| Order | Issue | Title | Effort | Why This Order? |
-| :---: | :---: | :--- | :---: | :--- |
-| **1** | [#3](https://github.com) | `--json` causes no color | **S** | Smallest isolated fix in `formatter.ts`; restores colored `stderr` telemetry during `--json` runs before adding new CLI flags. |
-| **2** | [#4](https://github.com) | Expose Playground 4-Tool Check Report to core `uirig` | **S–M** | Establishes the canonical human-readable console violation formatter in `src/utils/` before `--selectors` filtering modifies which violations appear. |
-| **3** | [#5](https://github.com) | Add `--selectors` (`-s`) flag to filter checks to specific elements | **M–L** | Core engine and CLI flag enhancement; naturally inherits the fixed color behavior (#3) and structured console report (#4). |
-| **4** | [#2](https://github.com) | Audit `npx uirig` -> `npx @rlevin/uirig` | **S** | Final documentation & CLI help sweep; performed last so docs are updated once with both `@rlevin/uirig` and the new `--verbose` / `--selectors` flags. |
+| Order | Issue | Title | Effort | Status | Why This Order? |
+| :---: | :--- | :--- | :---: | :---: | :--- |
+| **1** | Issue #3 | `--json` causes no color | **S** | **[x] Done** | Smallest isolated fix in `formatter.ts`; restores colored `stderr` telemetry during `--json` runs before adding new CLI flags. |
+| **2** | Issue #4 | Expose Playground 4-Tool Check Report to core `uirig` | **S–M** | **[~] Active** | Establishes the canonical human-readable console violation formatter in `src/utils/` before `--selectors` filtering modifies which violations appear. |
+| **3** | Issue #5 | Add `--selectors` (`-s`) flag to filter checks to specific elements | **M–L** | **[ ] Next** | Core engine and CLI flag enhancement; naturally inherits the fixed color behavior (#3) and structured console report (#4). |
+| **4** | Issue #2 | Audit `npx uirig` -> `npx @rlevin/uirig` | **S** | **[ ] Pending** | Final documentation & CLI help sweep; performed last so docs are updated once with both `@rlevin/uirig` and the new `--verbose` / `--selectors` flags. |
 
 ---
 
@@ -33,6 +33,10 @@
 ---
 
 ## Task 1.2.2 — Issue #4: Expose Structured Console Violation Report in Core CLI
+
+* **Implementation Checklist:**
+  - [ ] **Micro-Chunk 1:** Create `src/utils/console-report.ts` (`formatConsoleAuditReport`) + `tests/unit/console-report.test.ts`.
+  - [ ] **Micro-Chunk 2:** Wire `verbose?: boolean` and `--verbose` into `src/commands/check.ts`, `src/index.ts`, `tests/unit/check.test.ts`, and `tests/unit/index.test.ts`.
 
 * **GitHub Issue:** https://github.com/AgnosticUI/uirig/issues/4
 * **Problem Statement:** Outside of `playground/vite.config.ts` (`uirigAutoSpotCheckPlugin`), standard CLI runs (`npx @rlevin/uirig <target>`) print only aggregate violation counts (`Violations detected: 274`) without showing the offending CSS/Shadow-DOM selectors or measured deltas unless the user opens `.uirig/github_pr_comment.md` or parses `--json`.
