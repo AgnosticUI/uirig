@@ -21,8 +21,13 @@ import {
 import { executeManifestCommand } from './commands/manifest.js';
 import { logTelemetry, paint } from './utils/formatter.js';
 import { parseSelectorList } from './utils/scope.js';
+import { readFileSync } from 'fs';
 
-export const UIRIG_VERSION = '0.1.0';
+const pkg = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+) as { version: string };
+export const UIRIG_VERSION = pkg.version;
+
 
 const AUDIT_TOOL_NAMES = new Set<AuditToolName>([
   'tokens',

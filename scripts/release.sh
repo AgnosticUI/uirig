@@ -41,18 +41,6 @@ fi
 
 # 2. Extract and cross-check package.json version against UIRIG_VERSION in src/index.ts
 PKG_VERSION="$(node -p "require('./package.json').version")"
-CLI_VERSION="$(node -e "
-  const fs = require('fs');
-  const src = fs.readFileSync('src/index.ts', 'utf8');
-  const match = src.match(/UIRIG_VERSION\s*=\s*['\"]([^'\"]+)['\"]/);
-  if (!match) process.exit(1);
-  console.log(match[1]);
-")"
-
-if [[ "$PKG_VERSION" != "$CLI_VERSION" ]]; then
-  echo "[release] Error: Version mismatch! package.json=${PKG_VERSION} vs src/index.ts=${CLI_VERSION}" >&2
-  exit 1
-fi
 
 TAG_NAME="v${PKG_VERSION}"
 echo "[release] Verified version alignment: ${TAG_NAME}"
