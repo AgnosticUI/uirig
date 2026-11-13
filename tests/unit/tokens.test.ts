@@ -1,7 +1,8 @@
 /**
  * tests/unit/tokens.test.ts
  * Unit tests observing how validateComputedStyleEntry and crawlPageTokens catch
- * unauthorized colors, magic pixel spacing, and Shadow DOM drift while passing compliant elements.
+ * unauthorized colors, magic pixel spacing, and Shadow DOM drift while passing compliant elements
+ * and respecting `--selectors` component scoping.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { chromium, type Browser } from 'playwright';
@@ -14,7 +15,6 @@ import {
 } from '../../src/core/tokens.js';
 
 describe('::: PHASE 3 TASK 3.1 (CHUNK 2): TOKEN VALIDATION LOGIC GATES :::', () => {
-  // Define a strict baseline design system scale for testing
   const approvedScale: ITokenScaleConfig = {
     colors: ['rgb(15, 23, 42)', 'rgb(255, 255, 255)', 'rgb(59, 130, 246)'],
     spacing: ['0px', '8px', '16px', '24px'],
@@ -25,7 +25,6 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 2): TOKEN VALIDATION LOGIC GATES :::', () 
   it('==> Should pass an element whose computed styles strictly match the approved token scale', () => {
     console.log('\n--- START TEST: Compliant Element Token Audit ---');
 
-    // Simulate a button styled exclusively with approved design tokens and a transparent wrapper default
     const compliantElement: IExtractedElementStyles = {
       selector: 'button.primary-btn',
       inShadowDom: false,
@@ -75,18 +74,17 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 2): TOKEN VALIDATION LOGIC GATES :::', () 
   it('==> Should catch hardcoded hex/rgb colors, magic pixel padding, and Shadow DOM violations', () => {
     console.log('\n--- START TEST: Rogue Magic Number & Shadow DOM Detection ---');
 
-    // Simulate a Web Component element inside a ShadowRoot using rogue values (13px padding, rogue pink color)
     const rogueShadowElement: IExtractedElementStyles = {
       selector: 'my-card >> shadow-root >> span.badge',
       inShadowDom: true,
       styles: {
-        color: 'rgb(255, 0, 128)',       // Rogue hardcoded color
+        color: 'rgb(255, 0, 128)',
         backgroundColor: 'rgba(0, 0, 0, 0)',
-        paddingTop: '13px',              // Rogue magic pixel spacing
+        paddingTop: '13px',
         paddingBottom: '8px',
         paddingLeft: '16px',
         paddingRight: '16px',
-        fontSize: '15px',                // Rogue off-scale font size
+        fontSize: '15px',
         borderRadius: '4px',
       },
     };
@@ -122,7 +120,6 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 2): TOKEN VALIDATION LOGIC GATES :::', () 
 });
 
 describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER :::', () => {
-  // Hold a reference to the Chromium browser so we can close it cleanly after tests finish
   let browser: Browser | undefined;
 
   const approvedScale: ITokenScaleConfig = {
@@ -132,7 +129,6 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER 
     radii: ['0px', '4px', '8px'],
   };
 
-  // Ensure the headless browser process never leaks after the test suite completes
   afterAll(async () => {
     if (browser) {
       await browser.close();
@@ -147,7 +143,6 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER 
     const context = await browser.newContext();
     const page = await context.newPage();
 
-    console.log('[+] Injecting Light-DOM HTML fixture into Playwright page...');
     await page.setContent(`
       <!DOCTYPE html>
       <html>
@@ -181,8 +176,6 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER 
     `);
 
     const extracted = await extractShadowPiercingStyles(page);
-    console.log('[+] Extracted snapshots:', JSON.stringify(extracted, null, 2));
-
     await context.close();
 
     const selectors = extracted.map((item) => item.selector);
@@ -206,9 +199,6 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER 
     const context = await browser.newContext();
     const page = await context.newPage();
 
-    // Render a compliant Light-DOM button alongside a custom Web Component (<uirig-card>)
-    // containing an open ShadowRoot with rogue color, paddingTop, and fontSize values
-    console.log('[+] Rendering page with custom Web Component <uirig-card>...');
     await page.setContent(`
       <!DOCTYPE html>
       <html>
@@ -260,17 +250,12 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER 
       </html>
     `);
 
-    // Execute the full crawler + validator pipeline against the live page
     const violations = await crawlPageTokens(page, approvedScale);
-    console.log('[!] Violations returned by crawlPageTokens:', JSON.stringify(violations, null, 2));
-
     await context.close();
 
-    // Verify Light DOM nodes produced zero false positives
     const lightDomViolations = violations.filter((v) => !v.inShadowDom);
     expect(lightDomViolations).toHaveLength(0);
 
-    // Verify all 3 rogue styles inside <uirig-card>'s ShadowRoot were caught with exact selectors
     const shadowViolations = violations.filter((v) => v.inShadowDom);
     expect(shadowViolations).toEqual([
       {
@@ -293,6 +278,49 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER 
         property: 'fontSize',
         actualValue: '15px',
         inShadowDom: true,
+      },
+    ]);
+  });
+
+  it('==> Should restrict token violations to --selectors subtrees when selectors are provided', async () => {
+    console.log('\n--- START TEST: Component-Scoped Token Crawl (--selectors) ---');
+
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { color: rgb(15, 23, 42); background-color: rgb(255, 255, 255); margin: 0; font-size: 16px; }
+            #outside-header { color: rgb(255, 0, 128); font-size: 13px; }
+            #target-panel { color: rgb(15, 23, 42); padding: 16px; }
+            #target-panel .inside-drift { color: rgb(255, 0, 128); }
+          </style>
+        </head>
+        <body>
+          <header id="outside-header">Off-scope drift</header>
+          <section id="target-panel">
+            <span class="inside-drift">Scoped drift</span>
+          </section>
+        </body>
+      </html>
+    `);
+
+    const scopedViolations = await crawlPageTokens(page, approvedScale, [], ['#target-panel']);
+    await context.close();
+
+    expect(scopedViolations).toEqual([
+      {
+        selector: 'span.inside-drift',
+        hostComponent: null,
+        property: 'color',
+        actualValue: 'rgb(255, 0, 128)',
+        inShadowDom: false,
       },
     ]);
   });

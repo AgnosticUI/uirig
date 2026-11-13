@@ -1,13 +1,14 @@
 /**
  * src/core/tokens.ts
  * Shadow-piercing runtime computed style crawler and design token drift auditor.
- * Evaluates live DOM and Shadow DOM elements against approved design system scales.
+ * Evaluates live DOM and Shadow DOM elements against approved design system scales,
+ * with optional `--selectors` subtree scoping.
  */
 
-// Import only the TypeScript type for Playwright's Page so zero runtime bundle weight is added
 import type { Page } from 'playwright';
 import { logTelemetry, paint } from '../utils/formatter.js';
 import { isElementIgnoredInBrowser, type IUirigIgnoreRule } from '../utils/ignore.js';
+import { isElementInSelectorScope } from '../utils/scope.js';
 import {
   createBrowserDomWalker,
   extractHostComponentFromSelector,
@@ -74,23 +75,17 @@ export interface IExtractedElementStyles {
 /**
  * Pure validation helper that compares a single element's extracted computed styles
  * against the project's approved design token scale.
- *
- * @param entry - The extracted selector, Shadow DOM flag, and computed CSS properties.
- * @param scale - The approved design system token arrays.
- * @returns An array of detected violations (empty array if the element is compliant).
  */
 export function validateComputedStyleEntry(
   entry: IExtractedElementStyles,
   scale: ITokenScaleConfig
 ): ITokenViolation[] {
-  // Collect all token violations discovered on this specific DOM node
   const violations: ITokenViolation[] = [];
   const hostComponent =
     entry.hostComponent !== undefined
       ? entry.hostComponent
       : extractHostComponentFromSelector(entry.selector);
 
-  // Normalize approved colors to lowercase so 'RGB(255, 255, 255)' matches 'rgb(255, 255, 255)'
   const normalizedAllowedColors = new Set(scale.colors.map((c) => c.toLowerCase().trim()));
   const allowedSpacing = new Set(scale.spacing.map((s) => s.trim()));
   const allowedFontSizes = new Set(scale.fontSizes.map((f) => f.trim()));
@@ -165,53 +160,51 @@ export function validateComputedStyleEntry(
 
   return violations;
 }
-
 /**
  * Executes a recursive TreeWalker inside a live Playwright Page that pierces
- * open ShadowRoot boundaries to extract computed styles from all visible elements.
- *
- * @param page - An active Playwright Page instance loaded with target HTML/URL.
- * @param ignoreRules - Optional runtime ignore rules from `uirig.config.json`.
- * @returns An array of extracted style snapshots across both Light DOM and Shadow DOM.
+ * open ShadowRoot boundaries to extract computed styles from all visible elements
+ * (optionally filtered to subtrees matching `selectors`).
  */
 export async function extractShadowPiercingStyles(
   page: Page,
-  ignoreRules: IUirigIgnoreRule[] = []
+  ignoreRules: IUirigIgnoreRule[] = [],
+  selectors?: string[]
 ): Promise<IExtractedElementStyles[]> {
   logTelemetry(
     'tokens:crawler',
     'Dispatching recursive shadow-piercing TreeWalker into browser sandbox...'
   );
 
-  // page.evaluate serializes the shared walker factory and runs it inside Chromium's V8 context
   const extractedNodes = await page.evaluate(
     ({
       rules,
+      activeSelectors,
       walkerFactorySrc,
       ignoreHelperSrc,
+      scopeHelperSrc,
     }: {
       rules: IUirigIgnoreRule[];
+      activeSelectors?: string[];
       walkerFactorySrc: string;
       ignoreHelperSrc: string;
+      scopeHelperSrc: string;
     }): IExtractedElementStyles[] => {
       const buildWalker = new Function(
         `return (${walkerFactorySrc});`
       )() as typeof createBrowserDomWalker;
-      const walker = buildWalker(window.location.href, rules, ignoreHelperSrc);
+      const walker = buildWalker(
+        window.location.href,
+        rules,
+        ignoreHelperSrc,
+        activeSelectors,
+        scopeHelperSrc
+      );
 
-      // Store every visible element's computed style snapshot across all DOM and ShadowRoot levels
       const snapshots: IExtractedElementStyles[] = [];
 
-      // Open vs. Closed ShadowRoot Boundary:
-      // `element.shadowRoot` returns the ShadowRoot instance ONLY when attached with `{ mode: 'open' }`.
-      // If a Web Component uses `{ mode: 'closed' }`, the browser intentionally returns `null` to standard
-      // page scripts (`page.evaluate`), meaning closed shadow trees cannot be traversed without an
-      // elevated browser extension or custom Playwright selector engine.
       walker.walkElements((currentNode, meta) => {
-        // Ask the browser's CSS engine for the final resolved pixel and RGB values
         const computed = window.getComputedStyle(currentNode);
 
-        // Record computed styles only if the element actually renders on screen and is not ignored
         if (computed.display !== 'none' && !walker.isIgnored(currentNode, 'tokens')) {
           snapshots.push({
             selector: meta.selector,
@@ -235,8 +228,10 @@ export async function extractShadowPiercingStyles(
     },
     {
       rules: ignoreRules,
+      activeSelectors: selectors,
       walkerFactorySrc: createBrowserDomWalker.toString(),
       ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
+      scopeHelperSrc: isElementInSelectorScope.toString(),
     }
   );
 
@@ -257,28 +252,17 @@ export async function extractShadowPiercingStyles(
  * High-level runtime auditor that crawls a live Playwright Page across Light DOM
  * and open ShadowRoot boundaries, then pipes every extracted style snapshot through
  * the pure validateComputedStyleEntry rule engine.
- *
- * Note on Shadow DOM Encapsulation:
- * Only Web Components created with `attachShadow({ mode: 'open' })` expose `element.shadowRoot`
- * to standard `page.evaluate()` scripts. Components using `{ mode: 'closed' }` return `null`
- * for `element.shadowRoot` and are skipped by design.
- *
- * @param page - An active Playwright Page instance pointing to the target viewport.
- * @param scale - The approved design system token configuration.
- * @param ignoreRules - Optional runtime ignore rules from `uirig.config.json`.
- * @returns An array of all detected design token violations across the viewport.
  */
 export async function crawlPageTokens(
   page: Page,
   scale: ITokenScaleConfig,
-  ignoreRules: IUirigIgnoreRule[] = []
+  ignoreRules: IUirigIgnoreRule[] = [],
+  selectors?: string[]
 ): Promise<ITokenViolation[]> {
   logTelemetry('tokens:audit', 'Starting full viewport design token crawl...');
 
-  // Step 1: Extract live computed styles across Light DOM and open ShadowRoots
-  const extractedEntries = await extractShadowPiercingStyles(page, ignoreRules);
+  const extractedEntries = await extractShadowPiercingStyles(page, ignoreRules, selectors);
 
-  // Step 2: Validate every extracted element snapshot against the approved design scale
   const allViolations: ITokenViolation[] = [];
   for (const entry of extractedEntries) {
     const nodeViolations = validateComputedStyleEntry(entry, scale);
