@@ -3,7 +3,7 @@
  * 1-to-1 unit tests for `src/index.ts`.
  * Verifies:
  * 1. Pure CLI argument parsing (`parseCliArgs`) across `init`, `manifest`, `check`,
- *    direct zero-config `<url-or-file>` targets, `--config`, `--json`, `--headed`, `--help`, `--version`, and invalid flags.
+ *    direct zero-config `<url-or-file>` targets, `--config`, `--verbose`, `--json`, `--headed`, `--help`, `--version`, and invalid flags.
  * 2. Subcommand-specific `--help` topic parsing and `renderHelpText(topic?)` output for all 9 commands.
  * 3. Command dispatching and deterministic POSIX exit codes (`0`, `1`, `2`) in `runCli()`.
  */
@@ -45,22 +45,26 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     expect(parseCliArgs(['manifest'])).toEqual({ command: 'manifest' });
   });
 
-  it('parses check flags (--config=, --config <path>, --json, --headed)', () => {
+  it('parses check flags (--config=, --config <path>, --verbose, --json, --headed)', () => {
     console.log('\n--- START TEST: check Command Flag Parsing ---');
     expect(parseCliArgs(['check'])).toEqual({
       command: 'check',
       target: undefined,
       only: undefined,
       configPath: undefined,
+      verbose: false,
       json: false,
       headless: true,
     });
 
-    expect(parseCliArgs(['check', '--config=./custom.json', '--json', '--headed'])).toEqual({
+    expect(
+      parseCliArgs(['check', '--config=./custom.json', '--verbose', '--json', '--headed'])
+    ).toEqual({
       command: 'check',
       target: undefined,
       only: undefined,
       configPath: './custom.json',
+      verbose: true,
       json: true,
       headless: false,
     });
@@ -70,6 +74,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       target: undefined,
       only: undefined,
       configPath: 'dir/uirig.config.json',
+      verbose: false,
       json: false,
       headless: true,
     });
@@ -82,6 +87,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       target: 'http://localhost:5173',
       only: undefined,
       configPath: undefined,
+      verbose: false,
       json: false,
       headless: true,
     });
@@ -91,6 +97,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       target: './dist/index.html',
       only: undefined,
       configPath: undefined,
+      verbose: false,
       json: true,
       headless: true,
     });
@@ -100,6 +107,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       target: './dist/index.html',
       only: 'contrast',
       configPath: undefined,
+      verbose: false,
       json: false,
       headless: false,
     });
@@ -109,6 +117,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       target: 'https://example.com',
       only: undefined,
       configPath: undefined,
+      verbose: false,
       json: false,
       headless: true,
     });
@@ -163,11 +172,14 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
 
     expect(await runCli(['check'], { check: checkSpy })).toBe(0);
     expect(
-      await runCli(['check', '--config=custom.json', '--json', '--headed'], { check: checkSpy })
+      await runCli(['check', '--config=custom.json', '--verbose', '--json', '--headed'], {
+        check: checkSpy,
+      })
     ).toBe(1);
     expect(checkSpy).toHaveBeenLastCalledWith({
       target: undefined,
       configPath: 'custom.json',
+      verbose: true,
       json: true,
       only: undefined,
       headless: false,
@@ -178,6 +190,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     expect(checkSpy).toHaveBeenLastCalledWith({
       target: './dist/index.html',
       configPath: undefined,
+      verbose: false,
       json: true,
       only: undefined,
       headless: true,
@@ -212,22 +225,25 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     expect(helpOutput).toContain('uirig <url-or-file> [options]');
     expect(helpOutput).toContain('POSIX EXIT CODES:');
   });
-  it('parses standalone tool subcommands (tokens, contrast, stress, cls) and --only=<tool>', () => {
+
+  it('parses standalone tool subcommands (tokens, contrast, stress, cls, dark-mode, dom) and --only=<tool>', () => {
     console.log('\n--- START TEST: Standalone Engine Subcommands & --only Flag ---');
     expect(parseCliArgs(['tokens', '--json'])).toEqual({
       command: 'check',
       target: undefined,
       only: 'tokens',
       configPath: undefined,
+      verbose: false,
       json: true,
       headless: true,
     });
 
-    expect(parseCliArgs(['contrast', '--config=custom.json'])).toEqual({
+    expect(parseCliArgs(['contrast', '--config=custom.json', '--verbose'])).toEqual({
       command: 'check',
       target: undefined,
       only: 'contrast',
       configPath: 'custom.json',
+      verbose: true,
       json: false,
       headless: true,
     });
@@ -237,6 +253,7 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       target: undefined,
       only: 'stress',
       configPath: undefined,
+      verbose: false,
       json: false,
       headless: false,
     });
@@ -246,45 +263,17 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       target: undefined,
       only: 'cls',
       configPath: undefined,
+      verbose: false,
       json: false,
       headless: true,
     });
 
-    expect(parseCliArgs(['check', '--only=contrast'])).toEqual({
-      command: 'check',
-      target: undefined,
-      only: 'contrast',
-      configPath: undefined,
-      json: false,
-      headless: true,
-    });
-
-    const invalidOnly = parseCliArgs(['check', '--only=unknown']);
-    expect(invalidOnly.command).toBe('unknown');
-  });
-
-  it('dispatches standalone tool commands (e.g. uirig contrast --json) with only="contrast"', async () => {
-    console.log('\n--- START TEST: Standalone Tool Execution Routing ---');
-    const checkSpy = vi.fn().mockResolvedValue(createMockReport(0));
-
-    const exitCode = await runCli(['contrast', '--json'], { check: checkSpy });
-    expect(exitCode).toBe(0);
-    expect(checkSpy).toHaveBeenCalledWith({
-      target: undefined,
-      configPath: undefined,
-      only: 'contrast',
-      json: true,
-      headless: true,
-    });
-  });
-
-  it('parses standalone dark-mode and dom subcommands and --only flags', () => {
-    console.log('\n--- START TEST: Standalone dark-mode & dom Subcommand Parsing ---');
     expect(parseCliArgs(['dark-mode', './dist/index.html', '--json'])).toEqual({
       command: 'check',
       target: './dist/index.html',
       only: 'dark-mode',
       configPath: undefined,
+      verbose: false,
       json: true,
       headless: true,
     });
@@ -294,7 +283,37 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
       target: './dist/index.html',
       only: 'dom',
       configPath: undefined,
+      verbose: false,
       json: true,
+      headless: true,
+    });
+
+    expect(parseCliArgs(['check', '--only=contrast'])).toEqual({
+      command: 'check',
+      target: undefined,
+      only: 'contrast',
+      configPath: undefined,
+      verbose: false,
+      json: false,
+      headless: true,
+    });
+
+    const invalidOnly = parseCliArgs(['check', '--only=unknown']);
+    expect(invalidOnly.command).toBe('unknown');
+  });
+
+  it('dispatches standalone tool commands (e.g. uirig contrast --verbose) with verbose=true', async () => {
+    console.log('\n--- START TEST: Standalone Tool Execution Routing ---');
+    const checkSpy = vi.fn().mockResolvedValue(createMockReport(0));
+
+    const exitCode = await runCli(['contrast', '--verbose'], { check: checkSpy });
+    expect(exitCode).toBe(0);
+    expect(checkSpy).toHaveBeenCalledWith({
+      target: undefined,
+      configPath: undefined,
+      only: 'contrast',
+      verbose: true,
+      json: false,
       headless: true,
     });
   });

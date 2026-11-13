@@ -35,8 +35,8 @@
 ## Task 1.2.2 — Issue #4: Expose Structured Console Violation Report in Core CLI
 
 * **Implementation Checklist:**
-  - [ ] **Micro-Chunk 1:** Create `src/utils/console-report.ts` (`formatConsoleAuditReport`) + `tests/unit/console-report.test.ts`.
-  - [ ] **Micro-Chunk 2:** Wire `verbose?: boolean` and `--verbose` into `src/commands/check.ts`, `src/index.ts`, `tests/unit/check.test.ts`, and `tests/unit/index.test.ts`.
+  - [x] **Micro-Chunk 1:** Created `src/utils/console-report.ts` (`formatConsoleAuditReport`) + `tests/unit/console-report.test.ts`.
+  - [~] **Micro-Chunk 2:** Wire `verbose?: boolean` and `--verbose` into `src/commands/check.ts`, `src/index.ts`, `tests/unit/check.test.ts`, and `tests/unit/index.test.ts`.
 
 * **GitHub Issue:** https://github.com/AgnosticUI/uirig/issues/4
 * **Problem Statement:** Outside of `playground/vite.config.ts` (`uirigAutoSpotCheckPlugin`), standard CLI runs (`npx @rlevin/uirig <target>`) print only aggregate violation counts (`Violations detected: 274`) without showing the offending CSS/Shadow-DOM selectors or measured deltas unless the user opens `.uirig/github_pr_comment.md` or parses `--json`.

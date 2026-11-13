@@ -7,9 +7,9 @@
  * and pre-navigation `PerformanceObserver` monitoring (`cls`) execute without
  * cross-tool pollution or multiple browser startup overhead.
  *
- * Also supports zero-config runs (`npx uirig <url-or-file>`), runtime ignore
- * rules (`data-uirig-ignore` + `ignore[]`), and ephemeral local HTTP servers
- * for `.html` file targets.
+ * Also supports zero-config runs (`npx @rlevin/uirig <url-or-file>`), runtime ignore
+ * rules (`data-uirig-ignore` + `ignore[]`), structured terminal violation reports
+ * (`--verbose`), and ephemeral local HTTP servers for `.html` file targets.
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -20,6 +20,7 @@ import { auditPageContrast, type IContrastViolation, MIN_WCAG_AA_CONTRAST } from
 import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
 import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '../core/cls.js';
 import { logTelemetry, paint } from '../utils/formatter.js';
+import { formatConsoleAuditReport } from '../utils/console-report.js';
 import { formatAgenticJsonStream } from '../utils/agent-stream.js';
 import { writeGithubPrCommentReport, DEFAULT_PR_COMMENT_PATH } from '../utils/fs.js';
 import { runDomIntegrityAudit } from '../core/dom.js';
@@ -77,6 +78,8 @@ export interface ICheckCommandOptions {
   configPath?: string;
   json?: boolean;
   headless?: boolean;
+  /** When true, prints every individual failing selector beneath each engine section in human output. */
+  verbose?: boolean;
   /** Optional single-engine filter. Runs all enabled engines when omitted. */
   only?: AuditToolName;
   /** Optional inline token scale override (useful for programmatic calls & tests). */
@@ -118,7 +121,7 @@ export interface ICheckExecutionReport {
 }
 
 /**
- * Sensible built-in defaults used when running `npx uirig <url-or-file>` without
+ * Sensible built-in defaults used when running `npx @rlevin/uirig <url-or-file>` without
  * a `uirig.config.json` file on disk.
  */
 export const ZERO_CONFIG_DEFAULTS: Omit<IUirigConfig, 'targetUrls'> = {
@@ -287,7 +290,6 @@ export function resolveExecutionConfig(
   loadUirigConfig(defaultConfigPath);
   throw new Error(`ERR_CONFIG_MISSING: Configuration file not found at ${defaultConfigPath}.`);
 }
-
 /**
  * Loads and validates the approved design token scale JSON referenced by `tokensPath`.
  * Resolves relative paths against the directory containing `uirig.config.json`.
@@ -367,7 +369,6 @@ export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExi
   }
   return 0;
 }
-
 /**
  * Audits a single `(url, viewport)` target across isolated Playwright `BrowserContext`
  * sessions running concurrently (`Promise.all`) inside one shared Chromium browser.
@@ -484,7 +485,6 @@ export async function auditViewportInParallel(
         ignoreRules,
         allowedColors: tokenScale?.colors ?? [],
       });
-
     } finally {
       await context.close();
     }
@@ -544,7 +544,6 @@ export async function auditViewportInParallel(
     runtimeErrors: readOnlyResult.runtimeErrors,
   };
 }
-
 
 /**
  * Main orchestration entry point for `uirig check` and `uirig <url-or-file>`.
@@ -652,6 +651,9 @@ export async function executeCheckCommand(
       // Emit raw machine-readable JSON directly to stdout for AI Design System Harnesses
       process.stdout.write(`${formatAgenticJsonStream(executionReport)}\n`);
     } else {
+      process.stdout.write(
+        formatConsoleAuditReport(executionReport, { verbose: options.verbose })
+      );
       const exitBadge =
         exitCode === 0
           ? paint('0 (PASS)', 'bold', 'green')
