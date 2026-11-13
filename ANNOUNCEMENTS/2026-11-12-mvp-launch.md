@@ -7,7 +7,7 @@ AI coding agents, AGENTS.md files, and Figma MCP servers give LLMs great context
 uirig acts as a fast, zero-config guardrail: auditing live running viewports inside isolated headless Chromium contexts to catch design drift and layout breaks without brittle screenshot diffs (before you ever run a heavy axe-core audit or Lighthouse profile).
 
 Run it immediately against any URL or standalone HTML file with zero setup:
-npx uirig http://localhost:5173
+npx @rlevin/uirig http://localhost:5173
 
 ▸ 𝘀𝗵𝗮𝗱𝗼𝘄-𝗽𝗶𝗲𝗿𝗰𝗶𝗻𝗴 𝘁𝗼𝗸𝗲𝗻 𝗮𝘂𝗱𝗶𝘁𝘀 (𝘂𝗶𝗿𝗶𝗴 𝘁𝗼𝗸𝗲𝗻𝘀)
 Recursively walks Light DOM and open ShadowRoot trees to flag hardcoded colors, spacing, font sizes, and radii outside your design token scale (attributing failures directly to the host custom element).

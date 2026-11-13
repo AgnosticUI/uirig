@@ -35,12 +35,17 @@ export const DEFAULT_UIRIG_CONFIG = {
  * Teaches AI coding agents (Claude Code, Cursor, Codex) how to execute
  * `uirig` after UI edits and self-correct violations without context bloat.
  */
+/**
+ * Agent-ready skill manual emitted to `.uirig/SKILL.md` on `uirig init`.
+ * Teaches AI coding agents (Claude Code, Cursor, Codex) how to execute
+ * `uirig` after UI edits and self-correct violations without context bloat.
+ */
 export const DEFAULT_UIRIG_SKILL_MD = `---
 name: uirig-ui-verification
 description: First-line-of-defense live-viewport UI quality gate for design tokens, light/dark contrast parity, geometric stress overflow, CLS, and DOM markup integrity.
 ---
 
-# \`uirig\`: Deterministic UI Verification Gate
+# \`uirig\` (\`@rlevin/uirig\`): Deterministic UI Verification Gate
 
 Run \`uirig\` after modifying HTML, CSS, Web Components, or UI templates to verify rendered quality in a real headless browser before running heavier audits (\`axe-core\`, Lighthouse).
 
@@ -49,13 +54,14 @@ Run \`uirig\` after modifying HTML, CSS, Web Components, or UI templates to veri
 1. **Execute the deterministic JSON verification gate:**
    - Using \`uirig.config.json\` (when dev server is running):
      \`\`\`bash
-     npx uirig check --json
+     npx @rlevin/uirig check --json
      \`\`\`
    - Or directly against a URL or standalone \`.html\` file (zero-config mode):
      \`\`\`bash
-     npx uirig http://localhost:5173 --json
-     npx uirig ./dist/index.html --json
+     npx @rlevin/uirig http://localhost:5173 --json
+     npx @rlevin/uirig ./dist/index.html --json
      \`\`\`
+   *(If \`@rlevin/uirig\` is already installed in \`node_modules\`, \`npx uirig ...\` works interchangeably.)*
 2. **Inspect \`stdout\` JSON & POSIX Exit Code:**
    - \`0\` (\`status: "pass"\`): All 6 engines (\`tokens\`, \`contrast\`, \`dark-mode\`, \`stress\`, \`cls\`, \`dom\`) and runtime JS checks passed. Task is complete.
    - \`1\`: Design token drift (\`tokens\`), light/dark WCAG contrast failure (\`contrast\`, \`dark-mode\`), DOM/ARIA/hygiene violation (\`dom\`), or uncaught runtime JS error.
@@ -64,7 +70,7 @@ Run \`uirig\` after modifying HTML, CSS, Web Components, or UI templates to veri
    - Iterate over deduplicated entries in \`violations[]\`.
    - Use \`hostComponent\`, \`offendingSelectorPath\`, \`suggestedToken\`, and \`remediationAdvice\` to patch source CSS or component templates.
    - Prefer \`suggestedToken\` CSS custom properties over hardcoded values whenever provided.
-   - Re-run \`npx uirig check --json\` (or \`npx uirig <target> --json\`) until \`exitCode\` is \`0\`.
+   - Re-run \`npx @rlevin/uirig check --json\` (or \`npx @rlevin/uirig <target> --json\`) until \`exitCode\` is \`0\`.
 `;
 
 /**

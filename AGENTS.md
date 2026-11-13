@@ -1,6 +1,6 @@
-# AGENTS.md: `uirig` Design System Harness Instructions
+# AGENTS.md: `uirig` (`@rlevin/uirig`) Design System Harness Instructions
 
-This repository uses **`uirig`** as its deterministic, live-viewport UI verification gate (acting as a fast **first line of defense** for AI-generated UIs and Web Components before heavier audits like `axe-core` or Lighthouse run).
+This repository uses **`@rlevin/uirig`** as its deterministic, live-viewport UI verification gate (acting as a fast **first line of defense** for AI-generated UIs and Web Components before heavier audits like `axe-core` or Lighthouse run).
 
 ## Mandatory Post-Edit UI Verification Loop
 
@@ -9,13 +9,14 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
 1. **Run the deterministic JSON verification gate:**
    - If `uirig.config.json` is configured and your dev server is running:
      ```bash
-     npx uirig check --json
+     npx @rlevin/uirig check --json
      ```
    - Or target a live URL or standalone `.html` file directly (zero-config mode):
      ```bash
-     npx uirig http://localhost:5173 --json
-     npx uirig ./dist/index.html --json
+     npx @rlevin/uirig http://localhost:5173 --json
+     npx @rlevin/uirig ./dist/index.html --json
      ```
+   *(If `@rlevin/uirig` is already installed in `node_modules`, `npx uirig ...` works interchangeably.)*
 2. **Evaluate the POSIX exit code and JSON `stdout` payload:**
    - **Exit Code `0` (`"status": "pass"`):** All 6 engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`) and runtime JS error checks passed. You may finish your task.
    - **Exit Code `1`:** Design token drift (`tokens`), light/dark WCAG contrast failure (`contrast`, `dark-mode`), structural DOM/ARIA/hygiene violation (`dom`), or uncaught runtime JS error.
@@ -29,7 +30,7 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
      - `suggestedToken` (nearest passing design token when available)
      - `remediationAdvice`
    - Patch the offending CSS or component template directly using `suggestedToken` and `remediationAdvice`.
-   - Re-run `npx uirig check --json` (or `npx uirig <target> --json`) until `exitCode` is `0`.
+   - Re-run `npx @rlevin/uirig check --json` (or `npx @rlevin/uirig <target> --json`) until `exitCode` is `0`.
 
 ## Ground Rules for AI Agents
 

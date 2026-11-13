@@ -57,8 +57,8 @@ describe('init.ts — Workspace & Agent Skill Scaffolder', () => {
 
     const skillContent = readFileSync(skillPath, 'utf8');
     expect(skillContent).toBe(DEFAULT_UIRIG_SKILL_MD);
-    expect(skillContent).toContain('npx uirig check --json');
-    expect(skillContent).toContain('npx uirig ./dist/index.html --json');
+    expect(skillContent).toContain('npx @rlevin/uirig check --json');
+    expect(skillContent).toContain('npx @rlevin/uirig ./dist/index.html --json');
     expect(skillContent).toContain('dark-mode');
     expect(skillContent).toContain('dom');
     expect(skillContent).toContain('hostComponent');
