@@ -65,8 +65,7 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
       ])
     ).toBeUndefined();
   });
-
-    it('==> Should accurately composite semi-transparent overlays over dark backdrops', () => {
+  it('==> Should accurately composite semi-transparent overlays over dark backdrops', () => {
     console.log('\n--- START TEST: Semi-Transparent Overlay Alpha Compositing ---');
 
     const composited = compositeBackgroundStack([
@@ -136,8 +135,8 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
     expect(violations.at(0)?.selector).toBe('span.scoped-muted');
   });
 
-  it('==> Should composite slotted Light DOM text against the inner ShadowRoot button background', async () => {
-    console.log('\n--- START TEST: Shadow DOM <slot> Projected Text Contrast Compositing ---');
+  it('==> Should pass high-contrast slotted text and catch low-contrast slotted text inside ShadowRoot buttons', async () => {
+    console.log('\n--- START TEST: Shadow DOM <slot> Projected Text Contrast Pass & Failure ---');
 
     if (!browser) {
       browser = await chromium.launch({ headless: true });
@@ -145,8 +144,6 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
     const context = await browser.newContext();
     const page = await context.newPage();
 
-    // Simulate <ag-button variant="monochrome"> where the host is transparent with light inherited color,
-    // while the inner ShadowRoot <button> provides the solid dark surface behind <slot>
     await page.setContent(`
       <!DOCTYPE html>
       <html>
@@ -157,14 +154,16 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
           </style>
         </head>
         <body>
-          <ag-button title="Monochrome">Monochrome</ag-button>
+          <ag-button id="good-btn" data-bg="rgb(17, 24, 39)">Monochrome</ag-button>
+          <ag-button id="bad-btn" data-bg="rgb(229, 231, 235)">Monochrome Disabled</ag-button>
           <script>
             class AgButton extends HTMLElement {
               constructor() {
                 super();
                 const shadow = this.attachShadow({ mode: 'open' });
+                const bg = this.getAttribute('data-bg') || 'rgb(17, 24, 39)';
                 shadow.innerHTML =
-                  '<button style="background: rgb(17, 24, 39); color: rgb(240, 246, 252); padding: 8px 16px;">' +
+                  '<button style="background: ' + bg + '; color: rgb(240, 246, 252); padding: 8px 16px;">' +
                     '<slot></slot>' +
                   '</button>';
               }
@@ -178,6 +177,9 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
     const violations = await auditPageContrast(page, MIN_WCAG_AA_CONTRAST);
     await context.close();
 
-    expect(violations).toEqual([]);
+    expect(violations).toHaveLength(1);
+    expect(violations.at(0)?.selector).toBe('ag-button#bad-btn >> shadow-root >> slot');
+    expect(violations.at(0)?.hostComponent).toBe('ag-button');
+    expect(violations.at(0)?.contrastRatio).toBeLessThan(MIN_WCAG_AA_CONTRAST);
   });
 });

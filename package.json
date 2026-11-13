@@ -1,6 +1,6 @@
 {
   "name": "@rlevin/uirig",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "The first line of defense for AI-generated UIs and Web Components.",
   "type": "module",
   "main": "./dist/index.js",

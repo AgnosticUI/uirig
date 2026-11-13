@@ -3,7 +3,7 @@
  * Shared Light DOM & open ShadowRoot traversal utilities for `uirig`.
  * Provides:
  * 1. Pure Node-side selector & Shadow host extraction (`extractHostComponentFromSelector`).
- * 2. Self-contained browser-context DOM walker (`walkElementsInBrowser`) that pierces
+ * 2. Self-contained browser-context DOM walker (`createBrowserDomWalker`) that pierces
  *    open `ShadowRoot` boundaries, resolves `hostComponent` custom element tags,
  *    enforces `isElementIgnoredInBrowser`, and filters by `--selectors` scope.
  */
@@ -88,7 +88,6 @@ export function createBrowserDomWalker(
     'LINK',
     'NOSCRIPT',
     'TEMPLATE',
-    'SLOT',
   ]);
 
   function formatSelector(el: Element): string {
