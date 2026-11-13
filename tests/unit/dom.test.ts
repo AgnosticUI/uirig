@@ -4,7 +4,8 @@
  * Verifies:
  * 1. Pure helpers (`containsZeroWidthPromptCharacters`, `evaluateFrameProtectionHeaders`).
  * 2. Live Chromium Light + Shadow DOM sweep catching unlabeled controls, dangling ARIA/label IDs,
- *    broken media, unsafe links, hidden prompt-injection traps, `data-uirig-ignore`, and `--selectors`.
+ *    broken media, unsafe links, hidden prompt-injection traps, `data-uirig-ignore`, `--selectors`,
+ *    and Web Component `<slot>` projected button text / host ARIA labels.
  */
 
 import { describe, it, expect, afterAll } from 'vitest';
@@ -43,8 +44,8 @@ describe('dom.ts — Unified DOM & Markup Integrity Gate', () => {
     ).toBeNull();
   });
 
-  it('passes clean, accessible, well-formed Light & Shadow DOM markup', async () => {
-    console.log('\n--- START TEST: Compliant Markup DOM Integrity Pass ---');
+  it('passes clean, accessible, well-formed Light & Shadow DOM markup including slotted Web Component buttons', async () => {
+    console.log('\n--- START TEST: Compliant Markup & Slotted Web Component Button Pass ---');
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -61,7 +62,19 @@ describe('dom.ts — Unified DOM & Markup Integrity Gate', () => {
             <button type="button" aria-label="Close modal"><svg width="16" height="16"></svg></button>
             <a href="https://example.com" target="_blank" rel="noopener noreferrer">Docs</a>
             <video autoplay muted></video>
+            <ag-button>Monochrome</ag-button>
+            <ag-button aria-label="Host-labeled icon button"><svg width="16" height="16"></svg></ag-button>
           </form>
+          <script>
+            class AgButton extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                shadow.innerHTML = '<button part="ag-button" type="button"><slot></slot></button>';
+              }
+            }
+            customElements.define('ag-button', AgButton);
+          </script>
         </body>
       </html>
     `);
@@ -71,7 +84,8 @@ describe('dom.ts — Unified DOM & Markup Integrity Gate', () => {
 
     expect(violations).toEqual([]);
   });
-  it('catches structural AI hallucinations, broken media, unsafe links, and prompt-injection traps across Shadow DOM', async () => {
+
+    it('catches structural AI hallucinations, broken media, unsafe links, and prompt-injection traps across Shadow DOM', async () => {
     console.log('\n--- START TEST: Structural DOM Hallucination & Prompt-Injection Detection ---');
     if (!browser) {
       browser = await chromium.launch({ headless: true });

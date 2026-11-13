@@ -25,6 +25,6 @@
 
 ## Implementation Checklist (`v0.2.1`)
 
-- [ ] **Micro-Chunk 1 (`dom`):** Update `src/core/dom.ts` + `tests/unit/dom.test.ts` to resolve flattened `<slot>` text and `ShadowRoot.host` ARIA labels on `<button>` elements.
+- [~] **Micro-Chunk 1 (`dom`):** Update `src/core/dom.ts` + `tests/unit/dom.test.ts` to resolve flattened `<slot>` text and `ShadowRoot.host` ARIA labels on `<button>` elements.
 - [ ] **Micro-Chunk 2 (`matrix`):** Update `src/core/matrix.ts` + `tests/unit/matrix.test.ts` so slotted Light DOM text nodes (`assignedSlot !== null`) are evaluated against their `<slot>`'s Shadow DOM background stack rather than the transparent host element.
 - [ ] **Micro-Chunk 3 (`release`):** Bump version to `0.2.1` (`npm version 0.2.1 --no-git-tag-version`), run `npm run release` + `npm run release:publish`, and close the GitHub issue.

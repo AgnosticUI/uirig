@@ -3,7 +3,7 @@
  * Unified DOM & Markup Integrity Gate (uirig dom).
  * Performs a read-only sweep across Light DOM, open ShadowRoots, and HTTP response
  * headers to catch structural AI hallucinations and passive security/prompt-injection traps,
- * with optional `--selectors` subtree scoping.
+ * with optional `--selectors` subtree scoping and Shadow DOM `<slot>` label resolution.
  */
 
 import type { Page, Response } from 'playwright';
@@ -130,7 +130,8 @@ export async function runDomIntegrityAudit(
         }
         return document.getElementById(id);
       }
-      function hasAccessibleLabel(el: Element): boolean {
+
+      function hasDirectAriaOrLabel(el: Element): boolean {
         const ariaLabel = (el.getAttribute('aria-label') ?? '').trim();
         if (ariaLabel.length > 0) {
           return true;
@@ -152,6 +153,41 @@ export async function runDomIntegrityAudit(
             rootNode instanceof Document || rootNode instanceof ShadowRoot ? rootNode : document;
           if (container.querySelector(`label[for="${CSS.escape(el.id)}"]`)) {
             return true;
+          }
+        }
+        return false;
+      }
+
+            function hasAccessibleLabel(el: Element): boolean {
+        if (hasDirectAriaOrLabel(el)) {
+          return true;
+        }
+        const rootNode = el.getRootNode();
+        if (rootNode instanceof ShadowRoot && rootNode.host) {
+          if (hasDirectAriaOrLabel(rootNode.host)) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function hasSlottedAccessibleContent(el: Element): boolean {
+        const slots = Array.from(el.querySelectorAll('slot'));
+        for (const slot of slots) {
+          const assigned = slot.assignedNodes({ flatten: true });
+          for (const node of assigned) {
+            if (node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim().length > 0) {
+              return true;
+            }
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const assignedEl = node as Element;
+              if ((assignedEl.textContent ?? '').trim().length > 0) {
+                return true;
+              }
+              if (hasDirectAriaOrLabel(assignedEl)) {
+                return true;
+              }
+            }
           }
         }
         return false;
@@ -212,10 +248,14 @@ export async function runDomIntegrityAudit(
           }
         }
 
-        // 4. Unlabeled icon-only `<button>` elements
+        // 4. Unlabeled icon-only `<button>` elements (checking direct text, slotted text, and host ARIA)
         if (tag === 'BUTTON') {
           const visibleText = (el.textContent ?? '').trim();
-          if (visibleText.length === 0 && !hasAccessibleLabel(el)) {
+          if (
+            visibleText.length === 0 &&
+            !hasSlottedAccessibleContent(el) &&
+            !hasAccessibleLabel(el)
+          ) {
             found.push({
               rule: 'unlabeled_control',
               selector: meta.selector,
