@@ -1,16 +1,16 @@
 /**
  * tests/unit/matrix.test.ts
- * Unit tests verifying `colorjs.io` WCAG 2.1 contrast evaluation, Porter-Duff
- * semi-transparent background compositing, nearest passing token suggestions,
- * 4.5:1 legibility thresholds, and `--selectors` subtree scoping.
+ * Unit & live Chromium specs verifying `colorjs.io` WCAG 2.1 contrast evaluation,
+ * Porter-Duff semi-transparent background compositing, nearest passing token suggestions,
+ * and `--selectors` component scoping in `auditPageContrast`.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { chromium, type Browser } from 'playwright';
 import {
-  auditPageContrast,
   compositeBackgroundStack,
   evaluateContrastEntry,
   findNearestPassingColorToken,
+  auditPageContrast,
   MIN_WCAG_AA_CONTRAST,
 } from '../../src/core/matrix.js';
 
@@ -33,7 +33,6 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
       inShadowDom: false,
     });
 
-    console.log(`[+] Contrast check result (expected null): ${result}`);
     expect(result).toBeNull();
   });
 
@@ -55,8 +54,6 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
       allowedColors: tokenPalette,
     });
 
-    console.log('[!] Contrast violation caught:', JSON.stringify(result, null, 2));
-
     expect(result).not.toBeNull();
     expect(result?.selector).toBe('span.muted-caption');
     expect(result?.contrastRatio).toBeLessThan(MIN_WCAG_AA_CONTRAST);
@@ -76,7 +73,7 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
       'rgb(15, 23, 42)',
       'rgba(255, 255, 255, 0.85)',
     ]);
-    console.log(`[+] Composited glass backdrop: ${composited.toString({ format: 'rgb' })}`);
+    expect(composited).toBeDefined();
 
     const failingWhiteText = evaluateContrastEntry({
       selector: 'my-modal >> shadow-root >> h2.title',
@@ -99,7 +96,7 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
     expect(passingDarkText).toBeNull();
   });
 
-  it('==> Should scope live contrast violations strictly to --selectors subtrees', async () => {
+  it('==> Should restrict contrast violations to --selectors subtrees in live Chromium', async () => {
     console.log('\n--- START TEST: Component-Scoped Contrast Audit (--selectors) ---');
 
     browser = await chromium.launch({ headless: true });
@@ -111,28 +108,31 @@ describe('::: PHASE 3 TASK 3.2 (CHUNK 1): COLORJS.IO CONTRAST & ALPHA COMPOSITIN
       <html>
         <head>
           <style>
-            body { background: rgb(255, 255, 255); margin: 0; }
-            .low-contrast { color: rgb(180, 180, 180); font-size: 16px; }
+            body { margin: 0; background: rgb(255, 255, 255); color: rgb(15, 23, 42); font-size: 16px; }
+            #off-scope-footer { color: rgb(210, 210, 210); }
+            #target-card .scoped-muted { color: rgb(200, 200, 200); }
           </style>
         </head>
         <body>
-          <header id="outside-header"><p class="low-contrast">Off-scope contrast fail</p></header>
-          <section id="scoped-card"><span class="low-contrast">In-scope contrast fail</span></section>
+          <footer id="off-scope-footer">Off-scope low contrast</footer>
+          <div id="target-card">
+            <span class="scoped-muted">Scoped low contrast</span>
+          </div>
         </body>
       </html>
     `);
 
-    const scopedViolations = await auditPageContrast(
+    const violations = await auditPageContrast(
       page,
       MIN_WCAG_AA_CONTRAST,
       [],
       'contrast',
       [],
-      ['#scoped-card']
+      ['#target-card']
     );
     await context.close();
 
-    expect(scopedViolations).toHaveLength(1);
-    expect(scopedViolations[0]?.selector).toBe('span.low-contrast');
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.selector).toBe('span.scoped-muted');
   });
 });

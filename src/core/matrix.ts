@@ -53,19 +53,12 @@ export interface IExtractedTextContrastEntry {
   inShadowDom: boolean;
 }
 
-/**
- * Helper to extract strictly numeric [r, g, b] coordinates from a Color instance,
- * defaulting any CSS Color 4 `none` (`null`) channels to `0`.
- */
 function extractSafeRgbCoords(color: Color): [number, number, number] {
   const srgb = color.to('srgb');
   const [rawR, rawG, rawB] = srgb.coords;
   return [rawR ?? 0, rawG ?? 0, rawB ?? 0];
 }
 
-/**
- * Formats an sRGB Color instance as a standard 8-bit integer `rgb(r, g, b)` string.
- */
 function formatRgbString(color: Color): string {
   const [r, g, b] = extractSafeRgbCoords(color);
   const r255 = Math.round(Math.min(1, Math.max(0, r)) * 255);
@@ -123,8 +116,8 @@ export function findNearestPassingColorToken(
 }
 
 /**
- * Composites an ordered stack of CSS background colors into a single opaque sRGB Color
- * using standard Porter-Duff "Source-Over" alpha blending.
+ * Composites an ordered stack of CSS background colors using Porter-Duff Source-Over
+ * alpha blending over a white root canvas.
  */
 export function compositeBackgroundStack(backgroundLayers: string[]): Color {
   let accumulated = new Color('srgb', Array.of(1, 1, 1) as [number, number, number], 1);
@@ -154,6 +147,7 @@ export function compositeBackgroundStack(backgroundLayers: string[]): Color {
 
   return accumulated;
 }
+
 /**
  * Evaluates a foreground text color against a stack of ancestor background layers,
  * returning an `IContrastViolation` if the WCAG 2.1 contrast ratio is below `minRatio`.
@@ -174,7 +168,6 @@ export function evaluateContrastEntry(params: {
       : extractHostComponentFromSelector(params.selector);
 
   const resolvedBg = compositeBackgroundStack(params.backgroundLayers);
-
   const parsedFg = new Color(params.foregroundColor).to('srgb');
   const fgAlpha = parsedFg.alpha ?? 1;
   const [fgR, fgG, fgB] = extractSafeRgbCoords(parsedFg);
@@ -212,9 +205,9 @@ export function evaluateContrastEntry(params: {
 }
 
 /**
- * Crawls a live Playwright Page across Light DOM and open ShadowRoot boundaries
- * (optionally scoped to `selectors`), extracting foreground text colors and ancestor
- * background layer stacks for all visible elements that render direct text nodes.
+ * Crawls a live Playwright Page across Light DOM and open ShadowRoot boundaries,
+ * extracting foreground text colors and ancestor background layer stacks for visible
+ * elements that render direct text nodes (optionally scoped to `selectors`).
  */
 export async function extractTextContrastSnapshots(
   page: Page,
