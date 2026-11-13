@@ -2,7 +2,8 @@
  * src/core/matrix.ts
  * Rendered Luminance Contrast Gate (uirig contrast).
  * Uses `colorjs.io` for W3C CSS Color 4 parsing, Porter-Duff alpha layer compositing,
- * and exact WCAG 2.1 contrast ratio verification with optional `--selectors` scoping.
+ * and exact WCAG 2.1 contrast ratio verification with optional `--selectors` scoping
+ * and Shadow DOM `<slot>` background attribution.
  */
 
 import Color from 'colorjs.io';
@@ -207,7 +208,7 @@ export function evaluateContrastEntry(params: {
 /**
  * Crawls a live Playwright Page across Light DOM and open ShadowRoot boundaries,
  * extracting foreground text colors and ancestor background layer stacks for visible
- * elements that render direct text nodes (optionally scoped to `selectors`).
+ * elements that render direct text nodes (or projected `<slot>` text nodes).
  */
 export async function extractTextContrastSnapshots(
   page: Page,
@@ -248,9 +249,30 @@ export async function extractTextContrastSnapshots(
       );
       const results: IExtractedTextContrastEntry[] = [];
 
-      function hasDirectVisibleText(el: Element): boolean {
+      // Only treat direct text nodes NOT projected into a Shadow DOM <slot> as painted by `el`
+      function hasDirectUnassignedVisibleText(el: Element): boolean {
         for (const child of Array.from(el.childNodes)) {
           if (child.nodeType === Node.TEXT_NODE && (child.textContent ?? '').trim().length > 0) {
+            const textNode = child as Text;
+            if (!textNode.assignedSlot) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      // When `el` is a <slot>, check whether it projects any direct Light DOM text nodes
+      function hasSlottedDirectText(el: Element): boolean {
+        if (el.tagName !== 'SLOT') {
+          return false;
+        }
+        const slotEl = el as HTMLSlotElement;
+        for (const assigned of slotEl.assignedNodes({ flatten: true })) {
+          if (
+            assigned.nodeType === Node.TEXT_NODE &&
+            (assigned.textContent ?? '').trim().length > 0
+          ) {
             return true;
           }
         }
@@ -288,7 +310,7 @@ export async function extractTextContrastSnapshots(
         if (
           computed.display !== 'none' &&
           computed.visibility !== 'hidden' &&
-          hasDirectVisibleText(currentNode) &&
+          (hasDirectUnassignedVisibleText(currentNode) || hasSlottedDirectText(currentNode)) &&
           !walker.isIgnored(currentNode, activeRule)
         ) {
           results.push({
