@@ -5,9 +5,8 @@
  * 1. Pure `evaluateDarkModeSurfaceEntry` luminance math and minimum surface size filtering.
  * 2. Live Chromium dark-mode emulation (`prefers-color-scheme: dark` + `[data-theme="dark"]`):
  *    - Passes properly tokenized dark surfaces and high-contrast dark text.
- *    - Catches `stranded_light_surface` (hardcoded `#ffffff` cards) and `dark_mode_contrast_drop`
- *      across both Light DOM and open ShadowRoot Web Components.
- *    - Respects `data-uirig-ignore="dark-mode"`.
+ *    - Catches `stranded_light_surface` and `dark_mode_contrast_drop` across Light & Shadow DOM.
+ *    - Respects `data-uirig-ignore="dark-mode"` and `--selectors` subtree scoping.
  */
 
 import { describe, it, expect, afterAll } from 'vitest';
@@ -29,7 +28,6 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
   it('evaluates surface luminance accurately and ignores small badges <= 120x60px', () => {
     console.log('\n--- START TEST: Pure Dark-Mode Surface Luminance Evaluation ---');
 
-    // Dark slate card (luminance ~ 0.017) -> PASS
     expect(
       evaluateDarkModeSurfaceEntry({
         selector: 'div.dark-card',
@@ -40,7 +38,6 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
       })
     ).toBeNull();
 
-    // Small white pill badge (90x28px) -> skipped by minimum surface dimensions
     expect(
       evaluateDarkModeSurfaceEntry({
         selector: 'span.white-pill',
@@ -51,7 +48,6 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
       })
     ).toBeNull();
 
-    // Large hardcoded white card (320x180px, luminance = 1.0 > 0.85) -> FAIL
     const stranded = evaluateDarkModeSurfaceEntry({
       selector: 'ag-card >> shadow-root >> div.card-shell',
       backgroundLayers: ['rgb(255, 255, 255)'],
@@ -109,7 +105,6 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
 
     expect(violations).toEqual([]);
   });
-
   it('catches stranded light surfaces and dark-mode contrast drops across Light & Shadow DOM', async () => {
     console.log('\n--- START TEST: Stranded Light Surface & Dark Contrast Drop Detection ---');
     if (!browser) {
@@ -124,9 +119,7 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
         <head>
           <style>
             body { margin: 0; padding: 24px; background: #0f172a; color: #f8fafc; }
-            /* Hardcoded dark text that becomes unreadable on dark body */
             p.hardcoded-dark-text { color: #1e293b; font-size: 16px; }
-            /* Intentional light preview exempted via data-uirig-ignore */
             .exempt-preview { width: 240px; height: 100px; background: #ffffff; color: #0f172a; }
           </style>
         </head>
@@ -163,7 +156,40 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
     expect(strandedCard?.inShadowDom).toBe(true);
     expect(strandedCard?.hostComponent).toBe('hardcoded-card');
 
-    // Exempt preview swatch must not appear in violations
     expect(violations.some((v) => v.selector.includes('exempt-preview'))).toBe(false);
+  });
+
+  it('restricts dark-mode violations to --selectors subtrees when selectors are provided', async () => {
+    console.log('\n--- START TEST: Component-Scoped Dark-Mode Audit (--selectors) ---');
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 24px; background: #0f172a; color: #f8fafc; }
+            #off-scope-white { width: 260px; height: 100px; background: #ffffff; color: #0f172a; }
+            #scoped-region .scoped-white { width: 260px; height: 100px; background: #ffffff; color: #0f172a; }
+          </style>
+        </head>
+        <body>
+          <div id="off-scope-white">Off-scope stranded white box</div>
+          <section id="scoped-region">
+            <div class="scoped-white">Scoped stranded white box</div>
+          </section>
+        </body>
+      </html>
+    `);
+
+    const violations = await runDarkModeAudit(page, { selectors: ['#scoped-region'] });
+    await context.close();
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.selector).toBe('div.scoped-white');
   });
 });

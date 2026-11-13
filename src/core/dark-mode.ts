@@ -3,7 +3,8 @@
  * Dark-Mode Theme Parity & Luminance Inversion Gate (uirig dark-mode).
  * Emulates dark color scheme (`prefers-color-scheme: dark` + `data-theme="dark"`),
  * re-audits WCAG 2.1 text contrast across Light DOM and open ShadowRoots, and flags
- * large layout surfaces stranded at bright light luminance (`> darkModeMaxSurfaceLuminance`).
+ * large layout surfaces stranded at bright light luminance (`> darkModeMaxSurfaceLuminance`),
+ * with optional `--selectors` subtree scoping.
  */
 
 import type { Page } from 'playwright';
@@ -15,6 +16,7 @@ import {
 import type { IDarkModeViolation } from '../interfaces/locator.js';
 import { logTelemetry, paint } from '../utils/formatter.js';
 import { isElementIgnoredInBrowser, type IUirigIgnoreRule } from '../utils/ignore.js';
+import { isElementInSelectorScope } from '../utils/scope.js';
 import {
   createBrowserDomWalker,
   extractHostComponentFromSelector,
@@ -43,6 +45,8 @@ export interface IDarkModeAuditOptions {
   ignoreRules?: IUirigIgnoreRule[];
   /** Optional approved color tokens from `tokensPath` used to compute `suggestedToken` fixes. */
   allowedColors?: string[];
+  /** Optional CSS selectors limiting the dark-mode audit to matching subtrees. */
+  selectors?: string[];
 }
 
 /**
@@ -114,16 +118,10 @@ export function evaluateDarkModeSurfaceEntry(
 
   return null;
 }
-
 /**
  * Emulates dark mode on an isolated Playwright `Page` (`colorScheme: 'dark'` + `[data-theme="dark"]`),
  * runs rendered contrast checks, and audits large layout surfaces across Light & Shadow DOM
- * for stranded bright-light backgrounds.
- */
-/**
- * Emulates dark mode on an isolated Playwright `Page` (`colorScheme: 'dark'` + `[data-theme="dark"]`),
- * runs rendered contrast checks, and audits large layout surfaces across Light & Shadow DOM
- * for stranded bright-light backgrounds.
+ * for stranded bright-light backgrounds (optionally scoped to `options.selectors`).
  */
 export async function runDarkModeAudit(
   page: Page,
@@ -134,6 +132,7 @@ export async function runDarkModeAudit(
   const minContrastRatio = options.minContrastRatio ?? MIN_WCAG_AA_CONTRAST;
   const ignoreRules = options.ignoreRules ?? [];
   const allowedColors = options.allowedColors ?? [];
+  const selectors = options.selectors;
 
   logTelemetry(
     'dark-mode:audit',
@@ -144,7 +143,6 @@ export async function runDarkModeAudit(
     )})...`
   );
 
-  // Activate both media-query dark mode and attribute-driven dark themes (`data-theme="dark"`)
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.evaluate(() => {
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -158,7 +156,8 @@ export async function runDarkModeAudit(
     minContrastRatio,
     ignoreRules,
     'dark-mode',
-    allowedColors
+    allowedColors,
+    selectors
   );
   for (const failure of contrastFailures) {
     violations.push({
@@ -172,21 +171,32 @@ export async function runDarkModeAudit(
       inShadowDom: failure.inShadowDom,
     });
   }
+
   // 2. Crawl large visible surfaces with explicit non-transparent backgrounds across Light & Shadow DOM
   const surfaceSnapshots = await page.evaluate(
     ({
       rules,
+      activeSelectors,
       walkerFactorySrc,
       ignoreHelperSrc,
+      scopeHelperSrc,
     }: {
       rules: IUirigIgnoreRule[];
+      activeSelectors?: string[];
       walkerFactorySrc: string;
       ignoreHelperSrc: string;
+      scopeHelperSrc: string;
     }): ISurfaceLuminanceSnapshot[] => {
       const buildWalker = new Function(
         `return (${walkerFactorySrc});`
       )() as typeof createBrowserDomWalker;
-      const walker = buildWalker(window.location.href, rules, ignoreHelperSrc);
+      const walker = buildWalker(
+        window.location.href,
+        rules,
+        ignoreHelperSrc,
+        activeSelectors,
+        scopeHelperSrc
+      );
       const surfaces: ISurfaceLuminanceSnapshot[] = [];
 
       function collectAncestorBackgroundLayers(el: Element): string[] {
@@ -244,8 +254,10 @@ export async function runDarkModeAudit(
     },
     {
       rules: ignoreRules,
+      activeSelectors: selectors,
       walkerFactorySrc: createBrowserDomWalker.toString(),
       ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
+      scopeHelperSrc: isElementInSelectorScope.toString(),
     }
   );
 
@@ -268,5 +280,3 @@ export async function runDarkModeAudit(
 
   return violations;
 }
-
-
