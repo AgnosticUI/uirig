@@ -21,3 +21,6 @@ build/
 # uirig Project Transition Overhead
 README.OLD.md
 docs_old/
+
+# NPM pack tarballs
+*.tgz
