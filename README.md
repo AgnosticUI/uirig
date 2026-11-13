@@ -13,8 +13,8 @@
 * **Catches Design-System Drift `axe` Misses:** `axe` won't tell you that an AI agent hardcoded `#3b82f6` instead of `--ag-color-primary`, or that `+30%` longer German translation copy overflowed `<ag-card>`.
 * **Pierces Web Component Shadow DOMs:** `Lighthouse` won't climb inside a Lit or Stencil `ShadowRoot` to tell a coding agent *which custom element* (`hostComponent`) broke dark-mode contrast or layout bounds.
 * **Zero Screenshot Diff Flakiness:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast, and W3C session-window CLS scores instead of noisy pixel diffs.
-* **Zero-Config First Run:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required.
-* **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout`.
+* **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, or scope audits to specific components with `--selectors`.
+* **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout` while keeping colored telemetry on `stderr`.
 
 ---
 
@@ -28,6 +28,12 @@ npx @rlevin/uirig http://localhost:5173
 
 # Audit a standalone AI-generated HTML file (auto-served on an ephemeral local port)
 npx @rlevin/uirig ./dist/index.html
+
+# Print individual failing selectors and details in the terminal
+npx @rlevin/uirig ./dist/index.html --verbose
+
+# Scope checks to specific components or CSS selectors (Light DOM + Shadow DOM)
+npx @rlevin/uirig http://localhost:5173 --selectors="#hero, ag-button, .pricing-card"
 
 # Stream deduplicated JSON remediation diffs for an AI coding agent
 npx @rlevin/uirig http://localhost:5173 --json
@@ -49,6 +55,7 @@ npx @rlevin/uirig http://localhost:5173 --json
 | **6. DOM Integrity** | `dom` | Catches dangling `aria-labelledby`/`for` IDs, unlabeled controls, broken `<img>` loads, `javascript:` URIs, and hidden AI prompt-injection traps. | `1` |
 
 *(Full suite runs also automatically fail with exit code `1` if the page throws uncaught runtime JavaScript errors during load.)*
+
 ---
 
 ## Installation & Workspace Setup
@@ -66,14 +73,13 @@ npx playwright install chromium
 When you are ready to enforce custom design tokens, multi-viewport budgets, or AI agent skills in a repository, run `init` to scaffold `uirig.config.json`, `.uirig/session.json`, and `.uirig/SKILL.md`:
 
 ```bash
-npx uirig init
+npx @rlevin/uirig init
 ```
-
 ### Configuration (`uirig.config.json`)
 
 ```json
 {
-  "$schema": "https://json-schema.org",
+  "\$schema": "https://json-schema.org",
   "targetUrls": ["http://localhost:5173"],
   "tokensPath": "./config/default_tokens.json",
   "thresholdBudgets": {
@@ -120,7 +126,7 @@ Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comm
 
 ## CLI Command Reference
 
-*(Replace `npx uirig` with `npx @rlevin/uirig` when running without a local `node_modules` install.)*
+*(If `@rlevin/uirig` is installed locally in `node_modules`, `npx uirig` can be used interchangeably with `npx @rlevin/uirig`.)*
 
 ### Instant Target Run (`npx @rlevin/uirig <url-or-file> [options]`)
 Runs all 6 verification engines against a single URL or local `.html` path using `uirig.config.json` if present, or sensible built-in defaults if not.
@@ -132,18 +138,20 @@ Launches a single Chromium instance and executes all 6 verification engines acro
 Run any individual verification engine in isolation for rapid inner-loop debugging or targeted AI agent re-checks:
 
 ```bash
-npx uirig tokens [<url-or-file>] [--config=<path>] [--json] [--headed]
-npx uirig contrast [<url-or-file>] [--config=<path>] [--json] [--headed]
-npx uirig dark-mode [<url-or-file>] [--config=<path>] [--json] [--headed]
-npx uirig stress [<url-or-file>] [--config=<path>] [--json] [--headed]
-npx uirig cls [<url-or-file>] [--config=<path>] [--json] [--headed]
-npx uirig dom [<url-or-file>] [--config=<path>] [--json] [--headed]
+npx @rlevin/uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]
+npx @rlevin/uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]
+npx @rlevin/uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]
+npx @rlevin/uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]
+npx @rlevin/uirig cls [<url-or-file>] [--config=<path>] [--verbose] [--json] [--headed]
+npx @rlevin/uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]
 ```
 
 ### Shared Options
+* `-s, --selectors=<csv>`: Filter element-level checks to matching CSS selectors (comma-separated and repeatable; pierces Web Component `ShadowRoot` boundaries).
+* `--verbose`: Print every individual failing selector path, Shadow DOM host, measured delta, and suggested token beneath each engine summary.
 * `--config=<path>`: Use a custom configuration file path.
 * `--only=<tool>`: Filter `check` to a single engine (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, or `dom`).
-* `--json`: Route diagnostic logs to `stderr` and write a single deduplicated JSON report to `stdout`.
+* `--json`: Route colored diagnostic logs to `stderr` and write a single deduplicated JSON report to `stdout`.
 * `--headed`: Run Chromium with a visible browser window for local inspection.
 * `<command> --help` / `help <command>`: Print detailed mechanics, flags, exit codes, and examples for any subcommand.
 
@@ -159,7 +167,7 @@ npx uirig dom [<url-or-file>] [--config=<path>] [--json] [--headed]
 ### 1. AI Design System Harness Loop (`AGENTS.md` + `--json`)
 `uirig init` generates `.uirig/SKILL.md` so coding agents (Claude Code, Cursor, Codex) can self-verify UI changes after every edit:
 ```bash
-npx uirig http://localhost:5173 --json
+npx @rlevin/uirig http://localhost:5173 --selectors="ag-card" --json
 ```
 Each deduplicated entry in `violations[]` includes `engine`, `hostComponent`, `offendingSelectorPath`, `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
 
@@ -168,7 +176,7 @@ Each deduplicated entry in `violations[]` includes `engine`, `hostComponent`, `o
 - name: Run uirig UI verification gate
   run: |
     npm run build
-    npx @rlevin/uirig ./dist/index.html
+    npx @rlevin/uirig ./dist/index.html --verbose
 ```
 On every `uirig check` run, `.uirig/github_pr_comment.md` is generated and ready to post onto Pull Requests.
 
@@ -176,7 +184,7 @@ On every `uirig check` run, `.uirig/github_pr_comment.md` is generated and ready
 ```bash
 #!/usr/bin/env bash
 set -e
-npx uirig check --config=uirig.config.json
+npx @rlevin/uirig check --config=uirig.config.json
 ```
 
 ### 4. Local Development & Playground

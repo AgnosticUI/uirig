@@ -11,10 +11,10 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
      ```bash
      npx @rlevin/uirig check --json
      ```
-   - Or target a live URL or standalone `.html` file directly (zero-config mode):
+   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly:
      ```bash
      npx @rlevin/uirig http://localhost:5173 --json
-     npx @rlevin/uirig ./dist/index.html --json
+     npx @rlevin/uirig ./dist/index.html --selectors="ag-button, .pricing-card" --json
      ```
    *(If `@rlevin/uirig` is already installed in `node_modules`, `npx uirig ...` works interchangeably.)*
 2. **Evaluate the POSIX exit code and JSON `stdout` payload:**
@@ -30,7 +30,7 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
      - `suggestedToken` (nearest passing design token when available)
      - `remediationAdvice`
    - Patch the offending CSS or component template directly using `suggestedToken` and `remediationAdvice`.
-   - Re-run `npx @rlevin/uirig check --json` (or `npx @rlevin/uirig <target> --json`) until `exitCode` is `0`.
+   - Re-run `npx @rlevin/uirig check --json` (or `npx @rlevin/uirig <target> --selectors="..." --json`) until `exitCode` is `0`.
 
 ## Ground Rules for AI Agents
 
