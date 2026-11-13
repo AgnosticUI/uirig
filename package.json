@@ -1,10 +1,17 @@
 {
   "name": "uirig",
   "version": "0.1.0",
-  "description": "The zero-config, framework-blind UI quality gate for CI/CD pipelines.",
+  "description": "The first line of defense for AI-generated UIs and Web Components.",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
     "uirig": "./bin/uirig"
   },
@@ -12,11 +19,16 @@
     "dist",
     "bin",
     "README.md",
-    "AGENTS.md"
+    "AGENTS.md",
+    "LICENSE.md"
   ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck:all && npm test",
     "pretest": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -26,16 +38,21 @@
     "playground:dev": "vite playground",
     "playwright:verbose": "DEBUG=pw:protocol npx playwright test",
     "playground:test": "vitest run tests/integration/playground.test.ts",
-    "playground:test:headed": "UIRIG_HEADED=1 vitest run tests/integration/playground.test.ts"
+    "playground:test:headed": "UIRIG_HEADED=1 vitest run tests/integration/playground.test.ts",
+    "release": "bash scripts/release.sh",
+    "release:publish": "bash scripts/release.sh --publish"
   },
   "keywords": [
     "ui",
     "ux",
     "design-tokens",
+    "web-components",
+    "shadow-dom",
     "accessibility",
     "contrast",
+    "dark-mode",
     "cls",
-    "fuzzer",
+    "ai-agents",
     "playwright",
     "cicd"
   ],
@@ -44,11 +61,11 @@
   "dependencies": {
     "chokidar": "^6.0.0",
     "colorjs.io": "^0.7.1",
+    "playwright": "^1.65.0",
     "ws": "^8.22.2"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "playwright": "^1.65.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.7",
     "vitest": "^5.1.0"
