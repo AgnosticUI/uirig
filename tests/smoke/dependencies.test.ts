@@ -24,6 +24,6 @@ describe('::: PHASE 2 TASK 2.2: MODULE RUNTIME VALIDATION GATES :::', () => {
     expect(pkg.default.dependencies?.ws).toBeDefined();
     expect(pkg.default.dependencies?.chokidar).toBeDefined();
     expect(pkg.default.devDependencies?.vitest).toBeDefined();
-    expect(pkg.default.devDependencies?.playwright).toBeDefined();
+    expect(pkg.default.dependencies?.playwright).toBeDefined();
   });
 });
