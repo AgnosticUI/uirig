@@ -1,7 +1,7 @@
 /**
  * tests/unit/adversary.test.ts
- * Focused unit specs verifying parent-child bounding box overflow, horizontal
- * scrollbar leak detection, and interactive touch-target spacing invariants.
+ * Focused unit & live Chromium specs verifying parent-child bounding box overflow, horizontal
+ * scrollbar leak detection, interactive touch-target spacing invariants, and `--selectors` scoping.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { chromium, type Browser } from 'playwright';
@@ -26,7 +26,6 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
   it('==> Should allow sub-pixel child overflow within overflowPixelTolerance (2px)', () => {
     console.log('\n--- START TEST: Sub-Pixel Rounding Tolerance Pass ---');
 
-    // Child extends 1.5px past parent's right edge (321.5 vs 320) -> inside 2px tolerance
     const subPixelChild: IBoundingBox = {
       selector: 'span.price-label',
       x: 40,
@@ -37,14 +36,12 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
     };
 
     const result = checkParentChildOverflow(parentCard, subPixelChild, 2);
-    console.log(`[+] Sub-pixel rounding check (expected null): ${result}`);
     expect(result).toBeNull();
   });
 
   it('==> Should flag child container overflow exceeding overflowPixelTolerance', () => {
     console.log('\n--- START TEST: Parent-Child Container Breach Detection ---');
 
-    // Child spills 28px past parent's right edge (348 vs 320) -> exceeds 2px tolerance
     const overflowingChild: IBoundingBox = {
       selector: 'uirig-badge >> shadow-root >> span.expanded-text',
       x: 40,
@@ -55,7 +52,6 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
     };
 
     const result = checkParentChildOverflow(parentCard, overflowingChild, 2);
-    console.log('[!] Container overflow violation caught:', JSON.stringify(result, null, 2));
 
     expect(result).toEqual({
       violationType: 'container_overflow',
@@ -68,19 +64,13 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
 
   it('==> Should pass when document scrollWidth matches viewport innerWidth', () => {
     console.log('\n--- START TEST: Clean Mobile Viewport Width Pass ---');
-
-    const result = checkHorizontalScrollbarLeak(375, 375, 2);
-    console.log(`[+] Clean mobile viewport check (expected null): ${result}`);
-    expect(result).toBeNull();
+    expect(checkHorizontalScrollbarLeak(375, 375, 2)).toBeNull();
   });
 
   it('==> Should flag horizontal scrollbar leak when scrollWidth exceeds innerWidth', () => {
     console.log('\n--- START TEST: Horizontal Scrollbar Bleed Detection ---');
 
-    // 412px document width inside a 375px mobile viewport -> 37px horizontal leak
     const result = checkHorizontalScrollbarLeak(412, 375, 2);
-    console.log('[!] Horizontal scrollbar violation caught:', JSON.stringify(result, null, 2));
-
     expect(result).toEqual({
       violationType: 'horizontal_scrollbar',
       selector: 'document.documentElement',
@@ -102,7 +92,6 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       inShadowDom: false,
     };
 
-    // Placed 28px to the right (x = 148 vs saveButton right = 120) -> >= 24px budget
     const cancelButton: IBoundingBox = {
       selector: 'button#cancel-btn',
       x: 148,
@@ -112,9 +101,7 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       inShadowDom: false,
     };
 
-    const result = checkTouchTargetSpacing(saveButton, cancelButton, 24);
-    console.log(`[+] Well-spaced buttons check (expected null): ${result}`);
-    expect(result).toBeNull();
+    expect(checkTouchTargetSpacing(saveButton, cancelButton, 24)).toBeNull();
   });
 
   it('==> Should flag crowded interactive controls closer than touchTargetMinSpacingPx', () => {
@@ -129,7 +116,6 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       inShadowDom: false,
     };
 
-    // Placed only 8px to the right (x = 128 vs 120 -> 16px short of 24px budget)
     const deleteButton: IBoundingBox = {
       selector: 'button#delete-btn',
       x: 128,
@@ -139,10 +125,7 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       inShadowDom: false,
     };
 
-    const result = checkTouchTargetSpacing(saveButton, deleteButton, 24);
-    console.log('[!] Crowded touch target violation caught:', JSON.stringify(result, null, 2));
-
-    expect(result).toEqual({
+    expect(checkTouchTargetSpacing(saveButton, deleteButton, 24)).toEqual({
       violationType: 'touch_target_collision',
       selector: 'button#save-btn',
       relatedSelector: 'button#delete-btn',
@@ -167,8 +150,6 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
       const page = await context.newPage();
 
-      // Render a fixed-width card (140px) with `white-space: nowrap` text that fits in English
-      // but spills past its parent card and causes a horizontal scrollbar when expanded +30%
       await page.setContent(`
         <!DOCTYPE html>
         <html>
@@ -199,7 +180,6 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
         overflowPixelTolerance: 2,
         touchTargetMinSpacingPx: 24,
       });
-      console.log('[!] Live stress violations caught:', JSON.stringify(violations, null, 2));
 
       await context.close();
 
@@ -250,7 +230,6 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
         overflowPixelTolerance: 2,
         touchTargetMinSpacingPx: 24,
       });
-      console.log('[!] Shadow DOM touch target violations:', JSON.stringify(violations, null, 2));
 
       await context.close();
 
@@ -260,7 +239,6 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       expect(collision?.selector).toBe('uirig-toolbar >> shadow-root >> button#btn-approve');
       expect(collision?.relatedSelector).toBe('uirig-toolbar >> shadow-root >> button#btn-reject');
     });
-
     it('==> Should exempt inline paragraph links and .sr-only utilities without false positives', async () => {
       console.log('\n--- START TEST: Inline Prose Links & .sr-only False-Positive Exemptions ---');
 
@@ -347,6 +325,50 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       expect(types).toContain('undersized_touch_target');
       expect(types).toContain('squished_avatar');
       expect(types).toContain('stuck_invisible_element');
+    });
+
+    it('==> Should restrict stress audit violations to --selectors subtrees when selectors are provided', async () => {
+      console.log('\n--- START TEST: Component-Scoped Stress Audit (--selectors) ---');
+
+      if (!browser) {
+        browser = await chromium.launch({ headless: true });
+      }
+      const context = await browser.newContext({ viewport: { width: 500, height: 600 } });
+      const page = await context.newPage();
+
+      await page.setContent(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { margin: 0; padding: 16px; font-family: sans-serif; }
+              #off-scope-box { width: 120px; border: 1px solid #ccc; }
+              #off-scope-box .off-leak { display: inline-block; white-space: nowrap; font-size: 16px; }
+              #scoped-card { width: 120px; border: 1px solid #ccc; margin-top: 24px; }
+              #scoped-card .scoped-leak { display: inline-block; white-space: nowrap; font-size: 16px; }
+            </style>
+          </head>
+          <body>
+            <div id="off-scope-box">
+              <span class="off-leak">Off-scope overflowing label</span>
+            </div>
+            <div id="scoped-card">
+              <span class="scoped-leak">Scoped overflowing label</span>
+            </div>
+          </body>
+        </html>
+      `);
+
+      const violations = await runGeometricStressAudit(page, {
+        overflowPixelTolerance: 2,
+        touchTargetMinSpacingPx: 24,
+        selectors: ['#scoped-card'],
+      });
+
+      await context.close();
+
+      expect(violations).toHaveLength(1);
+      expect(violations.at(0)?.selector).toBe('span.scoped-leak');
     });
   });
 });

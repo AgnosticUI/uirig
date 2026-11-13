@@ -4,12 +4,13 @@
  * Injects +30% text expansion across Light DOM and open ShadowRoots,
  * then evaluates parent-child containment bounds, viewport horizontal scrollbar leaks,
  * and interactive touch-target spacing invariants using Euclidean box math,
- * respecting `data-uirig-ignore="stress|all"` and config `ignore` rules.
+ * respecting `data-uirig-ignore="stress|all"`, config `ignore` rules, and `--selectors` scoping.
  */
 
 import type { Page } from 'playwright';
 import { logTelemetry, paint } from '../utils/formatter.js';
 import { isElementIgnoredInBrowser, type IUirigIgnoreRule } from '../utils/ignore.js';
+import { isElementInSelectorScope } from '../utils/scope.js';
 import { createBrowserDomWalker } from '../utils/dom-walker.js';
 
 /**
@@ -62,6 +63,8 @@ export interface IStressAuditOptions {
   expansionRatio?: number;
   /** Optional runtime ignore rules from `uirig.config.json`. */
   ignoreRules?: IUirigIgnoreRule[];
+  /** Optional CSS selectors limiting stress mutation and geometric evaluation to matching subtrees. */
+  selectors?: string[];
 }
 
 /**
@@ -195,10 +198,6 @@ export function checkMinimumTouchTargetSize(
   return null;
 }
 
-/**
- * Snapshot payload returned from Playwright's `page.evaluate()` after +30% text expansion
- * and long space-free string injection.
- */
 interface IStressDomSnapshot {
   documentScrollWidth: number;
   windowInnerWidth: number;
@@ -224,12 +223,9 @@ interface IStressDomSnapshot {
 
 /**
  * Mutates a live Playwright Page by injecting +30% text expansion and long space-free
- * strings (emails/URLs) across Light DOM and open ShadowRoot nodes, then evaluates:
- * 1. Global horizontal scrollbar leaks (`100vw` bleed)
- * 2. Parent-child containment bounds (exempting `overflow-x/y: auto/scroll/hidden`)
- * 3. Standalone interactive touch-target spacing and `24x24px` minimum size (exempting inline text links)
- * 4. Flex-squished avatar aspect-ratio distortion
- * 5. Layout-occupying `opacity: 0` elements (exempting `.sr-only`, `aria-hidden`, `inert`, and collapsed `[aria-expanded="false"]` subtrees)
+ * strings (emails/URLs) across Light DOM and open ShadowRoot nodes (optionally scoped
+ * to `options.selectors`), then evaluates containment bounds, touch targets, avatars,
+ * and stuck `opacity: 0` elements.
  */
 export async function runGeometricStressAudit(
   page: Page,
@@ -239,6 +235,8 @@ export async function runGeometricStressAudit(
   const touchTargetMinSpacingPx = options.touchTargetMinSpacingPx ?? 24;
   const expansionRatio = options.expansionRatio ?? 0.3;
   const ignoreRules = options.ignoreRules ?? [];
+  const selectors = options.selectors;
+  const isScopedAudit = Boolean(selectors && selectors.length > 0);
 
   logTelemetry(
     'adversary:stress',
@@ -248,25 +246,34 @@ export async function runGeometricStressAudit(
       'yellow'
     )} text expansion & measuring bounds...`
   );
-
   const snapshot = await page.evaluate(
     ({
       ratio,
       minTouchPx,
       rules,
+      activeSelectors,
       walkerFactorySrc,
       ignoreHelperSrc,
+      scopeHelperSrc,
     }: {
       ratio: number;
       minTouchPx: number;
       rules: IUirigIgnoreRule[];
+      activeSelectors?: string[];
       walkerFactorySrc: string;
       ignoreHelperSrc: string;
+      scopeHelperSrc: string;
     }): IStressDomSnapshot => {
       const buildWalker = new Function(
         `return (${walkerFactorySrc});`
       )() as typeof createBrowserDomWalker;
-      const walker = buildWalker(window.location.href, rules, ignoreHelperSrc);
+      const walker = buildWalker(
+        window.location.href,
+        rules,
+        ignoreHelperSrc,
+        activeSelectors,
+        scopeHelperSrc
+      );
 
       const interactiveTags = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA']);
       const inlineProseParents = new Set(['P', 'LI', 'BLOCKQUOTE', 'DD', 'TD', 'SPAN']);
@@ -309,11 +316,13 @@ export async function runGeometricStressAudit(
       function isAvatarCandidate(el: Element): boolean {
         if (el.tagName === 'IMG') {
           const imgEl = el as HTMLImageElement;
-          return imgEl.classList.contains('avatar') || /avatar|profile/i.test(imgEl.alt || imgEl.id || '');
+          return (
+            imgEl.classList.contains('avatar') ||
+            /avatar|profile/i.test(imgEl.alt || imgEl.id || '')
+          );
         }
         return el.classList.contains('avatar');
       }
-
 
       // Step 0: Record baseline avatar aspect ratios before text expansion
       const baselineAvatarRatios = new Map<Element, number>();
@@ -385,7 +394,6 @@ export async function runGeometricStressAudit(
             return;
           }
 
-          // Detect layout-occupying `opacity: 0` elements (e.g. stuck scroll-reveal animations)
           if (parseFloat(computed.opacity) === 0 && rect.width >= 24 && rect.height >= 24) {
             stuckInvisibleElements.push({
               selector: meta.selector,
@@ -394,7 +402,6 @@ export async function runGeometricStressAudit(
             });
           }
 
-          // Detect flex-squished avatars whose aspect ratio distorted > 15%
           const initialRatio = baselineAvatarRatios.get(currentEl);
           if (initialRatio !== undefined && rect.height > 0) {
             const postRatio = rect.width / rect.height;
@@ -491,14 +498,16 @@ export async function runGeometricStressAudit(
       ratio: expansionRatio,
       minTouchPx: touchTargetMinSpacingPx,
       rules: ignoreRules,
+      activeSelectors: selectors,
       walkerFactorySrc: createBrowserDomWalker.toString(),
       ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
+      scopeHelperSrc: isElementInSelectorScope.toString(),
     }
   );
 
   const violations: IGeometricViolation[] = [];
 
-  if (!snapshot.ignoreRootScrollLeak) {
+  if (!snapshot.ignoreRootScrollLeak && !isScopedAudit) {
     const scrollLeak = checkHorizontalScrollbarLeak(
       snapshot.documentScrollWidth,
       snapshot.windowInnerWidth,
