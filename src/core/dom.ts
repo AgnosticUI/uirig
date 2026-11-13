@@ -2,19 +2,15 @@
  * src/core/dom.ts
  * Unified DOM & Markup Integrity Gate (uirig dom).
  * Performs a read-only sweep across Light DOM, open ShadowRoots, and HTTP response
- * headers to catch structural AI hallucinations and passive security/prompt-injection traps:
- * - Unlabeled form inputs/selects/textareas and empty icon-only buttons
- * - Dangling `aria-labelledby`, `aria-describedby`, and `<label for="...">` ID pointers
- * - Broken `<img>` assets (`complete && naturalWidth === 0`) and unmuted `<video autoplay>`
- * - Unsafe `javascript:` URIs and `target="_blank"` links missing `rel="noopener noreferrer"`
- * - Missing `X-Frame-Options` / `CSP frame-ancestors` headers on HTTP(S) responses
- * - Hidden AI prompt-injection traps (`font-size: 0px`, zero-width Unicode, matching fg/bg colors)
+ * headers to catch structural AI hallucinations and passive security/prompt-injection traps,
+ * with optional `--selectors` subtree scoping.
  */
 
 import type { Page, Response } from 'playwright';
 import type { IDomIntegrityViolation } from '../interfaces/locator.js';
 import { logTelemetry, paint } from '../utils/formatter.js';
 import { isElementIgnoredInBrowser, type IUirigIgnoreRule } from '../utils/ignore.js';
+import { isElementInSelectorScope } from '../utils/scope.js';
 import { createBrowserDomWalker } from '../utils/dom-walker.js';
 
 export interface IDomAuditOptions {
@@ -22,6 +18,8 @@ export interface IDomAuditOptions {
   navigationResponse?: Response | null;
   /** Optional runtime ignore rules from `uirig.config.json`. */
   ignoreRules?: IUirigIgnoreRule[];
+  /** Optional CSS selectors limiting the DOM integrity sweep to matching subtrees. */
+  selectors?: string[];
 }
 
 /**
@@ -76,6 +74,8 @@ export async function runDomIntegrityAudit(
   options: IDomAuditOptions = {}
 ): Promise<IDomIntegrityViolation[]> {
   const ignoreRules = options.ignoreRules ?? [];
+  const selectors = options.selectors;
+  const isScopedAudit = Boolean(selectors && selectors.length > 0);
 
   logTelemetry(
     'dom:audit',
@@ -84,7 +84,7 @@ export async function runDomIntegrityAudit(
 
   const violations: IDomIntegrityViolation[] = [];
 
-  if (options.navigationResponse) {
+  if (options.navigationResponse && !isScopedAudit) {
     const headerViolation = evaluateFrameProtectionHeaders(
       options.navigationResponse.headers(),
       page.url()
@@ -97,17 +97,27 @@ export async function runDomIntegrityAudit(
   const domViolations = await page.evaluate(
     ({
       rules,
+      activeSelectors,
       walkerFactorySrc,
       ignoreHelperSrc,
+      scopeHelperSrc,
     }: {
       rules: IUirigIgnoreRule[];
+      activeSelectors?: string[];
       walkerFactorySrc: string;
       ignoreHelperSrc: string;
+      scopeHelperSrc: string;
     }): IDomIntegrityViolation[] => {
       const buildWalker = new Function(
         `return (${walkerFactorySrc});`
       )() as typeof createBrowserDomWalker;
-      const walker = buildWalker(window.location.href, rules, ignoreHelperSrc);
+      const walker = buildWalker(
+        window.location.href,
+        rules,
+        ignoreHelperSrc,
+        activeSelectors,
+        scopeHelperSrc
+      );
       const found: IDomIntegrityViolation[] = [];
 
       const zeroWidthRegex = /[\u200B-\u200D\u2060\uFEFF]/;
@@ -120,7 +130,6 @@ export async function runDomIntegrityAudit(
         }
         return document.getElementById(id);
       }
-
       function hasAccessibleLabel(el: Element): boolean {
         const ariaLabel = (el.getAttribute('aria-label') ?? '').trim();
         if (ariaLabel.length > 0) {
@@ -317,8 +326,10 @@ export async function runDomIntegrityAudit(
     },
     {
       rules: ignoreRules,
+      activeSelectors: selectors,
       walkerFactorySrc: createBrowserDomWalker.toString(),
       ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
+      scopeHelperSrc: isElementInSelectorScope.toString(),
     }
   );
 
@@ -332,4 +343,3 @@ export async function runDomIntegrityAudit(
 
   return violations;
 }
-

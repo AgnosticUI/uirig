@@ -60,11 +60,10 @@
 
 * **Implementation Checklist:**
   - [x] **Micro-Chunk 1:** Created `src/utils/scope.ts` (`parseSelectorList`, `validateSelectorsInBrowser`, `isElementInSelectorScope`) + `tests/unit/scope.test.ts`.
-  - [~] **Micro-Chunk 2A:** Integrate `selectors?: string[]` into shared `createBrowserDomWalker()` (`src/utils/dom-walker.ts` + `tests/unit/dom-walker.test.ts`).
-  - [ ] **Micro-Chunk 2B:** Wire `selectors?: string[]` into `tokens.ts`, `matrix.ts`, `dark-mode.ts`, `adversary.ts`, and `dom.ts` + unit tests.
+  - [x] **Micro-Chunk 2A:** Integrated `selectors?: string[]` into shared `createBrowserDomWalker()` (`src/utils/dom-walker.ts` + `tests/unit/dom-walker.test.ts`).
+  - [~] **Micro-Chunk 2B:** Wire `selectors?: string[]` into `tokens.ts`, `matrix.ts`, `dark-mode.ts`, `adversary.ts`, and `dom.ts` + unit tests.
   - [ ] **Micro-Chunk 3:** Wire `selectors?: string[]` into `src/commands/check.ts` + `tests/unit/check.test.ts`.
   - [ ] **Micro-Chunk 4:** Wire `--selectors` / `-s` CLI parsing into `src/index.ts` + `tests/unit/index.test.ts`.
-
 
 * **GitHub Issue:** https://github.com/AgnosticUI/uirig/issues/5
 * **Problem Statement:** Auditing an entire page (`npx @rlevin/uirig http://localhost:5173`) produces noisy output (e.g., 274 hits across global navs, footers, or legacy widgets) when a developer or AI agent is iterating on one specific component or region.
