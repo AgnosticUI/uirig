@@ -2,7 +2,7 @@
  * tests/unit/check.test.ts
  * 1-to-1 unit & integration tests for `src/commands/check.ts`.
  * Covers configuration loading, token scale validation, POSIX exit code resolution,
- * zero-config local `.html` file execution, and concurrent Playwright runs.
+ * zero-config local `.html` file execution, `--selectors` component scoping, and concurrent Playwright runs.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -130,7 +130,7 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(() => loadTokenScale('./bad-tokens.json', configFile)).toThrow(/ERR_TOKENS_SCHEMA/);
   });
 
-  it('returns POSIX exit code 0 when all audits pass across viewports', () => {
+    it('returns POSIX exit code 0 when all audits pass across viewports', () => {
     console.log('[test:check] Verifying POSIX exit code 0 on clean audit results...');
     const exitCode = evaluatePosixExitCode([createCleanViewportReport()]);
     expect(exitCode).toBe(0);
@@ -328,6 +328,7 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalDarkModeViolations).toBeGreaterThan(0);
     expect(report.summary.totalContrastViolations).toBe(0);
   });
+
   it('detects structural overflow in stress track without polluting read-only audits and returns exitCode 2', async () => {
     console.log('[test:check] Running live parallel check on a stress-overflow fixture...');
     const overflowHtml = `<!DOCTYPE html>
@@ -392,7 +393,7 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalStressViolations).toBeGreaterThan(0);
   });
 
-  it('suppresses console chatter and writes pure agentic JSON to stdout when options.json is true', async () => {
+    it('suppresses console chatter and writes pure agentic JSON to stdout when options.json is true', async () => {
     console.log('\n--- START TEST: Pure stdout JSON Stream Mode (--json) ---');
     const contrastFailHtml = `<!DOCTYPE html>
       <html>
@@ -602,4 +603,54 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     );
   });
 
+  it('scopes all element-level audits to options.selectors and rejects malformed CSS selectors', async () => {
+    console.log('[test:check] Verifying end-to-end --selectors subtree filtering and validation...');
+    const mixedPageHtml = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root { --bg: #ffffff; --fg: #111827; }
+            :root[data-theme="dark"] { --bg: #0f172a; --fg: #f8fafc; }
+            body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); }
+            #noisy-header .bad-contrast { color: rgb(210, 210, 210); }
+            #clean-widget p { margin: 0; font-size: 16px; }
+          </style>
+        </head>
+        <body>
+          <header id="noisy-header">
+            <span class="bad-contrast">Off-scope low contrast</span>
+            <input placeholder="Off-scope unlabeled input" />
+          </header>
+          <section id="clean-widget">
+            <p>Clean scoped component</p>
+          </section>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(mixedPageHtml);
+    activeServer = server;
+
+    const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+    const scopedReport = await executeCheckCommand({
+      target: url,
+      cwd: tempDir,
+      headless: true,
+      selectors: ['#clean-widget'],
+      reportOutputPath: reportOutput,
+    });
+
+    expect(scopedReport.exitCode).toBe(0);
+    expect(scopedReport.summary.totalContrastViolations).toBe(0);
+    expect(scopedReport.summary.totalDomViolations).toBe(0);
+
+    await expect(
+      executeCheckCommand({
+        target: url,
+        cwd: tempDir,
+        headless: true,
+        selectors: ['div > > .malformed'],
+        reportOutputPath: reportOutput,
+      })
+    ).rejects.toThrow(/ERR_INVALID_SELECTOR/);
+  });
 });

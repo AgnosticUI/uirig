@@ -3,13 +3,14 @@
  * Isolated Parallel Context Dispatcher (uirig check).
  * Launches a single Playwright Chromium instance and orchestrates isolated
  * BrowserContext sessions concurrently (`Promise.all`) per target URL/viewport
- * so read-only audits (`tokens`, `contrast`), mutated DOM fuzzing (`stress`),
- * and pre-navigation `PerformanceObserver` monitoring (`cls`) execute without
- * cross-tool pollution or multiple browser startup overhead.
+ * so read-only audits (`tokens`, `contrast`, `dom`), dark-mode parity (`dark-mode`),
+ * mutated DOM fuzzing (`stress`), and pre-navigation `PerformanceObserver` monitoring (`cls`)
+ * execute without cross-tool pollution or multiple browser startup overhead.
  *
- * Also supports zero-config runs (`npx @rlevin/uirig <url-or-file>`), runtime ignore
- * rules (`data-uirig-ignore` + `ignore[]`), structured terminal violation reports
- * (`--verbose`), and ephemeral local HTTP servers for `.html` file targets.
+ * Also supports zero-config runs (`npx @rlevin/uirig <url-or-file>`), component-scoped
+ * audits (`--selectors` / `-s`), runtime ignore rules (`data-uirig-ignore` + `ignore[]`),
+ * structured terminal violation reports (`--verbose`), and ephemeral local HTTP servers
+ * for `.html` file targets.
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -33,6 +34,7 @@ import {
   startEphemeralStaticServer,
   type IEphemeralStaticServer,
 } from '../utils/static-server.js';
+import { validateSelectorsInBrowser } from '../utils/scope.js';
 import type { IUirigIgnoreRule } from '../utils/ignore.js';
 import type {
   IDarkModeViolation,
@@ -40,12 +42,6 @@ import type {
   IRuntimeErrorViolation,
 } from '../interfaces/locator.js';
 
-/**
- * Deterministic POSIX exit codes enforced by `uirig check`:
- * - `0`: All token, contrast, dark-mode parity, geometric stress, CLS, DOM, and runtime checks passed.
- * - `1`: Configuration/token load error, design token drift, WCAG/dark-mode contrast failure, DOM violation, or runtime JS error.
- * - `2`: Structural layout break (overflow, horizontal scrollbar, touch collision) or CLS budget breach.
- */
 export type PosixExitCode = 0 | 1 | 2;
 
 export interface IViewportConfig {
@@ -80,6 +76,8 @@ export interface ICheckCommandOptions {
   headless?: boolean;
   /** When true, prints every individual failing selector beneath each engine section in human output. */
   verbose?: boolean;
+  /** Optional CSS selectors limiting element-level audits to matching subtrees (`--selectors` / `-s`). */
+  selectors?: string[];
   /** Optional single-engine filter. Runs all enabled engines when omitted. */
   only?: AuditToolName;
   /** Optional inline token scale override (useful for programmatic calls & tests). */
@@ -119,11 +117,6 @@ export interface ICheckExecutionReport {
     totalRuntimeErrors?: number;
   };
 }
-
-/**
- * Sensible built-in defaults used when running `npx @rlevin/uirig <url-or-file>` without
- * a `uirig.config.json` file on disk.
- */
 export const ZERO_CONFIG_DEFAULTS: Omit<IUirigConfig, 'targetUrls'> = {
   tokensPath: undefined,
   thresholdBudgets: {
@@ -139,10 +132,6 @@ export const ZERO_CONFIG_DEFAULTS: Omit<IUirigConfig, 'targetUrls'> = {
   ignore: [],
 };
 
-/**
- * Fallback built-in token scale used only when `tokensPath` is omitted or explicitly
- * configured to use defaults, ensuring zero-config runs remain resilient.
- */
 export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
   colors: ['rgb(255, 255, 255)', 'rgb(0, 0, 0)', 'rgb(17, 24, 39)', 'rgb(243, 244, 246)'],
   spacing: ['0px', '4px', '8px', '12px', '16px', '20px', '24px', '32px'],
@@ -150,10 +139,6 @@ export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
   radii: ['0px', '4px', '6px', '8px', '16px', '9999px'],
 };
 
-/**
- * Reads and validates `uirig.config.json` from disk.
- * Throws descriptive `ERR_CONFIG_*` errors so CLI callers can exit with POSIX code `1`.
- */
 export function loadUirigConfig(
   configPath: string = resolve(process.cwd(), 'uirig.config.json')
 ): IUirigConfig {
@@ -246,10 +231,6 @@ export function loadUirigConfig(
   };
 }
 
-/**
- * Resolves the active `IUirigConfig` for a run, supporting explicit `--config`,
- * default `uirig.config.json`, and zero-config positional `<url-or-file>` runs.
- */
 export function resolveExecutionConfig(
   options: ICheckCommandOptions,
   cwd: string
@@ -290,10 +271,7 @@ export function resolveExecutionConfig(
   loadUirigConfig(defaultConfigPath);
   throw new Error(`ERR_CONFIG_MISSING: Configuration file not found at ${defaultConfigPath}.`);
 }
-/**
- * Loads and validates the approved design token scale JSON referenced by `tokensPath`.
- * Resolves relative paths against the directory containing `uirig.config.json`.
- */
+
 export function loadTokenScale(tokensPath: string, configFilePath: string): ITokenScaleConfig {
   const resolvedTokensPath = resolve(dirname(configFilePath), tokensPath);
   logTelemetry(
@@ -338,10 +316,6 @@ export function loadTokenScale(tokensPath: string, configFilePath: string): ITok
   };
 }
 
-/**
- * Evaluates an array of viewport audit reports and determines the deterministic
- * POSIX exit code for CI/CD pipelines (`0` = pass, `1` = policy/integrity/runtime, `2` = stress/CLS).
- */
 export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExitCode {
   let hasStructuralOrClsFailure = false;
   let hasPolicyOrIntegrityFailure = false;
@@ -369,10 +343,7 @@ export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExi
   }
   return 0;
 }
-/**
- * Audits a single `(url, viewport)` target across isolated Playwright `BrowserContext`
- * sessions running concurrently (`Promise.all`) inside one shared Chromium browser.
- */
+
 export async function auditViewportInParallel(
   browser: Browser,
   url: string,
@@ -381,7 +352,8 @@ export async function auditViewportInParallel(
   budgets: IThresholdBudgets,
   only?: AuditToolName,
   ignoreRules: IUirigIgnoreRule[] = [],
-  isLocalStaticTarget: boolean = false
+  isLocalStaticTarget: boolean = false,
+  selectors?: string[]
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
   const runTokens = (!only || only === 'tokens') && tokenScale !== null;
@@ -393,9 +365,11 @@ export async function auditViewportInParallel(
   const runRuntimeCapture = !only;
 
   const activeScope = only ? `single engine (${only})` : '4 isolated contexts';
+  const selectorTag =
+    selectors && selectors.length > 0 ? ` [scope: ${selectors.join(', ')}]` : '';
   logTelemetry(
     'check:dispatch',
-    `Running ${activeScope} for ${paint(url, 'cyan')} @ ${paint(
+    `Running ${activeScope}${selectorTag} for ${paint(url, 'cyan')} @ ${paint(
       `${viewport.name} (${viewport.width}x${viewport.height})`,
       'bold',
       'green'
@@ -445,7 +419,7 @@ export async function auditViewportInParallel(
       const response = await page.goto(url, { waitUntil: 'networkidle' });
       const tokenViolations =
         runTokens && tokenScale !== null
-          ? await crawlPageTokens(page, tokenScale, ignoreRules)
+          ? await crawlPageTokens(page, tokenScale, ignoreRules, selectors)
           : [];
       const contrastViolations = runContrast
         ? await auditPageContrast(
@@ -453,7 +427,8 @@ export async function auditViewportInParallel(
             MIN_WCAG_AA_CONTRAST,
             ignoreRules,
             'contrast',
-            tokenScale?.colors ?? []
+            tokenScale?.colors ?? [],
+            selectors
           )
         : [];
 
@@ -461,6 +436,7 @@ export async function auditViewportInParallel(
         ? await runDomIntegrityAudit(page, {
             navigationResponse: isLocalStaticTarget ? null : response,
             ignoreRules,
+            selectors,
           })
         : [];
 
@@ -470,7 +446,7 @@ export async function auditViewportInParallel(
     }
   };
 
-  // Track 2: Emulated Dark-Mode Theme Parity Audit (`dark-mode`)
+    // Track 2: Emulated Dark-Mode Theme Parity Audit (`dark-mode`)
   const runDarkModeTrack = async (): Promise<IDarkModeViolation[]> => {
     if (!runDarkMode) {
       return [];
@@ -484,6 +460,7 @@ export async function auditViewportInParallel(
           budgets.darkModeMaxSurfaceLuminance ?? DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
         ignoreRules,
         allowedColors: tokenScale?.colors ?? [],
+        selectors,
       });
     } finally {
       await context.close();
@@ -503,6 +480,7 @@ export async function auditViewportInParallel(
         overflowPixelTolerance: budgets.overflowPixelTolerance,
         touchTargetMinSpacingPx: budgets.touchTargetMinSpacingPx,
         ignoreRules,
+        selectors,
       });
     } finally {
       await context.close();
@@ -595,6 +573,17 @@ export async function executeCheckCommand(
     );
     browser = await chromium.launch({ headless });
 
+    // Validate CSS selector syntax upfront before dispatching parallel tracks
+    if (options.selectors && options.selectors.length > 0) {
+      const validationContext = await browser.newContext();
+      try {
+        const validationPage = await validationContext.newPage();
+        await validateSelectorsInBrowser(validationPage, options.selectors);
+      } finally {
+        await validationContext.close();
+      }
+    }
+
     const results: IViewportAuditReport[] = [];
 
     for (const targetEntry of resolvedTargets) {
@@ -607,7 +596,8 @@ export async function executeCheckCommand(
           config.thresholdBudgets,
           options.only,
           config.ignore ?? [],
-          targetEntry.isLocal
+          targetEntry.isLocal,
+          options.selectors
         );
         results.push({
           ...viewportReport,
@@ -644,11 +634,9 @@ export async function executeCheckCommand(
       summary,
     };
 
-    // Synthesize standalone GitHub PR comment Markdown report to disk
     writeGithubPrCommentReport(executionReport, resolvedReportPath);
 
     if (options.json) {
-      // Emit raw machine-readable JSON directly to stdout for AI Design System Harnesses
       process.stdout.write(`${formatAgenticJsonStream(executionReport)}\n`);
     } else {
       process.stdout.write(
