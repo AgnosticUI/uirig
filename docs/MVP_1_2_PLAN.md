@@ -59,8 +59,9 @@
 ## Task 1.2.3 — Issue #5: Add `--selectors` (`-s`) Flag for Component-Scoped Audits
 
 * **Implementation Checklist:**
-  - [~] **Micro-Chunk 1:** Create `src/utils/scope.ts` (`parseSelectorList`, `validateSelectorsInBrowser`, `isElementInSelectorScope`) + `tests/unit/scope.test.ts`.
-  - [ ] **Micro-Chunk 2:** Wire `selectors?: string[]` into `tokens.ts`, `matrix.ts`, `dark-mode.ts`, `adversary.ts`, and `dom.ts` + unit tests.
+  - [x] **Micro-Chunk 1:** Created `src/utils/scope.ts` (`parseSelectorList`, `validateSelectorsInBrowser`, `isElementInSelectorScope`) + `tests/unit/scope.test.ts`.
+  - [~] **Micro-Chunk 2A:** Integrate `selectors?: string[]` into shared `createBrowserDomWalker()` (`src/utils/dom-walker.ts` + `tests/unit/dom-walker.test.ts`).
+  - [ ] **Micro-Chunk 2B:** Wire `selectors?: string[]` into `tokens.ts`, `matrix.ts`, `dark-mode.ts`, `adversary.ts`, and `dom.ts` + unit tests.
   - [ ] **Micro-Chunk 3:** Wire `selectors?: string[]` into `src/commands/check.ts` + `tests/unit/check.test.ts`.
   - [ ] **Micro-Chunk 4:** Wire `--selectors` / `-s` CLI parsing into `src/index.ts` + `tests/unit/index.test.ts`.
 

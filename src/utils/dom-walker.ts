@@ -5,10 +5,10 @@
  * 1. Pure Node-side selector & Shadow host extraction (`extractHostComponentFromSelector`).
  * 2. Self-contained browser-context DOM walker (`walkElementsInBrowser`) that pierces
  *    open `ShadowRoot` boundaries, resolves `hostComponent` custom element tags,
- *    formats `offendingSelectorPath` breadcrumbs, and enforces `isElementIgnoredInBrowser`.
+ *    enforces `isElementIgnoredInBrowser`, and filters by `--selectors` scope.
  */
 
-import { isElementIgnoredInBrowser, type IUirigIgnoreRule } from './ignore.js';
+import type { IUirigIgnoreRule } from './ignore.js';
 
 export interface IWalkedElementMetadata {
   selector: string;
@@ -42,25 +42,42 @@ export function extractHostComponentFromSelector(selectorPath: string): string |
 
 /**
  * Browser-context DOM traversal helper designed to be serialized into `page.evaluate()`.
- * Recursively walks Light DOM and open `ShadowRoot` trees, resolving each element's
- * full selector path, enclosing `hostComponent` tag, and `isElementIgnoredInBrowser` status.
+ * IMPORTANT: Must contain ZERO runtime references to imported module values in its body
+ * or default parameters so `createBrowserDomWalker.toString()` executes cleanly inside Chromium V8.
  */
 export function createBrowserDomWalker(
   currentUrl: string,
   ignoreRules: IUirigIgnoreRule[] = [],
-  ignoreHelperSource: string = isElementIgnoredInBrowser.toString()
+  ignoreHelperSource?: string,
+  selectors?: string[],
+  scopeHelperSource?: string
 ): {
   formatSelector: (el: Element) => string;
   resolveHostComponent: (el: Element) => string | null;
   isIgnored: (el: Element, ruleName: string) => boolean;
+  isInScope: (el: Element) => boolean;
   walkElements: (
     onElement: (el: Element, meta: IWalkedElementMetadata) => void,
     options?: { includeBody?: boolean }
   ) => void;
 } {
-  const checkIgnored = new Function(
-    `return (${ignoreHelperSource});`
-  )() as typeof isElementIgnoredInBrowser;
+  type IgnorePredicate = (
+    el: Element,
+    ruleName: string,
+    url: string,
+    rules: IUirigIgnoreRule[]
+  ) => boolean;
+  type ScopePredicate = (el: Element, activeSelectors?: string[]) => boolean;
+
+  const checkIgnored: IgnorePredicate = ignoreHelperSource
+    ? (new Function(`return (${ignoreHelperSource});`)() as IgnorePredicate)
+    : () => false;
+
+  const checkInScope: ScopePredicate = scopeHelperSource
+    ? (new Function(`return (${scopeHelperSource});`)() as ScopePredicate)
+    : () => true;
+
+  const activeSelectors = selectors && selectors.length > 0 ? selectors : undefined;
 
   const nonVisualTags = new Set([
     'HTML',
@@ -98,6 +115,10 @@ export function createBrowserDomWalker(
     return checkIgnored(el, ruleName, currentUrl, ignoreRules);
   }
 
+  function isInScope(el: Element): boolean {
+    return checkInScope(el, activeSelectors);
+  }
+
   function walkElements(
     onElement: (el: Element, meta: IWalkedElementMetadata) => void,
     options: { includeBody?: boolean } = {}
@@ -118,7 +139,10 @@ export function createBrowserDomWalker(
           const elementLabel = formatSelector(currentNode);
           const fullSelector = shadowPrefix ? `${shadowPrefix} >> ${elementLabel}` : elementLabel;
 
-          if (includeBody || currentNode.tagName !== 'BODY') {
+          if (
+            (includeBody || currentNode.tagName !== 'BODY') &&
+            checkInScope(currentNode, activeSelectors)
+          ) {
             onElement(currentNode, {
               selector: fullSelector,
               hostComponent: activeHostTag,
@@ -144,6 +168,7 @@ export function createBrowserDomWalker(
     formatSelector,
     resolveHostComponent,
     isIgnored,
+    isInScope,
     walkElements,
   };
 }

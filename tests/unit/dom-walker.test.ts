@@ -5,7 +5,7 @@
  * 1. Pure Node-side `extractHostComponentFromSelector` across Light DOM, single ShadowRoot,
  *    and nested ShadowRoot breadcrumbs with `#id` / `.class` qualifiers.
  * 2. Live Chromium `createBrowserDomWalker` traversal across nested open ShadowRoots,
- *    verifying `hostComponent`, `inShadowDom`, `selector`, and integrated `isIgnored()` checks.
+ *    verifying `hostComponent`, `inShadowDom`, `selector`, `isIgnored()`, and `--selectors` scoping.
  */
 
 import { describe, it, expect, afterAll } from 'vitest';
@@ -16,6 +16,7 @@ import {
   type IWalkedElementMetadata,
 } from '../../src/utils/dom-walker.js';
 import { isElementIgnoredInBrowser, type IUirigIgnoreRule } from '../../src/utils/ignore.js';
+import { isElementInSelectorScope } from '../../src/utils/scope.js';
 
 describe('dom-walker.ts — Shared Shadow-Host & Selector Walker', () => {
   let browser: Browser | undefined;
@@ -39,8 +40,8 @@ describe('dom-walker.ts — Shared Shadow-Host & Selector Walker', () => {
     ).toBe('ag-badge');
   });
 
-  it('traverses Light DOM and nested open ShadowRoots in Chromium with hostComponent and ignore checks', async () => {
-    console.log('\n--- START TEST: Live Chromium Nested Shadow DOM Walker ---');
+  it('traverses Light DOM and nested open ShadowRoots in Chromium with hostComponent, ignore, and selector scope checks', async () => {
+    console.log('\n--- START TEST: Live Chromium Nested Shadow DOM & Scoped Walker ---');
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -49,6 +50,7 @@ describe('dom-walker.ts — Shared Shadow-Host & Selector Walker', () => {
       <!DOCTYPE html>
       <html>
         <body>
+          <header class="global-header"><nav class="top-nav">Nav</nav></header>
           <main class="shell">
             <outer-card id="card-1"></outer-card>
             <div data-uirig-ignore="tokens">
@@ -78,19 +80,26 @@ describe('dom-walker.ts — Shared Shadow-Host & Selector Walker', () => {
       </html>
     `);
 
+    const evalPayload = {
+      walkerFactorySrc: createBrowserDomWalker.toString(),
+      ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
+      scopeHelperSrc: isElementInSelectorScope.toString(),
+    };
+
+    // 1. Unscoped full-page walk
     const walkedItems = await page.evaluate(
-      ({
-        walkerFactorySrc,
-        ignoreHelperSrc,
-      }: {
-        walkerFactorySrc: string;
-        ignoreHelperSrc: string;
-      }) => {
+      ({ walkerFactorySrc, ignoreHelperSrc, scopeHelperSrc }) => {
         const buildWalker = new Function(
           `return (${walkerFactorySrc});`
         )() as typeof createBrowserDomWalker;
         const rules: IUirigIgnoreRule[] = [];
-        const walker = buildWalker('http://localhost:5173', rules, ignoreHelperSrc);
+        const walker = buildWalker(
+          'http://localhost:5173',
+          rules,
+          ignoreHelperSrc,
+          undefined,
+          scopeHelperSrc
+        );
 
         const collected: Array<IWalkedElementMetadata & { ignoredTokens: boolean }> = [];
         walker.walkElements(
@@ -104,13 +113,8 @@ describe('dom-walker.ts — Shared Shadow-Host & Selector Walker', () => {
         );
         return collected;
       },
-      {
-        walkerFactorySrc: createBrowserDomWalker.toString(),
-        ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
-      }
+      evalPayload
     );
-
-    await context.close();
 
     const cardBody = walkedItems.find((item) => item.selector.endsWith('div.card-body'));
     expect(cardBody).toEqual({
@@ -131,5 +135,37 @@ describe('dom-walker.ts — Shared Shadow-Host & Selector Walker', () => {
     const exemptSpan = walkedItems.find((item) => item.selector === 'span.exempt-text');
     expect(exemptSpan?.ignoredTokens).toBe(true);
     expect(exemptSpan?.hostComponent).toBeNull();
+
+    // 2. Scoped walk (`selectors = ['outer-card#card-1']`) excludes header/nav/exempt-text while piercing Shadow DOM
+    const scopedSelectors = await page.evaluate(
+      ({ walkerFactorySrc, ignoreHelperSrc, scopeHelperSrc }) => {
+        const buildWalker = new Function(
+          `return (${walkerFactorySrc});`
+        )() as typeof createBrowserDomWalker;
+        const walker = buildWalker(
+          'http://localhost:5173',
+          [],
+          ignoreHelperSrc,
+          ['outer-card#card-1'],
+          scopeHelperSrc
+        );
+
+        const paths: string[] = [];
+        walker.walkElements((_el, meta) => {
+          paths.push(meta.selector);
+        });
+        return paths;
+      },
+      evalPayload
+    );
+
+    await context.close();
+
+    expect(scopedSelectors).toEqual([
+      'outer-card#card-1',
+      'outer-card#card-1 >> shadow-root >> div.card-body',
+      'outer-card#card-1 >> shadow-root >> inner-badge',
+      'outer-card#card-1 >> shadow-root >> inner-badge >> shadow-root >> span.badge-label',
+    ]);
   });
 });
