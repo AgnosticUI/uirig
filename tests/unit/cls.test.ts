@@ -185,8 +185,7 @@ describe('::: PHASE 3 TASK 3.4 (CHUNK 2): LIVE CHROMIUM CLS PERFORMANCE OBSERVER
     // Register observer BEFORE loading content
     await prepareClsObserver(page);
 
-    // Render content at the top of the viewport, wait for Frame 1 to paint,
-    // then dynamically prepend a 240px banner to push `.primary-content` downward
+    // Render initial content and wait for Chromium to commit Frame 1 before mutating DOM
     await page.setContent(`
       <!DOCTYPE html>
       <html>
@@ -202,23 +201,26 @@ describe('::: PHASE 3 TASK 3.4 (CHUNK 2): LIVE CHROMIUM CLS PERFORMANCE OBSERVER
         </head>
         <body>
           <main class="primary-content">Primary article pushed down by late banner</main>
-          <script>
-            requestAnimationFrame(() => {
-              setTimeout(() => {
-                const banner = document.createElement('div');
-                banner.className = 'async-promo-banner';
-                banner.style.height = '240px';
-                banner.style.background = '#fee2e2';
-                banner.textContent = 'Late Async Promo Banner';
-                document.body.insertBefore(banner, document.body.firstChild);
-              }, 80);
-            });
-          </script>
         </body>
       </html>
     `);
 
-    const result = await collectPageCls(page, DEFAULT_CLS_MAX_LIMIT, 300);
+    // Ensure initial layout frame is painted so Chromium records a subsequent shift entry
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    );
+
+    // Deterministically prepend a 240px banner to push `.primary-content` downward
+    await page.evaluate(() => {
+      const banner = document.createElement('div');
+      banner.className = 'async-promo-banner';
+      banner.style.height = '240px';
+      banner.style.background = '#fee2e2';
+      banner.textContent = 'Late Async Promo Banner';
+      document.body.insertBefore(banner, document.body.firstChild);
+    });
+
+    const result = await collectPageCls(page, DEFAULT_CLS_MAX_LIMIT, 150);
     console.log('[!] Live Chromium CLS violation caught:', JSON.stringify(result, null, 2));
 
     await context.close();
@@ -228,5 +230,4 @@ describe('::: PHASE 3 TASK 3.4 (CHUNK 2): LIVE CHROMIUM CLS PERFORMANCE OBSERVER
     expect(result.violation?.shiftCountInWorstWindow).toBeGreaterThanOrEqual(1);
     expect(result.violation?.offendingSelectors).toContain('main.primary-content');
   });
- 
 });
