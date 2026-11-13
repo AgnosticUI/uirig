@@ -141,7 +141,7 @@ npx uirig dom [<url-or-file>] [--config=<path>] [--json] [--headed]
 * `--only=<tool>`: Filter `check` to a single engine (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, or `dom`).
 * `--json`: Route diagnostic logs to `stderr` and write a single deduplicated JSON report to `stdout`.
 * `--headed`: Run Chromium with a visible browser window for local inspection.
-* `<command> --help`: Print detailed mechanics, flags, and exit codes for any subcommand.
+* `<command> --help` / `help <command>`: Print detailed mechanics, flags, exit codes, and examples for any subcommand.
 
 ### POSIX Exit Codes
 * `0`: All token, contrast, dark-mode parity, geometric stress, CLS, DOM integrity, and runtime checks passed.
