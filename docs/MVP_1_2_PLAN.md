@@ -14,6 +14,11 @@
 | **3** | Issue #5 | Add `--selectors` (`-s`) flag to filter checks to specific elements | **M–L** | **[ ] Next** | Core engine and CLI flag enhancement; naturally inherits the fixed color behavior (#3) and structured console report (#4). |
 | **4** | Issue #2 | Audit `npx uirig` -> `npx @rlevin/uirig` | **S** | **[ ] Pending** | Final documentation & CLI help sweep; performed last so docs are updated once with both `@rlevin/uirig` and the new `--verbose` / `--selectors` flags. |
 
+### Status
+
+| **2** | Issue #4 | Expose Playground 4-Tool Check Report to core `uirig` | **S–M** | **[x] Done** | Establishes the canonical human-readable console violation formatter in `src/utils/` before `--selectors` filtering modifies which violations appear. |
+| **3** | Issue #5 | Add `--selectors` (`-s`) flag to filter checks to specific elements | **M–L** | **[~] Active** | Core engine and CLI flag enhancement; naturally inherits the fixed color behavior (#3) and structured console report (#4). |
+
 ---
 
 ## Task 1.2.1 — Issue #3: Restore Colored `stderr` Telemetry Under `--json`
@@ -36,7 +41,8 @@
 
 * **Implementation Checklist:**
   - [x] **Micro-Chunk 1:** Created `src/utils/console-report.ts` (`formatConsoleAuditReport`) + `tests/unit/console-report.test.ts`.
-  - [~] **Micro-Chunk 2:** Wire `verbose?: boolean` and `--verbose` into `src/commands/check.ts`, `src/index.ts`, `tests/unit/check.test.ts`, and `tests/unit/index.test.ts`.
+  - [x] **Micro-Chunk 2:** Wire `verbose?: boolean` and `--verbose` into `src/commands/check.ts`, `src/index.ts`, `tests/unit/check.test.ts`, and `tests/unit/index.test.ts`.
+  - [x] **Full Task Completed:** 1.2.2 code complete
 
 * **GitHub Issue:** https://github.com/AgnosticUI/uirig/issues/4
 * **Problem Statement:** Outside of `playground/vite.config.ts` (`uirigAutoSpotCheckPlugin`), standard CLI runs (`npx @rlevin/uirig <target>`) print only aggregate violation counts (`Violations detected: 274`) without showing the offending CSS/Shadow-DOM selectors or measured deltas unless the user opens `.uirig/github_pr_comment.md` or parses `--json`.
@@ -51,6 +57,13 @@
 ---
 
 ## Task 1.2.3 — Issue #5: Add `--selectors` (`-s`) Flag for Component-Scoped Audits
+
+* **Implementation Checklist:**
+  - [~] **Micro-Chunk 1:** Create `src/utils/scope.ts` (`parseSelectorList`, `validateSelectorsInBrowser`, `isElementInSelectorScope`) + `tests/unit/scope.test.ts`.
+  - [ ] **Micro-Chunk 2:** Wire `selectors?: string[]` into `tokens.ts`, `matrix.ts`, `dark-mode.ts`, `adversary.ts`, and `dom.ts` + unit tests.
+  - [ ] **Micro-Chunk 3:** Wire `selectors?: string[]` into `src/commands/check.ts` + `tests/unit/check.test.ts`.
+  - [ ] **Micro-Chunk 4:** Wire `--selectors` / `-s` CLI parsing into `src/index.ts` + `tests/unit/index.test.ts`.
+
 
 * **GitHub Issue:** https://github.com/AgnosticUI/uirig/issues/5
 * **Problem Statement:** Auditing an entire page (`npx @rlevin/uirig http://localhost:5173`) produces noisy output (e.g., 274 hits across global navs, footers, or legacy widgets) when a developer or AI agent is iterating on one specific component or region.
