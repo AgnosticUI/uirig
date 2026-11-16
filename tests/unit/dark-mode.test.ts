@@ -3,9 +3,10 @@
  * 1-to-1 unit & live Chromium specs for `src/core/dark-mode.ts`.
  * Verifies:
  * 1. Pure `evaluateDarkModeSurfaceEntry` luminance math and minimum surface size filtering.
- * 2. Live Chromium dark-mode emulation (`prefers-color-scheme: dark` + `[data-theme="dark"]`):
- *    - Passes properly tokenized dark surfaces and high-contrast dark text.
- *    - Catches `stranded_light_surface` and `dark_mode_contrast_drop` across Light & Shadow DOM.
+ * 2. Live Chromium dark-mode emulation (`prefers-color-scheme: dark`, `[data-theme="dark"]`, and `.dark`):
+ *    - Coexistence of VitePress `html.dark` page backgrounds and AgnosticUI `[data-theme="dark"]` tokens.
+ *    - Clean restoration of original `<html>` `data-theme` and `.dark` state after audit.
+ *    - Catches `stranded_light_surface`, `dark_mode_contrast_drop`, and `opacity < 1` Web Component drops.
  *    - Respects `data-uirig-ignore="dark-mode"` and `--selectors` subtree scoping.
  */
 
@@ -26,8 +27,6 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
   });
 
   it('evaluates surface luminance accurately and ignores small badges <= 120x60px', () => {
-    console.log('\n--- START TEST: Pure Dark-Mode Surface Luminance Evaluation ---');
-
     expect(
       evaluateDarkModeSurfaceEntry({
         selector: 'div.dark-card',
@@ -66,47 +65,59 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
     });
   });
 
-  it('passes a page that cleanly adapts surfaces and text to dark mode', async () => {
-    console.log('\n--- START TEST: Compliant Dark-Mode Theme Parity Pass ---');
+  it('activates both .dark (VitePress) and [data-theme="dark"] (AgnosticUI) and restores original <html> state', async () => {
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
     const page = await context.newPage();
 
     await page.setContent(`
       <!DOCTYPE html>
-      <html>
+      <html data-theme="light">
         <head>
           <style>
-            :root {
-              --bg: #ffffff;
-              --surface: #f8fafc;
-              --fg: #0f172a;
-            }
-            :root[data-theme="dark"] {
-              --bg: #0f172a;
-              --surface: #1e293b;
-              --fg: #f8fafc;
-            }
-            body { margin: 0; padding: 24px; background: var(--bg); color: var(--fg); }
-            .panel { width: 320px; height: 140px; padding: 16px; background: var(--surface); }
+            html { --vp-c-bg: #ffffff; --vp-c-text: #0f172a; }
+            html.dark { --vp-c-bg: #1b1b1f; --vp-c-text: #dfdfd6; }
+            :root { --ag-btn-bg: #2563eb; --ag-btn-fg: #ffffff; }
+            :root[data-theme="dark"] { --ag-btn-bg: #1d4ed8; --ag-btn-fg: #f8fafc; }
+            body { margin: 0; padding: 24px; background: var(--vp-c-bg); color: var(--vp-c-text); }
           </style>
         </head>
         <body>
-          <div class="panel">
-            <h1>Dark Mode Ready</h1>
-            <p>Tokenized surface and foreground adapt automatically.</p>
-          </div>
+          <h1>VitePress + AgnosticUI Docs</h1>
+          <ag-button>Primary Action</ag-button>
+          <script>
+            class AgButton extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                shadow.innerHTML =
+                  '<button style="background: var(--ag-btn-bg); color: var(--ag-btn-fg); border: 0; padding: 8px 16px;">' +
+                    'Primary Action' +
+                  '</button>';
+              }
+            }
+            customElements.define('ag-button', AgButton);
+          </script>
         </body>
       </html>
     `);
 
     const violations = await runDarkModeAudit(page);
+    expect(violations).toEqual([]);
+
+    const restoredState = await page.evaluate(() => ({
+      dataTheme: document.documentElement.getAttribute('data-theme'),
+      hasDarkClass: document.documentElement.classList.contains('dark'),
+    }));
     await context.close();
 
-    expect(violations).toEqual([]);
+    expect(restoredState).toEqual({
+      dataTheme: 'light',
+      hasDarkClass: false,
+    });
   });
-  it('catches stranded light surfaces and dark-mode contrast drops across Light & Shadow DOM', async () => {
-    console.log('\n--- START TEST: Stranded Light Surface & Dark Contrast Drop Detection ---');
+
+    it('catches stranded light surfaces, dark-mode contrast drops, and low-opacity Web Components', async () => {
     if (!browser) {
       browser = await chromium.launch({ headless: true });
     }
@@ -121,12 +132,14 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
             body { margin: 0; padding: 24px; background: #0f172a; color: #f8fafc; }
             p.hardcoded-dark-text { color: #1e293b; font-size: 16px; }
             .exempt-preview { width: 240px; height: 100px; background: #ffffff; color: #0f172a; }
+            ag-faded-btn { display: inline-block; opacity: 0.5; }
           </style>
         </head>
         <body>
           <p class="hardcoded-dark-text">Unreadable dark text in dark mode</p>
           <div class="exempt-preview" data-uirig-ignore="dark-mode">Light theme swatch</div>
           <hardcoded-card></hardcoded-card>
+          <ag-faded-btn>Faded</ag-faded-btn>
           <script>
             class HardcodedCard extends HTMLElement {
               constructor() {
@@ -139,6 +152,18 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
               }
             }
             customElements.define('hardcoded-card', HardcodedCard);
+
+            class AgFadedBtn extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                shadow.innerHTML =
+                  '<button style="background: #2563eb; color: #ffffff; border: 0; padding: 8px 16px;">' +
+                    'Faded' +
+                  '</button>';
+              }
+            }
+            customElements.define('ag-faded-btn', AgFadedBtn);
           </script>
         </body>
       </html>
@@ -151,6 +176,12 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
     expect(contrastDrop).toBeDefined();
     expect(contrastDrop?.selector).toBe('p.hardcoded-dark-text');
 
+    const fadedBtnDrop = violations.find(
+      (v) => v.violationType === 'dark_mode_contrast_drop' && v.hostComponent === 'ag-faded-btn'
+    );
+    expect(fadedBtnDrop).toBeDefined();
+    expect(fadedBtnDrop?.inShadowDom).toBe(true);
+
     const strandedCard = violations.find((v) => v.violationType === 'stranded_light_surface');
     expect(strandedCard).toBeDefined();
     expect(strandedCard?.inShadowDom).toBe(true);
@@ -160,7 +191,6 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
   });
 
   it('restricts dark-mode violations to --selectors subtrees when selectors are provided', async () => {
-    console.log('\n--- START TEST: Component-Scoped Dark-Mode Audit (--selectors) ---');
     if (!browser) {
       browser = await chromium.launch({ headless: true });
     }

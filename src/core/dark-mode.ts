@@ -1,17 +1,19 @@
 /**
  * src/core/dark-mode.ts
  * Dark-Mode Theme Parity & Luminance Inversion Gate (uirig dark-mode).
- * Emulates dark color scheme (`prefers-color-scheme: dark` + `data-theme="dark"`),
- * re-audits WCAG 2.1 text contrast across Light DOM and open ShadowRoots, and flags
+ * Emulates dark color scheme (`prefers-color-scheme: dark`, `data-theme="dark"`, and `.dark`),
+ * re-audits WCAG 2.1 text contrast across Light DOM and open ShadowRoots, flags
  * large layout surfaces stranded at bright light luminance (`> darkModeMaxSurfaceLuminance`),
- * with optional `--selectors` subtree scoping.
+ * cleanly restores original `<html>` theme attributes/classes afterward,
+ * and supports optional `--selectors` subtree scoping.
  */
 
 import type { Page } from 'playwright';
 import {
   auditPageContrast,
-  compositeBackgroundStack,
+  compositeContrastLayers,
   MIN_WCAG_AA_CONTRAST,
+  type IAncestorStyleLayer,
 } from './matrix.js';
 import type { IDarkModeViolation } from '../interfaces/locator.js';
 import { logTelemetry, paint } from '../utils/formatter.js';
@@ -31,6 +33,8 @@ export interface ISurfaceLuminanceSnapshot {
   selector: string;
   hostComponent?: string | null;
   backgroundLayers: string[];
+  /** Optional ordered `{ backgroundColor, opacity }` layers from `<html>` down to the surface. */
+  styleLayers?: IAncestorStyleLayer[];
   width: number;
   height: number;
   inShadowDom: boolean;
@@ -49,10 +53,6 @@ export interface IDarkModeAuditOptions {
   selectors?: string[];
 }
 
-/**
- * Picks the darkest compliant surface token from `allowedColors` whose relative luminance
- * stays at or below `maxSurfaceLuminance`.
- */
 export function findNearestDarkSurfaceToken(
   allowedColors: string[] = [],
   maxSurfaceLuminance: number = DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE
@@ -78,10 +78,6 @@ export function findNearestDarkSurfaceToken(
   return bestToken;
 }
 
-/**
- * Pure evaluator that composites a surface's ancestor background stack and checks
- * whether its WCAG relative luminance exceeds `maxSurfaceLuminance` in dark mode.
- */
 export function evaluateDarkModeSurfaceEntry(
   entry: ISurfaceLuminanceSnapshot,
   maxSurfaceLuminance: number = DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
@@ -91,7 +87,10 @@ export function evaluateDarkModeSurfaceEntry(
     return null;
   }
 
-  const resolvedBg = compositeBackgroundStack(entry.backgroundLayers);
+  const effectiveLayers: IAncestorStyleLayer[] =
+    entry.styleLayers ??
+    entry.backgroundLayers.map((backgroundColor) => ({ backgroundColor, opacity: 1 }));
+  const resolvedBg = compositeContrastLayers(effectiveLayers, 'rgb(0, 0, 0)').resolvedBg;
   const luminance = Math.round(resolvedBg.luminance * 1000) / 1000;
 
   if (luminance > maxSurfaceLuminance) {
@@ -118,10 +117,21 @@ export function evaluateDarkModeSurfaceEntry(
 
   return null;
 }
+
+interface IOriginalHtmlThemeState {
+  dataTheme: string | null;
+  hadDarkClass: boolean;
+  dataBsTheme: string | null;
+}
+
 /**
- * Emulates dark mode on an isolated Playwright `Page` (`colorScheme: 'dark'` + `[data-theme="dark"]`),
- * runs rendered contrast checks, and audits large layout surfaces across Light & Shadow DOM
- * for stranded bright-light backgrounds (optionally scoped to `options.selectors`).
+ * Emulates dark mode on a Playwright `Page` across all three major conventions:
+ * 1. CSS media query (`prefers-color-scheme: dark`)
+ * 2. Attribute selector (`[data-theme="dark"]` — AgnosticUI, DaisyUI, Carbon, etc.)
+ * 3. Root class selector (`html.dark` — VitePress, Tailwind, Nextra, etc.)
+ *
+ * Re-audits WCAG 2.1 text contrast and large surface luminance across Light & Shadow DOM
+ * (optionally scoped to `options.selectors`), then restores original `<html>` state.
  */
 export async function runDarkModeAudit(
   page: Page,
@@ -144,139 +154,174 @@ export async function runDarkModeAudit(
   );
 
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.evaluate(() => {
-    document.documentElement.setAttribute('data-theme', 'dark');
+  const originalThemeState: IOriginalHtmlThemeState = await page.evaluate(() => {
+    const root = document.documentElement;
+    const snapshot: IOriginalHtmlThemeState = {
+      dataTheme: root.getAttribute('data-theme'),
+      hadDarkClass: root.classList.contains('dark'),
+      dataBsTheme: root.getAttribute('data-bs-theme'),
+    };
+    root.setAttribute('data-theme', 'dark');
+    root.classList.add('dark');
+    if (snapshot.dataBsTheme !== null) {
+      root.setAttribute('data-bs-theme', 'dark');
+    }
+    return snapshot;
   });
 
-  const violations: IDarkModeViolation[] = [];
+  try {
+    const violations: IDarkModeViolation[] = [];
 
-  // 1. Re-run WCAG 2.1 contrast audit under dark mode using rule name `'dark-mode'`
-  const contrastFailures = await auditPageContrast(
-    page,
-    minContrastRatio,
-    ignoreRules,
-    'dark-mode',
-    allowedColors,
-    selectors
-  );
-  for (const failure of contrastFailures) {
-    violations.push({
-      violationType: 'dark_mode_contrast_drop',
-      selector: failure.selector,
-      hostComponent: failure.hostComponent,
-      foregroundRgb: failure.foregroundRgb,
-      backgroundRgb: failure.backgroundRgb,
-      contrastRatio: failure.contrastRatio,
-      ...(failure.suggestedToken ? { suggestedToken: failure.suggestedToken } : {}),
-      inShadowDom: failure.inShadowDom,
-    });
-  }
-
-  // 2. Crawl large visible surfaces with explicit non-transparent backgrounds across Light & Shadow DOM
-  const surfaceSnapshots = await page.evaluate(
-    ({
-      rules,
-      activeSelectors,
-      walkerFactorySrc,
-      ignoreHelperSrc,
-      scopeHelperSrc,
-    }: {
-      rules: IUirigIgnoreRule[];
-      activeSelectors?: string[];
-      walkerFactorySrc: string;
-      ignoreHelperSrc: string;
-      scopeHelperSrc: string;
-    }): ISurfaceLuminanceSnapshot[] => {
-      const buildWalker = new Function(
-        `return (${walkerFactorySrc});`
-      )() as typeof createBrowserDomWalker;
-      const walker = buildWalker(
-        window.location.href,
-        rules,
-        ignoreHelperSrc,
-        activeSelectors,
-        scopeHelperSrc
-      );
-      const surfaces: ISurfaceLuminanceSnapshot[] = [];
-
-      function collectAncestorBackgroundLayers(el: Element): string[] {
-        const bottomUpLayers: string[] = [];
-        let current: Element | null = el;
-
-        while (current) {
-          const bg = window.getComputedStyle(current).backgroundColor;
-          if (bg) {
-            bottomUpLayers.push(bg);
-          }
-          if (current.parentElement) {
-            current = current.parentElement;
-          } else {
-            const rootNode = current.getRootNode();
-            current = rootNode instanceof ShadowRoot ? rootNode.host : null;
-          }
-        }
-        return bottomUpLayers.reverse();
-      }
-
-      walker.walkElements((currentNode, meta) => {
-        if (currentNode.tagName === 'BODY') {
-          return;
-        }
-        const computed = window.getComputedStyle(currentNode);
-        if (
-          computed.display === 'none' ||
-          computed.visibility === 'hidden' ||
-          walker.isIgnored(currentNode, 'dark-mode')
-        ) {
-          return;
-        }
-
-        const bg = computed.backgroundColor.toLowerCase().trim();
-        const isTransparent = !bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)';
-        if (isTransparent) {
-          return;
-        }
-
-        const rect = currentNode.getBoundingClientRect();
-        if (rect.width > 120 && rect.height > 60) {
-          surfaces.push({
-            selector: meta.selector,
-            hostComponent: meta.hostComponent,
-            backgroundLayers: collectAncestorBackgroundLayers(currentNode),
-            width: rect.width,
-            height: rect.height,
-            inShadowDom: meta.inShadowDom,
-          });
-        }
-      });
-
-      return surfaces;
-    },
-    {
-      rules: ignoreRules,
-      activeSelectors: selectors,
-      walkerFactorySrc: createBrowserDomWalker.toString(),
-      ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
-      scopeHelperSrc: isElementInSelectorScope.toString(),
-    }
-  );
-
-  for (const surface of surfaceSnapshots) {
-    const surfaceViolation = evaluateDarkModeSurfaceEntry(
-      surface,
-      maxSurfaceLuminance,
-      allowedColors
+    const contrastFailures = await auditPageContrast(
+      page,
+      minContrastRatio,
+      ignoreRules,
+      'dark-mode',
+      allowedColors,
+      selectors
     );
-    if (surfaceViolation) {
-      violations.push(surfaceViolation);
+    for (const failure of contrastFailures) {
+      violations.push({
+        violationType: 'dark_mode_contrast_drop',
+        selector: failure.selector,
+        hostComponent: failure.hostComponent,
+        foregroundRgb: failure.foregroundRgb,
+        backgroundRgb: failure.backgroundRgb,
+        contrastRatio: failure.contrastRatio,
+        ...(failure.suggestedToken ? { suggestedToken: failure.suggestedToken } : {}),
+        inShadowDom: failure.inShadowDom,
+      });
     }
+
+    const surfaceSnapshots = await page.evaluate(
+      ({
+        rules,
+        activeSelectors,
+        walkerFactorySrc,
+        ignoreHelperSrc,
+        scopeHelperSrc,
+      }: {
+        rules: IUirigIgnoreRule[];
+        activeSelectors?: string[];
+        walkerFactorySrc: string;
+        ignoreHelperSrc: string;
+        scopeHelperSrc: string;
+      }): ISurfaceLuminanceSnapshot[] => {
+        const buildWalker = new Function(
+          `return (${walkerFactorySrc});`
+        )() as typeof createBrowserDomWalker;
+        const walker = buildWalker(
+          window.location.href,
+          rules,
+          ignoreHelperSrc,
+          activeSelectors,
+          scopeHelperSrc
+        );
+        const surfaces: ISurfaceLuminanceSnapshot[] = [];
+
+        function collectAncestorStyleLayers(el: Element): IAncestorStyleLayer[] {
+          const bottomUpLayers: IAncestorStyleLayer[] = [];
+          let current: Element | null = el;
+
+          while (current) {
+            const style = window.getComputedStyle(current);
+            const parsedOpacity = Number.parseFloat(style.opacity);
+            bottomUpLayers.push({
+              backgroundColor: style.backgroundColor || 'rgba(0, 0, 0, 0)',
+              opacity: Number.isFinite(parsedOpacity) ? parsedOpacity : 1,
+            });
+            if (current.parentElement) {
+              current = current.parentElement;
+            } else {
+              const rootNode = current.getRootNode();
+              current = rootNode instanceof ShadowRoot ? rootNode.host : null;
+            }
+          }
+          return bottomUpLayers.reverse();
+        }
+
+        walker.walkElements((currentNode, meta) => {
+          if (currentNode.tagName === 'BODY') {
+            return;
+          }
+          const computed = window.getComputedStyle(currentNode);
+          if (
+            computed.display === 'none' ||
+            computed.visibility === 'hidden' ||
+            walker.isIgnored(currentNode, 'dark-mode')
+          ) {
+            return;
+          }
+
+          const bg = computed.backgroundColor.toLowerCase().trim();
+          const isTransparent = !bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)';
+          if (isTransparent) {
+            return;
+          }
+
+          const rect = currentNode.getBoundingClientRect();
+          if (rect.width > 120 && rect.height > 60) {
+            const styleLayers = collectAncestorStyleLayers(currentNode);
+            surfaces.push({
+              selector: meta.selector,
+              hostComponent: meta.hostComponent,
+              backgroundLayers: styleLayers.map((layer) => layer.backgroundColor),
+              styleLayers,
+              width: rect.width,
+              height: rect.height,
+              inShadowDom: meta.inShadowDom,
+            });
+          }
+        });
+
+        return surfaces;
+      },
+      {
+        rules: ignoreRules,
+        activeSelectors: selectors,
+        walkerFactorySrc: createBrowserDomWalker.toString(),
+        ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
+        scopeHelperSrc: isElementInSelectorScope.toString(),
+      }
+    );
+
+    for (const surface of surfaceSnapshots) {
+      const surfaceViolation = evaluateDarkModeSurfaceEntry(
+        surface,
+        maxSurfaceLuminance,
+        allowedColors
+      );
+      if (surfaceViolation) {
+        violations.push(surfaceViolation);
+      }
+    }
+
+    const countBadge =
+      violations.length > 0
+        ? paint(String(violations.length), 'bold', 'red')
+        : paint('0', 'bold', 'green');
+    logTelemetry('dark-mode:audit', `Dark-mode parity audit complete. Violations detected: ${countBadge}`);
+
+    return violations;
+  } finally {
+    await page.emulateMedia({ colorScheme: null }).catch(() => {});
+    await page
+      .evaluate((prev: IOriginalHtmlThemeState) => {
+        const root = document.documentElement;
+        if (prev.dataTheme === null) {
+          root.removeAttribute('data-theme');
+        } else {
+          root.setAttribute('data-theme', prev.dataTheme);
+        }
+        if (!prev.hadDarkClass) {
+          root.classList.remove('dark');
+        }
+        if (prev.dataBsTheme === null) {
+          root.removeAttribute('data-bs-theme');
+        } else {
+          root.setAttribute('data-bs-theme', prev.dataBsTheme);
+        }
+      }, originalThemeState)
+      .catch(() => {});
   }
-
-  const countBadge =
-    violations.length > 0
-      ? paint(String(violations.length), 'bold', 'red')
-      : paint('0', 'bold', 'green');
-  logTelemetry('dark-mode:audit', `Dark-mode parity audit complete. Violations detected: ${countBadge}`);
-
-  return violations;
 }
