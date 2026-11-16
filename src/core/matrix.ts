@@ -2,8 +2,8 @@
  * src/core/matrix.ts
  * Rendered Luminance Contrast Gate (uirig contrast).
  * Uses `colorjs.io` for W3C CSS Color 4 parsing, Porter-Duff alpha layer compositing,
- * and exact WCAG 2.1 contrast ratio verification with optional `--selectors` scoping
- * and Shadow DOM `<slot>` background attribution.
+ * CSS `opacity` stacking-group unwinding, and exact WCAG 2.1 contrast ratio verification
+ * with optional `--selectors` scoping and Shadow DOM `<slot>` background attribution.
  */
 
 import Color from 'colorjs.io';
@@ -44,13 +44,24 @@ export interface IContrastViolation {
 }
 
 /**
- * Raw foreground and ancestor background layer snapshot extracted from a live text node.
+ * Represents a single DOM or Shadow DOM ancestor's computed background color and CSS `opacity`,
+ * ordered from outermost root (`<html>`) down to the target text element.
+ */
+export interface IAncestorStyleLayer {
+  backgroundColor: string;
+  opacity: number;
+}
+
+/**
+ * Raw foreground and ancestor style layer stack extracted from a live text node.
  */
 export interface IExtractedTextContrastEntry {
   selector: string;
   hostComponent?: string | null;
   foregroundColor: string;
   backgroundLayers: string[];
+  /** Ordered `{ backgroundColor, opacity }` layers from root (`<html>`) to leaf text element. */
+  styleLayers?: IAncestorStyleLayer[];
   inShadowDom: boolean;
 }
 
@@ -81,7 +92,6 @@ export function findNearestPassingColorToken(
   if (allowedColors.length === 0) {
     return undefined;
   }
-
   let parsedOffending: Color;
   let parsedBackdrop: Color;
   try {
@@ -93,15 +103,13 @@ export function findNearestPassingColorToken(
 
   let bestToken: string | undefined;
   let lowestDeltaE = Number.POSITIVE_INFINITY;
-
   for (const rawCandidate of allowedColors) {
     try {
       const candidate = new Color(rawCandidate).to('srgb');
       if ((candidate.alpha ?? 1) < 1) {
         continue;
       }
-      const ratio = parsedBackdrop.contrast(candidate, 'WCAG21');
-      if (ratio >= minRatio) {
+      if (parsedBackdrop.contrast(candidate, 'WCAG21') >= minRatio) {
         const distance = parsedOffending.deltaE(candidate, '2000');
         if (distance < lowestDeltaE) {
           lowestDeltaE = distance;
@@ -112,52 +120,96 @@ export function findNearestPassingColorToken(
       // Skip non-parseable token entries gracefully
     }
   }
-
   return bestToken;
 }
 
 /**
- * Composites an ordered stack of CSS background colors using Porter-Duff Source-Over
- * alpha blending over a white root canvas.
+ * Blends a source sRGB `Color` over an opaque destination sRGB `Color` using Porter-Duff Source-Over.
  */
-export function compositeBackgroundStack(backgroundLayers: string[]): Color {
-  let accumulated = new Color('srgb', Array.of(1, 1, 1) as [number, number, number], 1);
-
-  for (const rawLayer of backgroundLayers) {
-    const parsed = new Color(rawLayer).to('srgb');
-    const alpha = parsed.alpha ?? 1;
-
-    if (alpha <= 0) {
-      continue;
-    }
-
-    const [srcR, srcG, srcB] = extractSafeRgbCoords(parsed);
-
-    if (alpha >= 1) {
-      accumulated = new Color('srgb', [srcR, srcG, srcB], 1);
-      continue;
-    }
-
-    const [dstR, dstG, dstB] = extractSafeRgbCoords(accumulated);
-    const blendedR = srcR * alpha + dstR * (1 - alpha);
-    const blendedG = srcG * alpha + dstG * (1 - alpha);
-    const blendedB = srcB * alpha + dstB * (1 - alpha);
-
-    accumulated = new Color('srgb', [blendedR, blendedG, blendedB], 1);
+function blendOverBackdrop(src: Color, dst: Color, alpha: number): Color {
+  if (alpha <= 0) {
+    return dst;
   }
-
-  return accumulated;
+  const [srcR, srcG, srcB] = extractSafeRgbCoords(src);
+  if (alpha >= 1) {
+    return new Color('srgb', [srcR, srcG, srcB], 1);
+  }
+  const [dstR, dstG, dstB] = extractSafeRgbCoords(dst);
+  return new Color(
+    'srgb',
+    [
+      srcR * alpha + dstR * (1 - alpha),
+      srcG * alpha + dstG * (1 - alpha),
+      srcB * alpha + dstB * (1 - alpha),
+    ],
+    1
+  );
 }
 
 /**
- * Evaluates a foreground text color against a stack of ancestor background layers,
- * returning an `IContrastViolation` if the WCAG 2.1 contrast ratio is below `minRatio`.
+ * Composites an ordered stack of CSS background colors (`opacity: 1` assumed for each layer)
+ * into a single opaque sRGB `Color`. Preserved for callers evaluating background stacks alone.
+ */
+export function compositeBackgroundStack(backgroundLayers: string[]): Color {
+  const layers: IAncestorStyleLayer[] = backgroundLayers.map((backgroundColor) => ({
+    backgroundColor,
+    opacity: 1,
+  }));
+  return compositeContrastLayers(layers, 'rgb(0, 0, 0)').resolvedBg;
+}
+
+/**
+ * Resolves exact rendered opaque foreground and background `Color` values by modeling both
+ * `backgroundColor` alpha layers AND CSS `opacity < 1` stacking groups from `<html>` down
+ * through Light DOM and `ShadowRoot.host` ancestors to the leaf text element.
+ */
+export function compositeContrastLayers(
+  styleLayers: IAncestorStyleLayer[],
+  foregroundColor: string
+): { resolvedFg: Color; resolvedBg: Color } {
+  const whiteCanvas = new Color('srgb', Array.of(1, 1, 1) as [number, number, number], 1);
+  interface IOpacityGroupFrame {
+    opacity: number;
+    backdropBeforeGroup: Color;
+  }
+
+  let currentBg = whiteCanvas;
+  const opacityStack: IOpacityGroupFrame[] = [];
+
+  for (const layer of styleLayers) {
+    const clampedOpacity = Math.min(1, Math.max(0, Number.isFinite(layer.opacity) ? layer.opacity : 1));
+    if (clampedOpacity < 1) {
+      opacityStack.push({ opacity: clampedOpacity, backdropBeforeGroup: currentBg });
+    }
+    const parsedBg = new Color(layer.backgroundColor).to('srgb');
+    const bgAlpha = parsedBg.alpha ?? 1;
+    if (bgAlpha > 0) {
+      currentBg = blendOverBackdrop(parsedBg, currentBg, bgAlpha);
+    }
+  }
+
+  const parsedFg = new Color(foregroundColor).to('srgb');
+  let currentFg = blendOverBackdrop(parsedFg, currentBg, parsedFg.alpha ?? 1);
+
+  for (let i = opacityStack.length - 1; i >= 0; i--) {
+    const frame = opacityStack[i] as IOpacityGroupFrame;
+    currentBg = blendOverBackdrop(currentBg, frame.backdropBeforeGroup, frame.opacity);
+    currentFg = blendOverBackdrop(currentFg, frame.backdropBeforeGroup, frame.opacity);
+  }
+
+  return { resolvedFg: currentFg, resolvedBg: currentBg };
+}
+
+/**
+ * Evaluates a foreground text color against ancestor background/opacity layers,
+ * returning an `IContrastViolation` if WCAG 2.1 contrast drops below `minRatio`.
  */
 export function evaluateContrastEntry(params: {
   selector: string;
   hostComponent?: string | null;
   foregroundColor: string;
   backgroundLayers: string[];
+  styleLayers?: IAncestorStyleLayer[];
   inShadowDom: boolean;
   minRatio?: number;
   allowedColors?: string[];
@@ -168,15 +220,14 @@ export function evaluateContrastEntry(params: {
       ? params.hostComponent
       : extractHostComponentFromSelector(params.selector);
 
-  const resolvedBg = compositeBackgroundStack(params.backgroundLayers);
-  const parsedFg = new Color(params.foregroundColor).to('srgb');
-  const fgAlpha = parsedFg.alpha ?? 1;
-  const [fgR, fgG, fgB] = extractSafeRgbCoords(parsedFg);
+  const effectiveLayers: IAncestorStyleLayer[] =
+    params.styleLayers ??
+    params.backgroundLayers.map((backgroundColor) => ({ backgroundColor, opacity: 1 }));
 
-  const resolvedFg =
-    fgAlpha >= 1
-      ? new Color('srgb', [fgR, fgG, fgB], 1)
-      : compositeBackgroundStack([formatRgbString(resolvedBg), params.foregroundColor]);
+  const { resolvedFg, resolvedBg } = compositeContrastLayers(
+    effectiveLayers,
+    params.foregroundColor
+  );
 
   const rawRatio = resolvedBg.contrast(resolvedFg, 'WCAG21');
   const roundedRatio = Math.round(rawRatio * 100) / 100;
@@ -207,8 +258,8 @@ export function evaluateContrastEntry(params: {
 
 /**
  * Crawls a live Playwright Page across Light DOM and open ShadowRoot boundaries,
- * extracting foreground text colors and ancestor background layer stacks for visible
- * elements that render direct text nodes (or projected `<slot>` text nodes).
+ * extracting foreground text colors and ancestor `{ backgroundColor, opacity }` stacks
+ * for visible elements that render direct text nodes (or projected `<slot>` text nodes).
  */
 export async function extractTextContrastSnapshots(
   page: Page,
@@ -279,25 +330,25 @@ export async function extractTextContrastSnapshots(
         return false;
       }
 
-      function collectAncestorBackgroundLayers(el: Element): string[] {
-        const bottomUpLayers: string[] = [];
+      // Walk upward from `el` through `parentElement` and `ShadowRoot.host` boundaries,
+      // collecting `{ backgroundColor, opacity }` ordered from outermost ancestor down to `el`.
+      function collectAncestorStyleLayers(el: Element): IAncestorStyleLayer[] {
+        const bottomUpLayers: IAncestorStyleLayer[] = [];
         let current: Element | null = el;
 
         while (current) {
-          const bg = window.getComputedStyle(current).backgroundColor;
-          if (bg) {
-            bottomUpLayers.push(bg);
-          }
+          const style = window.getComputedStyle(current);
+          const parsedOpacity = Number.parseFloat(style.opacity);
+          bottomUpLayers.push({
+            backgroundColor: style.backgroundColor || 'rgba(0, 0, 0, 0)',
+            opacity: Number.isFinite(parsedOpacity) ? parsedOpacity : 1,
+          });
 
           if (current.parentElement) {
             current = current.parentElement;
           } else {
             const rootNode = current.getRootNode();
-            if (rootNode instanceof ShadowRoot) {
-              current = rootNode.host;
-            } else {
-              current = null;
-            }
+            current = rootNode instanceof ShadowRoot ? rootNode.host : null;
           }
         }
 
@@ -313,11 +364,13 @@ export async function extractTextContrastSnapshots(
           (hasDirectUnassignedVisibleText(currentNode) || hasSlottedDirectText(currentNode)) &&
           !walker.isIgnored(currentNode, activeRule)
         ) {
+          const styleLayers = collectAncestorStyleLayers(currentNode);
           results.push({
             selector: meta.selector,
             hostComponent: meta.hostComponent,
             foregroundColor: computed.color,
-            backgroundLayers: collectAncestorBackgroundLayers(currentNode),
+            backgroundLayers: styleLayers.map((layer) => layer.backgroundColor),
+            styleLayers,
             inShadowDom: meta.inShadowDom,
           });
         }
@@ -349,8 +402,11 @@ export async function extractTextContrastSnapshots(
 
 /**
  * High-level runtime contrast auditor that crawls a live Playwright Page across Light DOM
- * and open ShadowRoot boundaries, compositing ancestor backgrounds and flagging any text
- * pair whose WCAG 2.1 contrast ratio drops below `minRatio` (default 4.5:1).
+ * and open ShadowRoot boundaries, compositing ancestor backgrounds and opacity groups.
+ */
+/**
+ * High-level runtime contrast auditor that crawls a live Playwright Page across Light DOM
+ * and open ShadowRoot boundaries, compositing ancestor backgrounds and opacity groups.
  */
 export async function auditPageContrast(
   page: Page,
