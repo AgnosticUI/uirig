@@ -8,24 +8,26 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
 
 1. **Run the deterministic JSON verification gate:**
    - If `uirig.config.json` is configured and your dev server is running:
-     ```bash
-     npx @rlevin/uirig check --json
-     ```
-   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly:
-     ```bash
-     npx @rlevin/uirig http://localhost:5173 --json
-     npx @rlevin/uirig ./dist/index.html --selectors="ag-button, .pricing-card" --json
-     ```
+
+         npx @rlevin/uirig check --json
+
+   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly (add `--spatial-brief` to verify macro-layout alignment in ~40 text tokens without taking screenshots):
+
+         npx @rlevin/uirig http://localhost:5173 --spatial-brief --json
+         npx @rlevin/uirig ./dist/index.html --selectors="ag-button, .pricing-card" --spatial-brief --json
+
    *(If `@rlevin/uirig` is already installed in `node_modules`, `npx uirig ...` works interchangeably.)*
 2. **Evaluate the POSIX exit code and JSON `stdout` payload:**
-   - **Exit Code `0` (`"status": "pass"`):** All 6 engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`) and runtime JS error checks passed. You may finish your task.
+   - **Exit Code `0` (`"passed": true`):** All 6 engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`) and runtime JS error checks passed. You may finish your task.
    - **Exit Code `1`:** Design token drift (`tokens`), light/dark WCAG contrast failure (`contrast`, `dark-mode`), structural DOM/ARIA/hygiene violation (`dom`), or uncaught runtime JS error.
    - **Exit Code `2`:** Structural layout break (`stress`: container overflow, `100vw` scrollbar bleed, squished avatar, `<24px` tap target) or Cumulative Layout Shift budget breach (`cls`).
-3. **Self-Heal & Re-Verify:**
-   - Inspect each deduplicated entry in `violations[]`:
-     - `engine` & `rule`
+3. **Verify Macro-Layout via `spatialBrief` (No Vision Screenshots Required):**
+   - When `--spatial-brief` is passed, inspect the top-level `"spatialBrief"` field (e.g. `header[0,0 1440x64] | aside[0,64 260x836] | main[260,64 1180x836]`) to confirm side-by-side vs. stacked alignment and bounding-box dimensions without attaching vision screenshots.
+4. **Self-Heal & Re-Verify:**
+   - Inspect each deduplicated entry in `violations`:
+     - `engine` & `violationType`
      - `hostComponent` (the enclosing Web Component tag, e.g., `ag-button`)
-     - `offendingSelectorPath` (including `::shadow` boundaries)
+     - `selector` (including `::shadow` boundaries)
      - `occurrenceCount`
      - `suggestedToken` (nearest passing design token when available)
      - `remediationAdvice`

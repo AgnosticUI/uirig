@@ -2,7 +2,7 @@
 
 - **Issue:** `#5` — `"No-Vision Required" Semantic Spatial Brief (--spatial-brief)`
 - **Pillar:** Pillar 2: Token & AI Cost Savers (`ai-native`, `pillar: token-efficiency`)
-- **Status:** In Progress (Chunks 0–4 complete; Chunk 5 final docs sync next)
+- **Status:** Complete (All Chunks 0–5 implemented, verified, and documented)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -29,9 +29,7 @@ Add a `--spatial-brief` CLI flag (and `spatialBrief` field in `--json` output) t
 - [x] **Chunk 2: In-Page DOM & Shadow-DOM Landmark Collector + Unit Tests** (`feat(spatial-brief): implement Shadow-DOM-aware landmark and selector geometry collector`)
 - [x] **Chunk 3: Runner, JSON Stream & PR Comment Reporter Integration** (`feat(runner): integrate spatialBrief collection into check execution, JSON stream, and PR report`)
 - [x] **Chunk 4: CLI Flag Wiring (`--spatial-brief`), Subcommand `--help` & Unit Tests** (`feat(cli): expose --spatial-brief flag and update help output`)
-- **Chunk 5: Docs Sync & Next-Issue Capsule Handoff**
-  - **Files:** `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_5.md`, `.uirig/docs/NEXT_PROMPT.md`
-  - **Commit:** `docs: document --spatial-brief flag and update session continuity capsule`
+- [x] **Chunk 5: Docs Sync & Next-Issue Capsule Handoff** (`docs: document --spatial-brief flag and update session continuity capsule`)
 
 ---
 
@@ -39,4 +37,4 @@ Add a `--spatial-brief` CLI flag (and `spatialBrief` field in `--json` output) t
 - [x] `--spatial-brief` collector & formatter emit accurate viewport-relative `[x,y wxh]` coordinates for semantic landmarks and target selectors.
 - [x] Typical full-page landmark output stays under ~60 tokens (`DEFAULT_MAX_SPATIAL_NODES = 20`).
 - [x] Traverses open Shadow DOM boundaries to capture top-level custom element containers.
-- [x] CLI flag `--spatial-brief` wired end-to-end in `src/index.ts` with 1-to-1 unit specs in `tests/unit/index.test.ts`.
+- [x] CLI flag `--spatial-brief` wired end-to-end in `src/index.ts` with 1-to-1 unit specs in `tests/unit/index.test.ts` and documented in `README.md` and `AGENTS.md`.

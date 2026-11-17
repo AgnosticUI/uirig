@@ -12,7 +12,7 @@
 
 * **Catches Design-System Drift `axe` Misses:** `axe` won't tell you that an AI agent hardcoded `#3b82f6` instead of `--ag-color-primary`, or that `+30%` longer German translation copy overflowed `<ag-card>`.
 * **Pierces Web Component Shadow DOMs:** `Lighthouse` won't climb inside a Lit or Stencil `ShadowRoot` to tell a coding agent *which custom element* (`hostComponent`) broke dark-mode contrast or layout bounds.
-* **Zero Screenshot Diff Flakiness:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast, and W3C session-window CLS scores instead of noisy pixel diffs.
+* **Zero Screenshot Diff Flakiness & Zero Vision-Token Bloat:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast, and W3C session-window CLS scores—plus `--spatial-brief` delivers macro-layout coordinates in ~40 plain-text tokens instead of 1,500–3,000+ vision tokens.
 * **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, or scope audits to specific components with `--selectors`.
 * **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout` while keeping colored telemetry on `stderr`.
 
@@ -22,25 +22,23 @@
 
 Run `uirig` immediately against any running URL or local `.html` file (no installation or `uirig.config.json` required):
 
-```bash
-# Audit a live dev server
-npx @rlevin/uirig http://localhost:5173
+    # Audit a live dev server
+    npx @rlevin/uirig http://localhost:5173
 
-# Audit a standalone AI-generated HTML file (auto-served on an ephemeral local port)
-npx @rlevin/uirig ./dist/index.html
+    # Audit a standalone AI-generated HTML file (auto-served on an ephemeral local port)
+    npx @rlevin/uirig ./dist/index.html
 
-# Print individual failing selectors and details in the terminal
-npx @rlevin/uirig ./dist/index.html --verbose
+    # Print individual failing selectors and details in the terminal
+    npx @rlevin/uirig ./dist/index.html --verbose
 
-# Scope checks to specific components or CSS selectors (Light DOM + Shadow DOM)
-npx @rlevin/uirig http://localhost:5173 --selectors="#hero, ag-button, .pricing-card"
+    # Scope checks to specific components or CSS selectors (Light DOM + Shadow DOM)
+    npx @rlevin/uirig http://localhost:5173 --selectors="#hero, ag-button, .pricing-card"
 
-# Use repeated flags if you prefer
-npx @rlevin/uirig <URL> -s="#hero" -s="ag-button" -s=".pricing-card"
+    # Use repeated flags if you prefer
+    npx @rlevin/uirig <URL> -s="#hero" -s="ag-button" -s=".pricing-card"
 
-# Stream deduplicated JSON remediation diffs for an AI coding agent
-npx @rlevin/uirig http://localhost:5173 --json
-```
+    # Emit compact ~40-token layout bounding boxes (no vision screenshots needed) + JSON remediation stream
+    npx @rlevin/uirig http://localhost:5173 --spatial-brief --json
 
 *(If `@rlevin/uirig` is already installed in your repository's `node_modules`, you can run `npx uirig ...` directly.)*
 
@@ -67,63 +65,56 @@ npx @rlevin/uirig http://localhost:5173 --json
 * **Node.js 22+**
 * **Playwright Chromium browser binary**
 
-```bash
-npm install -D @rlevin/uirig
-npx playwright install chromium
-```
+    npm install -D @rlevin/uirig
+    npx playwright install chromium
 
 ### Optional Workspace Initialization (`uirig init`)
 When you are ready to enforce custom design tokens, multi-viewport budgets, or AI agent skills in a repository, run `init` to scaffold `uirig.config.json`, `.uirig/session.json`, and `.uirig/SKILL.md`:
 
-```bash
-npx @rlevin/uirig init
-```
+    npx @rlevin/uirig init
+
 ### Configuration (`uirig.config.json`)
 
-```json
-{
-  "$schema": "https://json-schema.org",
-  "targetUrls": ["http://localhost:5173"],
-  "tokensPath": "./config/default_tokens.json",
-  "thresholdBudgets": {
-    "clsMaxLimit": 0.1,
-    "overflowPixelTolerance": 2,
-    "touchTargetMinSpacingPx": 24,
-    "darkModeMaxSurfaceLuminance": 0.85
-  },
-  "viewports": [
-    { "name": "mobile", "width": 375, "height": 812 },
-    { "name": "desktop", "width": 1440, "height": 900 }
-  ],
-  "ignore": [
-    { "rule": "tokens", "selector": ".legacy-embed" }
-  ]
-}
-```
+    {
+      "$schema": "https://json-schema.org",
+      "targetUrls": ["http://localhost:5173"],
+      "tokensPath": "./config/default_tokens.json",
+      "thresholdBudgets": {
+        "clsMaxLimit": 0.1,
+        "overflowPixelTolerance": 2,
+        "touchTargetMinSpacingPx": 24,
+        "darkModeMaxSurfaceLuminance": 0.85
+      },
+      "viewports": [
+        { "name": "mobile", "width": 375, "height": 812 },
+        { "name": "desktop", "width": 1440, "height": 900 }
+      ],
+      "ignore": [
+        { "rule": "tokens", "selector": ".legacy-embed" }
+      ]
+    }
 
 ### Bundler-Proof Rule Escape Hatches
 Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comments, you can exempt intentional one-off overrides in two ways:
 
 1. **In Markup (`data-uirig-ignore`):** Add `data-uirig-ignore` to an element, ancestor container, or Web Component host. Exemptions cascade down to child elements and across open `ShadowRoot` boundaries:
-   ```html
-   <!-- Exempt a single rule -->
-   <div data-uirig-ignore="tokens">Intentional one-off hero gradient</div>
 
-   <!-- Exempt multiple comma-separated rules -->
-   <ag-card data-uirig-ignore="tokens, dark-mode">Custom promotional card</ag-card>
+       <!-- Exempt a single rule -->
+       <div data-uirig-ignore="tokens">Intentional one-off hero gradient</div>
 
-   <!-- Exempt all engines on a third-party widget -->
-   <section data-uirig-ignore="all">Legacy third-party embed</section>
-   ```
+       <!-- Exempt multiple comma-separated rules -->
+       <ag-card data-uirig-ignore="tokens, dark-mode">Custom promotional card</ag-card>
+
+       <!-- Exempt all engines on a third-party widget -->
+       <section data-uirig-ignore="all">Legacy third-party embed</section>
 
 2. **In `uirig.config.json` (`ignore`):** Exempt specific selectors or route URLs (including trailing `*` wildcards) centrally without touching markup:
-   ```json
-   "ignore": [
-     { "rule": "tokens", "selector": ".legacy-embed" },
-     { "rule": "contrast", "url": "http://localhost:5173/admin/*" },
-     { "rule": "all", "selector": "#third-party-chat" }
-   ]
-   ```
+
+       "ignore": [
+         { "rule": "tokens", "selector": ".legacy-embed" },
+         { "rule": "contrast", "url": "http://localhost:5173/admin/*" },
+         { "rule": "all", "selector": "#third-party-chat" }
+       ]
 
 ---
 
@@ -140,17 +131,16 @@ Launches a single Chromium instance and executes all 6 verification engines acro
 ### Standalone Engine Commands
 Run any individual verification engine in isolation for rapid inner-loop debugging or targeted AI agent re-checks:
 
-```bash
-npx @rlevin/uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]
-npx @rlevin/uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]
-npx @rlevin/uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]
-npx @rlevin/uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]
-npx @rlevin/uirig cls [<url-or-file>] [--config=<path>] [--verbose] [--json] [--headed]
-npx @rlevin/uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]
-```
+    npx @rlevin/uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig cls [<url-or-file>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]
 
 ### Shared Options
 * `-s, --selectors=<csv>`: Filter element-level checks to matching CSS selectors (comma-separated and repeatable; pierces Web Component `ShadowRoot` boundaries).
+* `--spatial-brief`: Emit an ultra-compact, plain-text bounding-box summary (`header[0,0 1440x64] | aside[0,64 260x836] | main[260,64 1180x836]`) of semantic landmarks, top-level custom elements, and target selectors (~40 tokens, zero vision screenshots required).
 * `--verbose`: Print every individual failing selector path, Shadow DOM host, measured delta, and suggested token beneath each engine summary.
 * `--config=<path>`: Use a custom configuration file path.
 * `--only=<tool>`: Filter `check` to a single engine (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, or `dom`).
@@ -167,41 +157,39 @@ npx @rlevin/uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--v
 
 ## Common Use Cases
 
-### 1. AI Design System Harness Loop (`AGENTS.md` + `--json`)
-`uirig init` generates `.uirig/SKILL.md` so coding agents (Claude Code, Cursor, Codex) can self-verify UI changes after every edit:
-```bash
-npx @rlevin/uirig http://localhost:5173 --selectors="ag-card" --json
-```
-Each deduplicated entry in `violations[]` includes `engine`, `hostComponent`, `offendingSelectorPath`, `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
+### 1. AI Design System Harness Loop (`AGENTS.md` + `--spatial-brief --json`)
+`uirig init` generates `.uirig/SKILL.md` so coding agents (Claude Code, Cursor, Codex) can verify both macro-layout (`spatialBrief`) and component-level regressions after every edit without vision tokens:
+
+    npx @rlevin/uirig http://localhost:5173 --selectors="ag-card" --spatial-brief --json
+
+Each deduplicated entry in `violations` includes `engine`, `hostComponent`, `selector`, `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
 
 ### 2. GitHub Actions CI/CD Gate
-```yaml
-- name: Run uirig UI verification gate
-  run: |
-    npm run build
-    npx @rlevin/uirig ./dist/index.html --verbose
-```
+
+    - name: Run uirig UI verification gate
+      run: |
+        npm run build
+        npx @rlevin/uirig ./dist/index.html --verbose
+
 On every `uirig check` run, `.uirig/github_pr_comment.md` is generated and ready to post onto Pull Requests.
 
 ### 3. Git Pre-Commit Hook (`.git/hooks/pre-commit`)
-```bash
-#!/usr/bin/env bash
-set -e
-npx @rlevin/uirig check --config=uirig.config.json
-```
+
+    #!/usr/bin/env bash
+    set -e
+    npx @rlevin/uirig check --config=uirig.config.json
 
 ### 4. Local Development & Playground
-```bash
-# Typecheck and run the unit test suite
-npm run typecheck:all && npm test
 
-# Start the interactive Vite + Lit playground
-npm run playground:dev
+    # Typecheck and run the unit test suite
+    npm run typecheck:all && npm test
 
-# Run end-to-end playground verification (headless or headed)
-npm run playground:test
-npm run playground:test:headed
-```
+    # Start the interactive Vite + Lit playground
+    npm run playground:dev
+
+    # Run end-to-end playground verification (headless or headed)
+    npm run playground:test
+    npm run playground:test:headed
 
 ---
 
