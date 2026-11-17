@@ -8,9 +8,9 @@
  * execute without cross-tool pollution or multiple browser startup overhead.
  *
  * Also supports zero-config runs (`npx @rlevin/uirig <url-or-file>`), component-scoped
- * audits (`--selectors` / `-s`), runtime ignore rules (`data-uirig-ignore` + `ignore[]`),
- * structured terminal violation reports (`--verbose`), and ephemeral local HTTP servers
- * for `.html` file targets.
+ * audits (`--selectors` / `-s`) with matched element counts, runtime ignore rules
+ * (`data-uirig-ignore` + `ignore[]`), structured terminal violation reports (`--verbose`),
+ * and ephemeral local HTTP servers for `.html` file targets.
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -34,7 +34,10 @@ import {
   startEphemeralStaticServer,
   type IEphemeralStaticServer,
 } from '../utils/static-server.js';
-import { validateSelectorsInBrowser } from '../utils/scope.js';
+import {
+  countMatchedSelectorsInBrowser,
+  validateSelectorsInBrowser,
+} from '../utils/scope.js';
 import type { IUirigIgnoreRule } from '../utils/ignore.js';
 import type {
   IDarkModeViolation,
@@ -91,6 +94,10 @@ export interface ICheckCommandOptions {
 export interface IViewportAuditReport {
   url: string;
   viewport: IViewportConfig;
+  /** Active `--selectors` / `-s` filters when the audit was component-scoped. */
+  scopedSelectors?: string[];
+  /** Number of unique elements matched across Light + Shadow DOM for `scopedSelectors`. */
+  matchedSelectorCount?: number;
   tokenViolations: ITokenViolation[];
   contrastViolations: IContrastViolation[];
   darkModeViolations?: IDarkModeViolation[];
@@ -117,6 +124,7 @@ export interface ICheckExecutionReport {
     totalRuntimeErrors?: number;
   };
 }
+
 export const ZERO_CONFIG_DEFAULTS: Omit<IUirigConfig, 'targetUrls'> = {
   tokensPath: undefined,
   thresholdBudgets: {
@@ -363,10 +371,10 @@ export async function auditViewportInParallel(
   const runCls = !only || only === 'cls';
   const runDom = !only || only === 'dom';
   const runRuntimeCapture = !only;
+  const hasSelectors = Boolean(selectors && selectors.length > 0);
 
   const activeScope = only ? `single engine (${only})` : '4 isolated contexts';
-  const selectorTag =
-    selectors && selectors.length > 0 ? ` [scope: ${selectors.join(', ')}]` : '';
+  const selectorTag = hasSelectors && selectors ? ` [scope: ${selectors.join(', ')}]` : '';
   logTelemetry(
     'check:dispatch',
     `Running ${activeScope}${selectorTag} for ${paint(url, 'cyan')} @ ${paint(
@@ -376,14 +384,14 @@ export async function auditViewportInParallel(
     )}...`
   );
 
-  // Track 1: Read-Only Audits (`tokens`, `contrast`, `dom`) & Runtime JS Error Capture
   const runReadOnlyTrack = async (): Promise<{
+    matchedSelectorCount?: number;
     tokenViolations: ITokenViolation[];
     contrastViolations: IContrastViolation[];
     domViolations: IDomIntegrityViolation[];
     runtimeErrors: IRuntimeErrorViolation[];
   }> => {
-    if (!runTokens && !runContrast && !runDom && !runRuntimeCapture) {
+    if (!runTokens && !runContrast && !runDom && !runRuntimeCapture && !hasSelectors) {
       return {
         tokenViolations: [],
         contrastViolations: [],
@@ -417,6 +425,17 @@ export async function auditViewportInParallel(
       }
 
       const response = await page.goto(url, { waitUntil: 'networkidle' });
+
+      let matchedSelectorCount: number | undefined;
+      if (hasSelectors && selectors) {
+        matchedSelectorCount = await countMatchedSelectorsInBrowser(page, selectors);
+        const countBadge =
+          matchedSelectorCount === 0
+            ? paint('0 (WARNING: selector matched 0 elements!)', 'bold', 'yellow')
+            : paint(String(matchedSelectorCount), 'bold', 'cyan');
+        logTelemetry('check:scope', `Selectors matched on page: ${countBadge}`);
+      }
+
       const tokenViolations =
         runTokens && tokenScale !== null
           ? await crawlPageTokens(page, tokenScale, ignoreRules, selectors)
@@ -440,13 +459,17 @@ export async function auditViewportInParallel(
           })
         : [];
 
-      return { tokenViolations, contrastViolations, domViolations, runtimeErrors };
+      return {
+        matchedSelectorCount,
+        tokenViolations,
+        contrastViolations,
+        domViolations,
+        runtimeErrors,
+      };
     } finally {
       await context.close();
     }
   };
-
-    // Track 2: Emulated Dark-Mode Theme Parity Audit (`dark-mode`)
   const runDarkModeTrack = async (): Promise<IDarkModeViolation[]> => {
     if (!runDarkMode) {
       return [];
@@ -467,7 +490,6 @@ export async function auditViewportInParallel(
     }
   };
 
-  // Track 3: Mutated DOM Fuzzing (`stress`)
   const runStressTrack = async (): Promise<IGeometricViolation[]> => {
     if (!runStress) {
       return [];
@@ -487,7 +509,6 @@ export async function auditViewportInParallel(
     }
   };
 
-  // Track 4: Pre-Navigation Layout Shift Monitor (`cls`)
   const runClsTrack = async (): Promise<IClsEvaluationResult> => {
     if (!runCls) {
       return { maxSessionCls: 0, violation: null };
@@ -513,6 +534,12 @@ export async function auditViewportInParallel(
   return {
     url,
     viewport,
+    ...(hasSelectors && selectors
+      ? {
+          scopedSelectors: selectors,
+          matchedSelectorCount: readOnlyResult.matchedSelectorCount ?? 0,
+        }
+      : {}),
     tokenViolations: readOnlyResult.tokenViolations,
     contrastViolations: readOnlyResult.contrastViolations,
     darkModeViolations,
@@ -523,9 +550,6 @@ export async function auditViewportInParallel(
   };
 }
 
-/**
- * Main orchestration entry point for `uirig check` and `uirig <url-or-file>`.
- */
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
 ): Promise<ICheckExecutionReport> {
@@ -573,7 +597,6 @@ export async function executeCheckCommand(
     );
     browser = await chromium.launch({ headless });
 
-    // Validate CSS selector syntax upfront before dispatching parallel tracks
     if (options.selectors && options.selectors.length > 0) {
       const validationContext = await browser.newContext();
       try {

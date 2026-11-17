@@ -2,8 +2,8 @@
  * src/utils/console-report.ts
  * Human-readable terminal audit report formatter for `uirig`.
  * Ports and generalizes the playground's structured multi-engine check report
- * into core CLI runs so developers can inspect exact failing selectors, Shadow DOM
- * hosts, measured deltas, and suggested tokens directly in the terminal.
+ * into core CLI runs so developers can inspect matched selector counts, exact failing
+ * selectors, Shadow DOM hosts, measured deltas, and suggested tokens directly in the terminal.
  */
 
 import type { ICheckExecutionReport, IViewportAuditReport } from '../commands/check.js';
@@ -20,8 +20,8 @@ function formatCountBadge(count: number): string {
 
 /**
  * Formats a single `(url, viewport)` audit report into a color-coded terminal breakdown
- * covering all core verification engines (`tokens`, `contrast`, `dark-mode`, `stress`,
- * `cls`, `dom`, and `runtime`).
+ * covering matched selector scope counts and all core verification engines
+ * (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`, and `runtime`).
  */
 export function formatViewportConsoleSection(
   vpReport: IViewportAuditReport,
@@ -38,6 +38,19 @@ export function formatViewportConsoleSection(
   );
 
   const lines: string[] = [viewportHeader];
+
+  // Display matched element count before engine summary when `--selectors` / `-s` was provided
+  if (vpReport.matchedSelectorCount !== undefined) {
+    const scopeLabel =
+      vpReport.scopedSelectors && vpReport.scopedSelectors.length > 0
+        ? ` (${vpReport.scopedSelectors.join(', ')})`
+        : '';
+    const countText =
+      vpReport.matchedSelectorCount === 0
+        ? paint('0 (Warning: no elements matched selector)', 'bold', 'yellow')
+        : paint(String(vpReport.matchedSelectorCount), 'bold', 'cyan');
+    lines.push(`Selectors matched on page${scopeLabel}: ${countText}`);
+  }
 
   // 1. Design Tokens (`tokens`)
   lines.push(

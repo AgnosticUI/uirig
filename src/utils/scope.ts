@@ -1,7 +1,7 @@
 /**
  * src/utils/scope.ts
  * Component-scoped CSS selector parsing, browser syntax validation, and
- * Shadow-DOM-aware subtree matching for `--selectors` / `-s` audits.
+ * Shadow-DOM-aware subtree matching & element counting for `--selectors` / `-s` audits.
  */
 
 import type { Page } from 'playwright';
@@ -93,6 +93,47 @@ export async function validateSelectorsInBrowser(
       `ERR_INVALID_SELECTOR: Invalid CSS selector '${invalidSelector}' passed to --selectors.`
     );
   }
+}
+
+/**
+ * Counts how many unique elements across Light DOM and open `ShadowRoot` trees
+ * match at least one selector in `selectors` on the loaded `page`.
+ */
+export async function countMatchedSelectorsInBrowser(
+  page: Page,
+  selectors: string[]
+): Promise<number> {
+  if (selectors.length === 0) {
+    return 0;
+  }
+
+  return await page.evaluate((sels: string[]): number => {
+    const matched = new Set<Element>();
+
+    function visitRoot(root: Document | ShadowRoot): void {
+      for (const sel of sels) {
+        try {
+          for (const el of Array.from(root.querySelectorAll(sel))) {
+            matched.add(el);
+          }
+        } catch {
+          // Malformed selectors are rejected upfront by validateSelectorsInBrowser
+        }
+      }
+
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      let current: Node | null = walker.currentNode;
+      while (current) {
+        if (current instanceof Element && current.shadowRoot) {
+          visitRoot(current.shadowRoot);
+        }
+        current = walker.nextNode();
+      }
+    }
+
+    visitRoot(document);
+    return matched.size;
+  }, selectors);
 }
 
 /**

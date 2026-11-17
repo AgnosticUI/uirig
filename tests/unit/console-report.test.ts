@@ -7,6 +7,8 @@
  * 2. Verbose rendering (`verbose: true`) prints every failing selector, ShadowDOM tag,
  *    contrast ratio, suggested token, stress leak, CLS element, DOM rule, and runtime error.
  * 3. Clean passing reports (`exitCode: 0`) omit the `--verbose` tip.
+ * 4. Scoped `--selectors` runs display `Selectors matched on page: <N>` before the
+ *    pass/fail summary and warn clearly when `0` elements match.
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
@@ -116,7 +118,6 @@ describe('console-report.ts — Structured Multi-Engine Console Report Formatter
 
   it('renders compact per-engine failure counts and --verbose tip when verbose is false', () => {
     process.env.NO_COLOR = '1';
-    console.log('\n--- START TEST: Compact Console Report Rendering (verbose=false) ---');
 
     const output = formatConsoleAuditReport(createSampleFailingReport(), { verbose: false });
 
@@ -130,14 +131,12 @@ describe('console-report.ts — Structured Multi-Engine Console Report Formatter
     expect(output).toContain('7. [runtime]   Runtime JS Errors       : 1 FAIL');
     expect(output).toContain('Tip: 7 violation(s) detected. Re-run with --verbose');
 
-    // Individual selector lines should stay hidden in compact mode
     expect(output).not.toContain('p.muted-note');
     expect(output).not.toContain('span#overflow-label');
   });
 
   it('renders full selector paths, ShadowDOM tags, and token hints when verbose is true', () => {
     process.env.NO_COLOR = '1';
-    console.log('\n--- START TEST: Verbose Console Report Rendering (verbose=true) ---');
 
     const output = formatConsoleAuditReport(createSampleFailingReport(), { verbose: true });
 
@@ -155,7 +154,6 @@ describe('console-report.ts — Structured Multi-Engine Console Report Formatter
 
   it('renders clean PASS badges without --verbose tip when zero violations exist', () => {
     process.env.NO_COLOR = '1';
-    console.log('\n--- START TEST: Clean Passing Console Report Rendering ---');
 
     const passingReport: ICheckExecutionReport = {
       timestamp: '2026-11-13T06:50:00.000Z',
@@ -192,5 +190,68 @@ describe('console-report.ts — Structured Multi-Engine Console Report Formatter
     expect(output).toContain('1. [tokens]    Design Token Violations : 0 PASS');
     expect(output).toContain('5. [cls]       Max Session CLS Score   : 0.01 -> PASS');
     expect(output).not.toContain('Re-run with --verbose');
+  });
+
+  it('prints matched selector count before engine summary and warns when 0 elements match', () => {
+    process.env.NO_COLOR = '1';
+
+    const matchedReport: ICheckExecutionReport = {
+      timestamp: '2026-11-16T12:00:00.000Z',
+      configPath: '/workspace/uirig.config.json',
+      reportPath: '/workspace/.uirig/github_pr_comment.md',
+      exitCode: 0,
+      summary: {
+        totalViewportsAudited: 1,
+        totalTokenViolations: 0,
+        totalContrastViolations: 0,
+        totalDarkModeViolations: 0,
+        totalStressViolations: 0,
+        totalClsViolations: 0,
+        totalDomViolations: 0,
+        totalRuntimeErrors: 0,
+      },
+      results: [
+        {
+          url: 'http://localhost:5173',
+          viewport: { name: 'desktop', width: 1440, height: 900 },
+          scopedSelectors: ['ag-button'],
+          matchedSelectorCount: 2,
+          tokenViolations: [],
+          contrastViolations: [],
+          darkModeViolations: [],
+          stressViolations: [],
+          clsEvaluation: { maxSessionCls: 0, violation: null },
+          domViolations: [],
+          runtimeErrors: [],
+        },
+      ],
+    };
+
+    const matchedOut = formatConsoleAuditReport(matchedReport, { verbose: false });
+    expect(matchedOut).toContain('Selectors matched on page (ag-button): 2');
+    expect(matchedOut.indexOf('Selectors matched on page')).toBeLessThan(
+      matchedOut.indexOf('1. [tokens]')
+    );
+
+    const baseResult = matchedReport.results[0];
+    if (!baseResult) {
+      throw new Error('Expected baseResult to exist');
+    }
+
+    const zeroMatchReport: ICheckExecutionReport = {
+      ...matchedReport,
+      results: [
+        {
+          ...baseResult,
+          scopedSelectors: ['.nonexistent-selector'],
+          matchedSelectorCount: 0,
+        },
+      ],
+    };
+
+    const zeroOut = formatConsoleAuditReport(zeroMatchReport, { verbose: false });
+    expect(zeroOut).toContain(
+      'Selectors matched on page (.nonexistent-selector): 0 (Warning: no elements matched selector)'
+    );
   });
 });
