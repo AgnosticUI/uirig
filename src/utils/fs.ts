@@ -53,7 +53,7 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
     ? '✅ **PASSED**: All design tokens, contrast ratios, dark-mode parity, geometric stress bounds, CLS budgets, and DOM integrity checks passed.'
     : `❌ **FAILED (POSIX Exit Code ${report.exitCode})**: UI verification violations detected across ${report.summary.totalViewportsAudited} viewport(s).`;
 
-  const lines: string[] = [
+  const lines: Array<string> = [
     '## 🛡️ `uirig` UI Verification Gate Report',
     '',
     statusBanner,
@@ -86,7 +86,21 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
     '',
   ];
 
-  // Append per-viewport violation breakdowns only for viewports that recorded issues
+  // Include compact viewport spatial layout coordinates when `--spatial-brief` was requested
+  const spatialReports = report.results.filter((r) => r.spatialBrief !== undefined);
+  if (spatialReports.length > 0) {
+    lines.push('### 📐 Semantic Spatial Brief', '');
+    for (const sr of spatialReports) {
+      lines.push(
+        `- **${escapeMarkdownCell(sr.viewport.name)} (${sr.viewport.width}x${
+          sr.viewport.height
+        }):** \`${escapeMarkdownCell(sr.spatialBrief || '(no visible landmarks)')}\``
+      );
+    }
+    lines.push('');
+  }
+
+    // Append per-viewport violation breakdowns only for viewports that recorded issues
   const failingViewports = report.results.filter(
     (r) =>
       r.tokenViolations.length > 0 ||
@@ -149,7 +163,7 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
           '| Type | Selector | Detail | Background | Shadow DOM |',
           '| :--- | :--- | :---: | :--- | :---: |'
         );
-        for (const v of vpReport.darkModeViolations ?? []) {
+        for (const v of vpReport.darkModeViolations ?? new Array()) {
           const detail =
             v.violationType === 'stranded_light_surface'
               ? `Luminance **${v.relativeLuminance?.toFixed(2) ?? 'high'}** (> 0.85)`
@@ -185,7 +199,7 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
         lines.push('');
       }
 
-      if (vpReport.clsEvaluation.violation !== null) {
+            if (vpReport.clsEvaluation.violation !== null) {
         const clsV = vpReport.clsEvaluation.violation;
         const selectorsText =
           clsV.offendingSelectors.length > 0
@@ -208,7 +222,7 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
           '| Rule | Selector | Detail | Shadow DOM |',
           '| :--- | :--- | :--- | :---: |'
         );
-        for (const v of vpReport.domViolations ?? []) {
+        for (const v of vpReport.domViolations ?? new Array()) {
           lines.push(
             `| \`${escapeMarkdownCell(v.rule)}\` | \`${escapeMarkdownCell(
               v.selector
@@ -225,7 +239,7 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
           '| Source | Message |',
           '| :--- | :--- |'
         );
-        for (const err of vpReport.runtimeErrors ?? []) {
+        for (const err of vpReport.runtimeErrors ?? new Array()) {
           lines.push(
             `| \`${escapeMarkdownCell(err.source)}\` | \`${escapeMarkdownCell(err.message)}\` |`
           );

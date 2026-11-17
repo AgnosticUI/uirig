@@ -32,7 +32,7 @@ export interface IAgenticViolation {
   /** Number of matching elements collapsed into this pattern violation (1 when unique). */
   occurrenceCount: number;
   /** Sample selector paths when multiple repeating elements share the exact same defect. */
-  sampleSelectors?: string[];
+  sampleSelectors?: Array<string>;
   /** Human- and machine-readable measurement showing how far the value drifted from budget. */
   measuredDelta: string;
   /** Nearest passing design token when available. */
@@ -49,8 +49,10 @@ export interface IAgenticJsonStreamPayload {
   exitCode: 0 | 1 | 2;
   passed: boolean;
   timestamp: string;
+  /** Compact plain-text layout geometry emitted when `--spatial-brief` is enabled. */
+  spatialBrief?: string;
   summary: ICheckExecutionReport['summary'];
-  violations: IAgenticViolation[];
+  violations: Array<IAgenticViolation>;
 }
 
 /**
@@ -60,8 +62,8 @@ export interface IAgenticJsonStreamPayload {
  */
 export function normalizeViewportViolations(
   viewportReport: IViewportAuditReport
-): IAgenticViolation[] {
-  const normalized: IAgenticViolation[] = [];
+): Array<IAgenticViolation> {
+  const normalized = new Array<IAgenticViolation>();
   const viewportLabel = `${viewportReport.viewport.name} (${viewportReport.viewport.width}x${viewportReport.viewport.height})`;
 
   // 1. Normalize Design Token Drift (`tokens`)
@@ -84,7 +86,6 @@ export function normalizeViewportViolations(
       remediationAdvice: `Replace hardcoded CSS property '${tokenViolation.property}' (${tokenViolation.actualValue}) on '${tokenViolation.selector}' with an approved design token from uirig.config.json tokensPath.`,
     });
   }
-
   // 2. Normalize Rendered Luminance Contrast Drops (`contrast`)
   for (const contrastViolation of viewportReport.contrastViolations) {
     const hostComponent =
@@ -112,8 +113,8 @@ export function normalizeViewportViolations(
     });
   }
 
-    // 3. Normalize Dark-Mode Theme Parity Violations (`dark-mode`)
-  for (const darkViolation of viewportReport.darkModeViolations ?? []) {
+  // 3. Normalize Dark-Mode Theme Parity Violations (`dark-mode`)
+  for (const darkViolation of viewportReport.darkModeViolations ?? new Array()) {
     const hostComponent =
       darkViolation.hostComponent !== undefined
         ? darkViolation.hostComponent
@@ -179,7 +180,7 @@ export function normalizeViewportViolations(
       remediationAdvice = `Increase gap/margin between '${stressViolation.selector}' and '${neighborTarget}' by at least ${stressViolation.measuredLeakPixels}px to meet the minimum touch-target spacing budget.`;
     }
 
-    const hostComponent =
+        const hostComponent =
       stressViolation.hostComponent !== undefined
         ? stressViolation.hostComponent
         : extractHostComponentFromSelector(stressViolation.selector);
@@ -221,8 +222,8 @@ export function normalizeViewportViolations(
     });
   }
 
-    // 6. Normalize DOM & Markup Integrity Violations (`dom`)
-  for (const domViolation of viewportReport.domViolations ?? []) {
+  // 6. Normalize DOM & Markup Integrity Violations (`dom`)
+  for (const domViolation of viewportReport.domViolations ?? new Array()) {
     const hostComponent =
       domViolation.hostComponent !== undefined
         ? domViolation.hostComponent
@@ -243,7 +244,7 @@ export function normalizeViewportViolations(
   }
 
   // 7. Normalize Uncaught Runtime JS & Console Errors (`runtime`)
-  for (const runtimeErr of viewportReport.runtimeErrors ?? []) {
+  for (const runtimeErr of viewportReport.runtimeErrors ?? new Array()) {
     normalized.push({
       engine: 'runtime',
       violationType: runtimeErr.source,
@@ -274,8 +275,8 @@ function buildPatternSignature(selector: string): string {
  * bucket into a single entry with `occurrenceCount` and up to 5 `sampleSelectors` to prevent AI context bloat.
  */
 export function deduplicateAgenticViolations(
-  violations: IAgenticViolation[]
-): IAgenticViolation[] {
+  violations: Array<IAgenticViolation>
+): Array<IAgenticViolation> {
   const grouped = new Map<string, IAgenticViolation>();
 
   for (const item of violations) {
@@ -314,7 +315,7 @@ export function deduplicateAgenticViolations(
  * @returns Deterministic, pretty-printed JSON string ready for `process.stdout.write()`.
  */
 export function formatAgenticJsonStream(report: ICheckExecutionReport): string {
-  const rawViolations: IAgenticViolation[] = [];
+  const rawViolations = new Array<IAgenticViolation>();
 
   for (const viewportResult of report.results) {
     const viewportViolations = normalizeViewportViolations(viewportResult);
@@ -323,11 +324,27 @@ export function formatAgenticJsonStream(report: ICheckExecutionReport): string {
 
   const violations = deduplicateAgenticViolations(rawViolations);
 
+  const briefEntries = report.results.filter((r) => r.spatialBrief !== undefined);
+  let spatialBrief: string | undefined;
+  if (briefEntries.length === 1) {
+    spatialBrief = briefEntries.at(0)?.spatialBrief;
+  } else if (briefEntries.length > 1) {
+    spatialBrief = briefEntries
+      .map(
+        (r) =>
+          `${r.viewport.name} (${r.viewport.width}x${r.viewport.height}): ${
+            r.spatialBrief || '(none)'
+          }`
+      )
+      .join(' || ');
+  }
+
   const payload: IAgenticJsonStreamPayload = {
     tool: 'uirig',
     exitCode: report.exitCode,
     passed: report.exitCode === 0,
     timestamp: report.timestamp,
+    ...(spatialBrief !== undefined ? { spatialBrief } : {}),
     summary: report.summary,
     violations,
   };

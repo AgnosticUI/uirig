@@ -9,7 +9,7 @@
  *
  * Also supports zero-config runs (`npx @rlevin/uirig <url-or-file>`), component-scoped
  * audits (`--selectors` / `-s`) with matched element counts, runtime ignore rules
- * (`data-uirig-ignore` + `ignore[]`), structured terminal violation reports (`--verbose`),
+ * (`data-uirig-ignore` + `ignore`), structured terminal violation reports (`--verbose`),
  * and ephemeral local HTTP servers for `.html` file targets.
  */
 
@@ -24,6 +24,7 @@ import { logTelemetry, paint } from '../utils/formatter.js';
 import { formatConsoleAuditReport } from '../utils/console-report.js';
 import { formatAgenticJsonStream } from '../utils/agent-stream.js';
 import { writeGithubPrCommentReport, DEFAULT_PR_COMMENT_PATH } from '../utils/fs.js';
+import { collectSpatialNodes, formatSpatialBrief } from '../utils/spatial-brief.js';
 import { runDomIntegrityAudit } from '../core/dom.js';
 import {
   runDarkModeAudit,
@@ -62,11 +63,11 @@ export interface IThresholdBudgets {
 
 export interface IUirigConfig {
   $schema?: string;
-  targetUrls: string[];
+  targetUrls: Array<string>;
   tokensPath?: string;
   thresholdBudgets: IThresholdBudgets;
-  viewports: IViewportConfig[];
-  ignore?: IUirigIgnoreRule[];
+  viewports: Array<IViewportConfig>;
+  ignore?: Array<IUirigIgnoreRule>;
 }
 
 export type AuditToolName = 'tokens' | 'contrast' | 'dark-mode' | 'stress' | 'cls' | 'dom';
@@ -79,8 +80,10 @@ export interface ICheckCommandOptions {
   headless?: boolean;
   /** When true, prints every individual failing selector beneath each engine section in human output. */
   verbose?: boolean;
+  /** When true, collects and emits a compact viewport-relative landmark bounding-box summary (`--spatial-brief`). */
+  spatialBrief?: boolean;
   /** Optional CSS selectors limiting element-level audits to matching subtrees (`--selectors` / `-s`). */
-  selectors?: string[];
+  selectors?: Array<string>;
   /** Optional single-engine filter. Runs all enabled engines when omitted. */
   only?: AuditToolName;
   /** Optional inline token scale override (useful for programmatic calls & tests). */
@@ -95,24 +98,25 @@ export interface IViewportAuditReport {
   url: string;
   viewport: IViewportConfig;
   /** Active `--selectors` / `-s` filters when the audit was component-scoped. */
-  scopedSelectors?: string[];
+  scopedSelectors?: Array<string>;
   /** Number of unique elements matched across Light + Shadow DOM for `scopedSelectors`. */
   matchedSelectorCount?: number;
-  tokenViolations: ITokenViolation[];
-  contrastViolations: IContrastViolation[];
-  darkModeViolations?: IDarkModeViolation[];
-  stressViolations: IGeometricViolation[];
+  /** Compact plain-text bounding-box summary emitted when `--spatial-brief` is enabled. */
+  spatialBrief?: string;
+  tokenViolations: Array<ITokenViolation>;
+  contrastViolations: Array<IContrastViolation>;
+  darkModeViolations?: Array<IDarkModeViolation>;
+  stressViolations: Array<IGeometricViolation>;
   clsEvaluation: IClsEvaluationResult;
-  domViolations?: IDomIntegrityViolation[];
-  runtimeErrors?: IRuntimeErrorViolation[];
+  domViolations?: Array<IDomIntegrityViolation>;
+  runtimeErrors?: Array<IRuntimeErrorViolation>;
 }
-
 export interface ICheckExecutionReport {
   timestamp: string;
   configPath: string;
   reportPath: string;
   exitCode: PosixExitCode;
-  results: IViewportAuditReport[];
+  results: Array<IViewportAuditReport>;
   summary: {
     totalViewportsAudited: number;
     totalTokenViolations: number;
@@ -137,7 +141,7 @@ export const ZERO_CONFIG_DEFAULTS: Omit<IUirigConfig, 'targetUrls'> = {
     { name: 'mobile', width: 375, height: 812 },
     { name: 'desktop', width: 1440, height: 900 },
   ],
-  ignore: [],
+  ignore: new Array<IUirigIgnoreRule>(),
 };
 
 export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
@@ -207,7 +211,7 @@ export function loadUirigConfig(
     );
   }
 
-  const ignoreRules: IUirigIgnoreRule[] = [];
+  const ignoreRules = new Array<IUirigIgnoreRule>();
   if (candidate.ignore !== undefined) {
     if (!Array.isArray(candidate.ignore)) {
       throw new Error(`ERR_CONFIG_SCHEMA: 'ignore' must be an array of ignore rule objects.`);
@@ -238,7 +242,6 @@ export function loadUirigConfig(
     ignore: ignoreRules,
   };
 }
-
 export function resolveExecutionConfig(
   options: ICheckCommandOptions,
   cwd: string
@@ -324,7 +327,7 @@ export function loadTokenScale(tokensPath: string, configFilePath: string): ITok
   };
 }
 
-export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExitCode {
+export function evaluatePosixExitCode(results: Array<IViewportAuditReport>): PosixExitCode {
   let hasStructuralOrClsFailure = false;
   let hasPolicyOrIntegrityFailure = false;
 
@@ -351,7 +354,6 @@ export function evaluatePosixExitCode(results: IViewportAuditReport[]): PosixExi
   }
   return 0;
 }
-
 export async function auditViewportInParallel(
   browser: Browser,
   url: string,
@@ -359,9 +361,10 @@ export async function auditViewportInParallel(
   tokenScale: ITokenScaleConfig | null,
   budgets: IThresholdBudgets,
   only?: AuditToolName,
-  ignoreRules: IUirigIgnoreRule[] = [],
+  ignoreRules: Array<IUirigIgnoreRule> = new Array<IUirigIgnoreRule>(),
   isLocalStaticTarget: boolean = false,
-  selectors?: string[]
+  selectors?: Array<string>,
+  includeSpatialBrief: boolean = false
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
   const runTokens = (!only || only === 'tokens') && tokenScale !== null;
@@ -386,23 +389,31 @@ export async function auditViewportInParallel(
 
   const runReadOnlyTrack = async (): Promise<{
     matchedSelectorCount?: number;
-    tokenViolations: ITokenViolation[];
-    contrastViolations: IContrastViolation[];
-    domViolations: IDomIntegrityViolation[];
-    runtimeErrors: IRuntimeErrorViolation[];
+    spatialBrief?: string;
+    tokenViolations: Array<ITokenViolation>;
+    contrastViolations: Array<IContrastViolation>;
+    domViolations: Array<IDomIntegrityViolation>;
+    runtimeErrors: Array<IRuntimeErrorViolation>;
   }> => {
-    if (!runTokens && !runContrast && !runDom && !runRuntimeCapture && !hasSelectors) {
+    if (
+      !runTokens &&
+      !runContrast &&
+      !runDom &&
+      !runRuntimeCapture &&
+      !hasSelectors &&
+      !includeSpatialBrief
+    ) {
       return {
-        tokenViolations: [],
-        contrastViolations: [],
-        domViolations: [],
-        runtimeErrors: [],
+        tokenViolations: new Array<ITokenViolation>(),
+        contrastViolations: new Array<IContrastViolation>(),
+        domViolations: new Array<IDomIntegrityViolation>(),
+        runtimeErrors: new Array<IRuntimeErrorViolation>(),
       };
     }
     const context = await browser.newContext({ viewport: viewportSize });
     try {
       const page = await context.newPage();
-      const runtimeErrors: IRuntimeErrorViolation[] = [];
+      const runtimeErrors = new Array<IRuntimeErrorViolation>();
 
       if (runRuntimeCapture) {
         page.on('pageerror', (err: Error) => {
@@ -436,20 +447,33 @@ export async function auditViewportInParallel(
         logTelemetry('check:scope', `Selectors matched on page: ${countBadge}`);
       }
 
+      let spatialBrief: string | undefined;
+      if (includeSpatialBrief) {
+        const rawSpatialNodes = await page.evaluate(
+          collectSpatialNodes,
+          selectors ?? new Array<string>()
+        );
+        spatialBrief = formatSpatialBrief(rawSpatialNodes);
+        logTelemetry(
+          'check:spatial-brief',
+          `Collected spatial brief (${rawSpatialNodes.length} raw nodes): ${spatialBrief || '(none)'}`
+        );
+      }
+
       const tokenViolations =
         runTokens && tokenScale !== null
           ? await crawlPageTokens(page, tokenScale, ignoreRules, selectors)
-          : [];
+          : new Array<ITokenViolation>();
       const contrastViolations = runContrast
         ? await auditPageContrast(
             page,
             MIN_WCAG_AA_CONTRAST,
             ignoreRules,
             'contrast',
-            tokenScale?.colors ?? [],
+            tokenScale?.colors ?? new Array<string>(),
             selectors
           )
-        : [];
+        : new Array<IContrastViolation>();
 
       const domViolations = runDom
         ? await runDomIntegrityAudit(page, {
@@ -457,10 +481,11 @@ export async function auditViewportInParallel(
             ignoreRules,
             selectors,
           })
-        : [];
+        : new Array<IDomIntegrityViolation>();
 
       return {
         matchedSelectorCount,
+        spatialBrief,
         tokenViolations,
         contrastViolations,
         domViolations,
@@ -470,9 +495,10 @@ export async function auditViewportInParallel(
       await context.close();
     }
   };
-  const runDarkModeTrack = async (): Promise<IDarkModeViolation[]> => {
+
+    const runDarkModeTrack = async (): Promise<Array<IDarkModeViolation>> => {
     if (!runDarkMode) {
-      return [];
+      return new Array<IDarkModeViolation>();
     }
     const context = await browser.newContext({ viewport: viewportSize });
     try {
@@ -482,7 +508,7 @@ export async function auditViewportInParallel(
         maxSurfaceLuminance:
           budgets.darkModeMaxSurfaceLuminance ?? DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
         ignoreRules,
-        allowedColors: tokenScale?.colors ?? [],
+        allowedColors: tokenScale?.colors ?? new Array<string>(),
         selectors,
       });
     } finally {
@@ -490,9 +516,9 @@ export async function auditViewportInParallel(
     }
   };
 
-  const runStressTrack = async (): Promise<IGeometricViolation[]> => {
+  const runStressTrack = async (): Promise<Array<IGeometricViolation>> => {
     if (!runStress) {
-      return [];
+      return new Array<IGeometricViolation>();
     }
     const context = await browser.newContext({ viewport: viewportSize });
     try {
@@ -540,6 +566,9 @@ export async function auditViewportInParallel(
           matchedSelectorCount: readOnlyResult.matchedSelectorCount ?? 0,
         }
       : {}),
+    ...(readOnlyResult.spatialBrief !== undefined
+      ? { spatialBrief: readOnlyResult.spatialBrief }
+      : {}),
     tokenViolations: readOnlyResult.tokenViolations,
     contrastViolations: readOnlyResult.contrastViolations,
     darkModeViolations,
@@ -562,7 +591,7 @@ export async function executeCheckCommand(
   }
 
   let browser: Browser | null = null;
-  const ephemeralServers: IEphemeralStaticServer[] = [];
+  const ephemeralServers = new Array<IEphemeralStaticServer>();
 
   try {
     const { config, configLabel } = resolveExecutionConfig(options, cwd);
@@ -579,7 +608,7 @@ export async function executeCheckCommand(
       );
     }
 
-    const resolvedTargets: Array<{ displayUrl: string; liveUrl: string; isLocal: boolean }> = [];
+    const resolvedTargets = new Array<{ displayUrl: string; liveUrl: string; isLocal: boolean }>();
     for (const rawTarget of config.targetUrls) {
       if (isLocalFileTarget(rawTarget)) {
         const server = await startEphemeralStaticServer(rawTarget, cwd);
@@ -607,7 +636,7 @@ export async function executeCheckCommand(
       }
     }
 
-    const results: IViewportAuditReport[] = [];
+    const results = new Array<IViewportAuditReport>();
 
     for (const targetEntry of resolvedTargets) {
       for (const viewport of config.viewports) {
@@ -618,9 +647,10 @@ export async function executeCheckCommand(
           tokenScale,
           config.thresholdBudgets,
           options.only,
-          config.ignore ?? [],
+          config.ignore ?? new Array<IUirigIgnoreRule>(),
           targetEntry.isLocal,
-          options.selectors
+          options.selectors,
+          Boolean(options.spatialBrief)
         );
         results.push({
           ...viewportReport,
@@ -665,6 +695,20 @@ export async function executeCheckCommand(
       process.stdout.write(
         formatConsoleAuditReport(executionReport, { verbose: options.verbose })
       );
+      if (options.spatialBrief) {
+        for (const vpReport of executionReport.results) {
+          if (vpReport.spatialBrief !== undefined) {
+            const vpTag = paint(
+              `${vpReport.viewport.name} (${vpReport.viewport.width}x${vpReport.viewport.height})`,
+              'bold',
+              'cyan'
+            );
+            process.stdout.write(
+              `📐 Spatial Brief [${vpTag}]: ${vpReport.spatialBrief || '(no visible landmarks)'}\n`
+            );
+          }
+        }
+      }
       const exitBadge =
         exitCode === 0
           ? paint('0 (PASS)', 'bold', 'green')
