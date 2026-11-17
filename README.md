@@ -175,12 +175,12 @@ Each deduplicated entry in `violations[]` includes `engine`, `hostComponent`, `o
 
 * Comma-separated string (recommended):
 ```bash
-npx @rlevin/uirig <URL> --selectors="ag-card, ag-button, ag-input" --json
+npx @rlevin/uirig <URL> --selectors="ag-card, ag-button, ag-input"
 ```
 
 * Repeated flags:
 ```bash
-npx @rlevin/uirig <URL> -s="ag-card" -s="ag-button" -s="ag-input" --json
+npx @rlevin/uirig <URL> -s="ag-card" -s="ag-button" -s="ag-input"
 ```
 
 
