@@ -2,10 +2,10 @@
  * src/index.ts
  * Main system entry point and zero-dependency CLI argument parser/router for `uirig`.
  * Supports:
- * - `uirig <url-or-file> [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]`
+ * - `uirig <url-or-file> [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]`
  * - `uirig init`
- * - `uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]`
- * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]`
+ * - `uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]`
+ * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]`
  * - `uirig manifest`
  * - `uirig --help` / `uirig <command> --help` / `uirig --version`
  */
@@ -28,7 +28,6 @@ const pkg = JSON.parse(
 ) as { version: string };
 export const UIRIG_VERSION = pkg.version;
 
-
 const AUDIT_TOOL_NAMES = new Set<AuditToolName>([
   'tokens',
   'contrast',
@@ -41,15 +40,16 @@ const AUDIT_TOOL_NAMES = new Set<AuditToolName>([
 interface ISubcommandHelpSpec {
   summary: string;
   usage: string;
-  mechanics: string[];
-  options: string[];
-  exitCodes: string[];
-  examples: string[];
+  mechanics: Array<string>;
+  options: Array<string>;
+  exitCodes: Array<string>;
+  examples: Array<string>;
 }
 
 const SHARED_AUDIT_OPTIONS = [
   '-s, --selectors=<csv>  Filter element checks to matching CSS selectors (repeatable)',
   '--config=<path>        Path to uirig.config.json (also supports: --config <path>)',
+  '--spatial-brief        Emit compact bounding-box summary of landmarks & target selectors',
   '--verbose              Print individual failing selectors and details beneath each engine',
   '--json                 Route diagnostic logs to stderr and emit deduplicated JSON to stdout',
   '--headed               Launch Chromium with a visible browser window for local inspection',
@@ -73,7 +73,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   check: {
     summary: 'Run all 6 verification engines concurrently across configured or direct targets in isolated contexts.',
-    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Launches a single headless Chromium instance and isolates each (url, viewport) pair in a fresh BrowserContext.',
       'Automatically serves local .html files on an ephemeral 127.0.0.1 HTTP server when given a file path.',
@@ -91,12 +91,14 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     examples: [
       'npx @rlevin/uirig check',
       'npx @rlevin/uirig check ./dist/index.html --selectors="#hero, .card" --verbose',
+      'npx @rlevin/uirig check ./dist/index.html --spatial-brief --json',
       'npx @rlevin/uirig check --only=dark-mode --json',
     ],
   },
-  tokens: {
+
+    tokens: {
     summary: 'Audit Light DOM and open ShadowRoot computed styles against your design token scale.',
-    usage: 'uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Climbs Light DOM and nested Web Component ShadowRoot trees to inspect rendered colors, spacing, font sizes, and radii.',
       'Attributes violations to the nearest custom element hostComponent and respects data-uirig-ignore="tokens".',
@@ -113,7 +115,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   contrast: {
     summary: 'Verify WCAG 2.1 AA rendered luminance contrast (>= 4.5:1) using Porter-Duff alpha compositing.',
-    usage: 'uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Walks Light DOM and ShadowRoot.host ancestors to composite translucent backgrounds before computing luminance contrast.',
       'Computes the nearest passing design system color token (suggestedToken) when tokensPath is configured.',
@@ -128,10 +130,9 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       'npx @rlevin/uirig contrast http://localhost:5173 --json',
     ],
   },
-
-    'dark-mode': {
+  'dark-mode': {
     summary: 'Emulate dark color scheme / [data-theme="dark"] and audit dark contrast & un-inverted bright surfaces.',
-    usage: 'uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Forces prefers-color-scheme: dark and toggles data-theme="dark" on <html> inside an isolated browser context.',
       'Re-runs Porter-Duff contrast checks and flags large surfaces stranded above 0.85 relative luminance.',
@@ -148,7 +149,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   stress: {
     summary: 'Fuzz text with +30% expansion and space-free strings to catch layout overflow, bleed, and tiny tap targets.',
-    usage: 'uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Injects +30% longer copy and unbreakable email/URL tokens to test flex/grid resilience and container clipping.',
       'Checks horizontal scrollbar bleed (100vw), squished avatars, stuck opacity: 0 elements, and 24x24px minimum tap targets.',
@@ -165,7 +166,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   cls: {
     summary: 'Measure W3C 1s/5s session-window Cumulative Layout Shift (CLS) against clsMaxLimit.',
-    usage: 'uirig cls [<url-or-file>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig cls [<url-or-file>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Injects a pre-navigation PerformanceObserver for layout-shift entries prior to initial page load.',
       'Aggregates shifting bursts using W3C 1-second gap / 5-second max session windows.',
@@ -182,7 +183,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   dom: {
     summary: 'Audit Light + Shadow DOM for broken ARIA/label IDs, broken media, unsafe links, and prompt-injection traps.',
-    usage: 'uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--verbose] [--json] [--headed]',
+    usage: 'uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Verifies aria-labelledby / label[for] ID resolution, accessible names on controls, and loaded <img> dimensions.',
       'Flags javascript: URIs, target="_blank" without rel="noopener", and invisible AI prompt-injection text.',
@@ -197,7 +198,8 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       'npx @rlevin/uirig dom http://localhost:5173 --json',
     ],
   },
-  manifest: {
+
+    manifest: {
     summary: 'Print an ASCII repository directory tree blueprint while excluding blocklisted build/vendor directories.',
     usage: 'uirig manifest [--help]',
     mechanics: [
@@ -231,6 +233,7 @@ ${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / cls / d
   -s, --selectors=<csv>           Filter element checks to matching CSS selectors (repeatable)
   --config=<path>                 Path to uirig.config.json (also supports: --config <path>)
   --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls | dom
+  --spatial-brief                 Emit compact bounding-box summary of landmarks & target selectors
   --verbose                       Print individual failing selectors and details beneath each engine
   --json                          Route telemetry to stderr and emit machine-readable JSON to stdout
   --headed                        Launch Chromium with a visible browser window for local debugging
@@ -256,7 +259,7 @@ export function renderHelpText(topic?: string): string {
     return CLI_HELP_TEXT.trim();
   }
 
-  const formatList = (items: string[]): string =>
+  const formatList = (items: Array<string>): string =>
     items.map((line) => `  ${line}`).join('\n');
 
   return [
@@ -288,8 +291,9 @@ export type ParsedCliCommand =
       command: 'check';
       target?: string;
       only?: AuditToolName;
-      selectors?: string[];
+      selectors?: Array<string>;
       configPath?: string;
+      spatialBrief: boolean;
       verbose: boolean;
       json: boolean;
       headless: boolean;
@@ -309,17 +313,17 @@ export function isDirectTargetArg(arg: string): boolean {
     /\.html?$/i.test(trimmed)
   );
 }
-
 function parseAuditCommandArgs(
   rawSubcommand: string,
-  restArgs: string[],
+  restArgs: Array<string>,
   presetOnly?: AuditToolName,
   initialTarget?: string
 ): ParsedCliCommand {
   let target: string | undefined = initialTarget;
   let configPath: string | undefined;
   let only: AuditToolName | undefined = presetOnly;
-  const collectedSelectors: string[] = [];
+  const collectedSelectors = new Array<string>();
+  let spatialBrief = false;
   let verbose = false;
   let json = false;
   let headless = true;
@@ -329,6 +333,8 @@ function parseAuditCommandArgs(
 
     if (token === '--json') {
       json = true;
+    } else if (token === '--spatial-brief') {
+      spatialBrief = true;
     } else if (token === '--verbose') {
       verbose = true;
     } else if (token === '--headed') {
@@ -419,13 +425,14 @@ function parseAuditCommandArgs(
     only,
     selectors: uniqueSelectors,
     configPath,
+    spatialBrief,
     verbose,
     json,
     headless,
   };
 }
 
-export function parseCliArgs(argv: string[]): ParsedCliCommand {
+export function parseCliArgs(argv: Array<string>): ParsedCliCommand {
   if (argv.length === 0) {
     return { command: 'help' };
   }
@@ -485,7 +492,7 @@ export interface ICliCommandHandlers {
 }
 
 export async function runCli(
-  argv: string[],
+  argv: Array<string>,
   handlers: ICliCommandHandlers = {}
 ): Promise<PosixExitCode> {
   const parsed = parseCliArgs(argv);
@@ -524,6 +531,7 @@ export async function runCli(
       configPath: parsed.configPath,
       only: parsed.only,
       selectors: parsed.selectors,
+      spatialBrief: parsed.spatialBrief,
       verbose: parsed.verbose,
       json: parsed.json,
       headless: parsed.headless,

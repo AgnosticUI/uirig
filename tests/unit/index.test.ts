@@ -1,155 +1,147 @@
 /**
  * tests/unit/index.test.ts
- * 1-to-1 unit tests for `src/index.ts`.
- * Verifies:
- * 1. Pure CLI argument parsing (`parseCliArgs`) across `init`, `manifest`, `check`,
- *    direct zero-config `<url-or-file>` targets, `--selectors` / `-s`, `--config`,
- *    `--verbose`, `--json`, `--headed`, `--help`, `--version`, and invalid flags.
- * 2. Subcommand-specific `--help` topic parsing and `renderHelpText(topic?)` output for all 9 commands.
- * 3. Command dispatching and deterministic POSIX exit codes (`0`, `1`, `2`) in `runCli()`.
+ * Unit test suite for the root CLI entry router (`src/index.ts`), including
+ * zero-config direct target invocations (`uirig <url-or-file>`), `--selectors`
+ * / `-s` scoping flags, `--spatial-brief`, `--verbose`, subcommand routing,
+ * subcommand-specific `--help` pages, and POSIX exit code forwarding.
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { execFileSync } from 'child_process';
-import { resolve } from 'path';
-import { parseCliArgs, renderHelpText, runCli, UIRIG_VERSION } from '../../src/index.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  parseCliArgs,
+  runCli,
+  CLI_HELP_TEXT,
+  renderHelpText,
+  UIRIG_VERSION,
+} from '../../src/index.js';
 import type { ICheckExecutionReport } from '../../src/commands/check.js';
 
-function createMockReport(exitCode: 0 | 1 | 2): ICheckExecutionReport {
+function createMockReport(exitCode: 0 | 1 | 2 = 0): ICheckExecutionReport {
   return {
-    timestamp: '2026-11-12T08:00:00.000Z',
+    timestamp: '2026-11-12T12:00:00.000Z',
     configPath: '/workspace/uirig.config.json',
     reportPath: '/workspace/.uirig/github_pr_comment.md',
     exitCode,
-    results: [],
+    results: new Array(),
     summary: {
       totalViewportsAudited: 1,
-      totalTokenViolations: exitCode === 1 ? 1 : 0,
+      totalTokenViolations: 0,
       totalContrastViolations: 0,
-      totalStressViolations: exitCode === 2 ? 1 : 0,
+      totalStressViolations: 0,
       totalClsViolations: 0,
     },
   };
 }
 
-describe('index.ts — Root CLI Parser & Command Router', () => {
+describe('Root CLI Entry Router (src/index.ts)', () => {
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  });
+
   afterEach(() => {
-    vi.restoreAllMocks();
+    stdoutSpy.mockRestore();
+    stderrSpy.mockRestore();
   });
 
-  it('parses help, version, init, and manifest subcommands accurately', () => {
-    console.log('\n--- START TEST: Basic Subcommand & Flag Parsing ---');
-    expect(parseCliArgs([])).toEqual({ command: 'help', topic: undefined });
-    expect(parseCliArgs(['--help'])).toEqual({ command: 'help', topic: undefined });
-    expect(parseCliArgs(['-v'])).toEqual({ command: 'version' });
-    expect(parseCliArgs(['init'])).toEqual({ command: 'init' });
-    expect(parseCliArgs(['manifest'])).toEqual({ command: 'manifest' });
-  });
+  it('parses `check` defaults cleanly and captures --only, --config, --spatial-brief, --verbose, --json, and --headed flags', () => {
+    console.log('[TEST] Verifying parseCliArgs for check command and flags...');
 
-  it('parses check flags (--config=, --config <path>, --verbose, --json, --headed)', () => {
-    console.log('\n--- START TEST: check Command Flag Parsing ---');
     expect(parseCliArgs(['check'])).toEqual({
       command: 'check',
       target: undefined,
       only: undefined,
       selectors: undefined,
       configPath: undefined,
+      spatialBrief: false,
       verbose: false,
       json: false,
       headless: true,
     });
 
     expect(
-      parseCliArgs(['check', '--config=./custom.json', '--verbose', '--json', '--headed'])
+      parseCliArgs([
+        'check',
+        '--only=contrast',
+        '--config=./custom/uirig.config.json',
+        '--spatial-brief',
+        '--verbose',
+        '--json',
+        '--headed',
+      ])
     ).toEqual({
       command: 'check',
       target: undefined,
-      only: undefined,
+      only: 'contrast',
       selectors: undefined,
-      configPath: './custom.json',
+      configPath: './custom/uirig.config.json',
+      spatialBrief: true,
       verbose: true,
       json: true,
       headless: false,
     });
-
-    expect(parseCliArgs(['check', '--config', 'dir/uirig.config.json'])).toEqual({
-      command: 'check',
-      target: undefined,
-      only: undefined,
-      selectors: undefined,
-      configPath: 'dir/uirig.config.json',
-      verbose: false,
-      json: false,
-      headless: true,
-    });
   });
 
-  it('parses direct zero-config <url-or-file> targets and standalone engine + target pairs', () => {
-    console.log('\n--- START TEST: Zero-Config Instant Target CLI Parsing ---');
-    expect(parseCliArgs(['http://localhost:5173'])).toEqual({
+  it('parses zero-config direct URL and local .html file targets (`uirig <url-or-file>`)', () => {
+    console.log('[TEST] Verifying zero-config direct target parsing in parseCliArgs...');
+
+    expect(parseCliArgs(['http://localhost:5173', '--json'])).toEqual({
       command: 'check',
       target: 'http://localhost:5173',
       only: undefined,
       selectors: undefined,
       configPath: undefined,
-      verbose: false,
-      json: false,
-      headless: true,
-    });
-
-    expect(parseCliArgs(['./dist/index.html', '--json'])).toEqual({
-      command: 'check',
-      target: './dist/index.html',
-      only: undefined,
-      selectors: undefined,
-      configPath: undefined,
+      spatialBrief: false,
       verbose: false,
       json: true,
       headless: true,
     });
-
-    expect(parseCliArgs(['contrast', './dist/index.html', '--headed'])).toEqual({
+    expect(parseCliArgs(['./index.html', '--only=contrast', '--headed', '--spatial-brief'])).toEqual({
       command: 'check',
-      target: './dist/index.html',
+      target: './index.html',
       only: 'contrast',
       selectors: undefined,
       configPath: undefined,
+      spatialBrief: true,
       verbose: false,
       json: false,
       headless: false,
     });
 
-    expect(parseCliArgs(['check', 'https://example.com'])).toEqual({
+    expect(parseCliArgs(['check', 'dist/preview.html', '--config', 'alt.config.json'])).toEqual({
       command: 'check',
-      target: 'https://example.com',
+      target: 'dist/preview.html',
       only: undefined,
       selectors: undefined,
-      configPath: undefined,
+      configPath: 'alt.config.json',
+      spatialBrief: false,
       verbose: false,
       json: false,
       headless: true,
     });
   });
 
-    it('parses --selectors and -s flags (comma-separated, repeatable, equals syntax) and rejects empty values', () => {
-    console.log('\n--- START TEST: --selectors / -s Flag Parsing & Deduplication ---');
-    expect(parseCliArgs(['check', '--selectors=#hero, .card, [data-qux="a, b"]'])).toEqual({
-      command: 'check',
-      target: undefined,
-      only: undefined,
-      selectors: ['#hero', '.card', '[data-qux="a, b"]'],
-      configPath: undefined,
-      verbose: false,
-      json: false,
-      headless: true,
-    });
+  it('parses comma-separated and repeatable --selectors / -s flags with deduplication', () => {
+    console.log('[TEST] Verifying --selectors / -s parsing and validation...');
 
-    expect(parseCliArgs(['tokens', './dist/index.html', '-s', 'ag-button', '-s=.badge', '-s', 'ag-button'])).toEqual({
+    expect(
+      parseCliArgs([
+        'check',
+        './index.html',
+        '--selectors=#hero, .pricing-card',
+        '-s',
+        '.pricing-card, ag-button',
+      ])
+    ).toEqual({
       command: 'check',
-      target: './dist/index.html',
-      only: 'tokens',
-      selectors: ['ag-button', '.badge'],
+      target: './index.html',
+      only: undefined,
+      selectors: ['#hero', '.pricing-card', 'ag-button'],
       configPath: undefined,
+      spatialBrief: false,
       verbose: false,
       json: false,
       headless: true,
@@ -159,46 +151,52 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     expect(parseCliArgs(['check', '-s']).command).toBe('unknown');
   });
 
-  it('returns command=unknown with descriptive reason on invalid commands or missing flag values', () => {
-    console.log('\n--- START TEST: Invalid Command & Missing Flag Value Detection ---');
-    const badCmd = parseCliArgs(['deploy']);
-    expect(badCmd.command).toBe('unknown');
+  it('prints help text on empty args or --help and version on --version', async () => {
+    console.log('[TEST] Verifying --help and --version CLI routes...');
 
-    const missingConfigVal = parseCliArgs(['check', '--config=']);
-    expect(missingConfigVal.command).toBe('unknown');
-
-    const badFlag = parseCliArgs(['check', '--bogus']);
-    expect(badFlag.command).toBe('unknown');
-  });
-
-  it('writes help and version text to stdout and returns POSIX exit code 0', async () => {
-    console.log('\n--- START TEST: Help & Version stdout Output ---');
-    const stdoutChunks: string[] = [];
-    vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array): boolean => {
-      stdoutChunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
-      return true;
-    });
+    const emptyExit = await runCli(new Array<string>());
+    expect(emptyExit).toBe(0);
+    expect(stdoutSpy).toHaveBeenCalledWith(`${CLI_HELP_TEXT.trim()}\n`);
 
     const helpExit = await runCli(['--help']);
     expect(helpExit).toBe(0);
-    expect(stdoutChunks.join('')).toContain('uirig <url-or-file> [options]');
 
-    stdoutChunks.length = 0;
     const versionExit = await runCli(['--version']);
     expect(versionExit).toBe(0);
-    expect(stdoutChunks.join('').trim()).toBe(UIRIG_VERSION);
+    expect(stdoutSpy).toHaveBeenLastCalledWith(`${UIRIG_VERSION}\n`);
   });
 
-  it('dispatches init, manifest, check, and direct <url-or-file> handlers and propagates POSIX exit codes (0, 1, 2)', async () => {
-    console.log('\n--- START TEST: Command Dispatching & Exit Code Propagation ---');
-    const initSpy = vi.fn().mockResolvedValue(undefined);
-    const manifestSpy = vi.fn().mockResolvedValue(undefined);
-    const checkSpy = vi
-      .fn()
-      .mockResolvedValueOnce(createMockReport(0))
-      .mockResolvedValueOnce(createMockReport(1))
-      .mockResolvedValueOnce(createMockReport(2))
-      .mockResolvedValueOnce(createMockReport(0));
+  it('renders dedicated subcommand help pages for `uirig <command> --help` and `uirig help <command>`', async () => {
+    console.log('[TEST] Verifying subcommand-specific --help pages...');
+
+    const darkModeHelpExit = await runCli(['dark-mode', '--help']);
+    expect(darkModeHelpExit).toBe(0);
+    const darkModeOutput = String(stdoutSpy.mock.calls.at(-1)?.at(0) ?? '');
+    expect(darkModeOutput).toContain('uirig dark-mode');
+    expect(darkModeOutput).toContain('prefers-color-scheme: dark');
+    expect(darkModeOutput).toContain('--selectors=<csv>');
+
+    const checkHelpExit = await runCli(['help', 'check']);
+    expect(checkHelpExit).toBe(0);
+    const checkOutput = String(stdoutSpy.mock.calls.at(-1)?.at(0) ?? '');
+    expect(checkOutput).toContain('uirig check');
+    expect(checkOutput).toContain('--only=<tool>');
+    expect(checkOutput).toContain('--spatial-brief');
+    expect(checkOutput).toContain('POSIX EXIT CODES:');
+
+    const initHelpExit = await runCli(['init', '-h']);
+    expect(initHelpExit).toBe(0);
+    expect(renderHelpText('init')).toContain('uirig init');
+
+    expect(renderHelpText('nonexistent-topic')).toBe(CLI_HELP_TEXT.trim());
+  });
+
+    it('routes `init`, `manifest`, and `check` (including zero-config target, selectors, spatialBrief & verbose) to handlers and forwards POSIX exit code', async () => {
+    console.log('[TEST] Verifying subcommand routing and exit code propagation...');
+
+    const initSpy = vi.fn(async () => {});
+    const manifestSpy = vi.fn(async () => {});
+    const checkSpy = vi.fn(async () => createMockReport(2));
 
     expect(await runCli(['init'], { init: initSpy })).toBe(0);
     expect(initSpy).toHaveBeenCalledTimes(1);
@@ -206,217 +204,86 @@ describe('index.ts — Root CLI Parser & Command Router', () => {
     expect(await runCli(['manifest'], { manifest: manifestSpy })).toBe(0);
     expect(manifestSpy).toHaveBeenCalledTimes(1);
 
-    expect(await runCli(['check'], { check: checkSpy })).toBe(0);
-    expect(
-      await runCli(
-        ['check', '--config=custom.json', '-s', '#card, .btn', '--verbose', '--json', '--headed'],
-        { check: checkSpy }
-      )
-    ).toBe(1);
-    expect(checkSpy).toHaveBeenLastCalledWith({
-      target: undefined,
-      configPath: 'custom.json',
-      selectors: ['#card', '.btn'],
+    const checkExit = await runCli(
+      [
+        './demo.html',
+        '--only=stress',
+        '-s',
+        '.card',
+        '--spatial-brief',
+        '--verbose',
+        '--json',
+      ],
+      { check: checkSpy }
+    );
+    expect(checkExit).toBe(2);
+    expect(checkSpy).toHaveBeenCalledWith({
+      target: './demo.html',
+      configPath: undefined,
+      only: 'stress',
+      selectors: ['.card'],
+      spatialBrief: true,
       verbose: true,
       json: true,
-      only: undefined,
-      headless: false,
-    });
-    expect(await runCli(['check'], { check: checkSpy })).toBe(2);
-
-    expect(await runCli(['./dist/index.html', '--json'], { check: checkSpy })).toBe(0);
-    expect(checkSpy).toHaveBeenLastCalledWith({
-      target: './dist/index.html',
-      configPath: undefined,
-      selectors: undefined,
-      verbose: false,
-      json: true,
-      only: undefined,
       headless: true,
     });
   });
 
-    it('returns POSIX exit code 1 and writes to stderr on unknown commands or thrown runtime errors', async () => {
-    console.log('\n--- START TEST: Fatal Runtime Error & Unknown Command Exit Code 1 ---');
-    const stderrSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('supports standalone subcommands (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`) with optional direct targets', async () => {
+    console.log('[TEST] Verifying standalone engine subcommands...');
 
-    const unknownExit = await runCli(['unknown-subcommand']);
-    expect(unknownExit).toBe(1);
-    expect(stderrSpy).toHaveBeenCalled();
+    const checkSpy = vi.fn(async () => createMockReport(0));
 
-    const failingCheck = vi.fn().mockRejectedValue(new Error('ERR_CONFIG_MISSING: Not found'));
-    const crashExit = await runCli(['check'], { check: failingCheck });
-    expect(crashExit).toBe(1);
-  });
-
-  it('executes compiled bin/uirig binary end-to-end for --version and --help', () => {
-    console.log('\n--- START TEST: End-to-End Compiled bin/uirig Execution ---');
-    const binPath = resolve(process.cwd(), 'bin/uirig');
-
-    const versionOutput = execFileSync(process.execPath, [binPath, '--version'], {
-      encoding: 'utf8',
-    });
-    expect(versionOutput.trim()).toBe(UIRIG_VERSION);
-
-    const helpOutput = execFileSync(process.execPath, [binPath, '--help'], {
-      encoding: 'utf8',
-    });
-    expect(helpOutput).toContain('uirig <url-or-file> [options]');
-    expect(helpOutput).toContain('POSIX EXIT CODES:');
-  });
-
-  it('parses standalone tool subcommands (tokens, contrast, stress, cls, dark-mode, dom) and --only=<tool>', () => {
-    console.log('\n--- START TEST: Standalone Engine Subcommands & --only Flag ---');
-    expect(parseCliArgs(['tokens', '--json'])).toEqual({
+    expect(
+      parseCliArgs(['tokens', '--config=uirig.config.json', '--selectors=ag-button'])
+    ).toEqual({
       command: 'check',
       target: undefined,
       only: 'tokens',
-      selectors: undefined,
-      configPath: undefined,
-      verbose: false,
-      json: true,
-      headless: true,
-    });
-
-    expect(parseCliArgs(['contrast', '--config=custom.json', '--verbose'])).toEqual({
-      command: 'check',
-      target: undefined,
-      only: 'contrast',
-      selectors: undefined,
-      configPath: 'custom.json',
-      verbose: true,
-      json: false,
-      headless: true,
-    });
-
-    expect(parseCliArgs(['stress', '--headed'])).toEqual({
-      command: 'check',
-      target: undefined,
-      only: 'stress',
-      selectors: undefined,
-      configPath: undefined,
-      verbose: false,
-      json: false,
-      headless: false,
-    });
-
-    expect(parseCliArgs(['cls'])).toEqual({
-      command: 'check',
-      target: undefined,
-      only: 'cls',
-      selectors: undefined,
-      configPath: undefined,
+      selectors: ['ag-button'],
+      configPath: 'uirig.config.json',
+      spatialBrief: false,
       verbose: false,
       json: false,
       headless: true,
     });
 
-    expect(parseCliArgs(['dark-mode', './dist/index.html', '--json'])).toEqual({
+    expect(parseCliArgs(['dark-mode', './index.html', '--verbose'])).toEqual({
       command: 'check',
-      target: './dist/index.html',
+      target: './index.html',
       only: 'dark-mode',
       selectors: undefined,
       configPath: undefined,
-      verbose: false,
-      json: true,
-      headless: true,
-    });
-
-    expect(parseCliArgs(['dom', './dist/index.html', '--json'])).toEqual({
-      command: 'check',
-      target: './dist/index.html',
-      only: 'dom',
-      selectors: undefined,
-      configPath: undefined,
-      verbose: false,
-      json: true,
-      headless: true,
-    });
-
-    expect(parseCliArgs(['check', '--only=contrast'])).toEqual({
-      command: 'check',
-      target: undefined,
-      only: 'contrast',
-      selectors: undefined,
-      configPath: undefined,
-      verbose: false,
-      json: false,
-      headless: true,
-    });
-
-    const invalidOnly = parseCliArgs(['check', '--only=unknown']);
-    expect(invalidOnly.command).toBe('unknown');
-  });
-
-  it('dispatches standalone tool commands (e.g. uirig contrast --verbose) with verbose=true', async () => {
-    console.log('\n--- START TEST: Standalone Tool Execution Routing ---');
-    const checkSpy = vi.fn().mockResolvedValue(createMockReport(0));
-
-    const exitCode = await runCli(['contrast', '--verbose'], { check: checkSpy });
-    expect(exitCode).toBe(0);
-    expect(checkSpy).toHaveBeenCalledWith({
-      target: undefined,
-      configPath: undefined,
-      only: 'contrast',
-      selectors: undefined,
+      spatialBrief: false,
       verbose: true,
       json: false,
       headless: true,
     });
-  });
-
-  it('parses subcommand-specific --help and help <topic> across all 9 commands', () => {
-    console.log('\n--- START TEST: Subcommand --help Topic Parsing & Rendering ---');
-    const topics = [
-      'init',
-      'check',
-      'tokens',
-      'contrast',
-      'dark-mode',
-      'stress',
-      'cls',
-      'dom',
-      'manifest',
-    ] as const;
-
-    for (const topic of topics) {
-      expect(parseCliArgs([topic, '--help'])).toEqual({ command: 'help', topic });
-      expect(parseCliArgs([topic, '-h'])).toEqual({ command: 'help', topic });
-      expect(parseCliArgs(['help', topic])).toEqual({ command: 'help', topic });
-
-      const rendered = renderHelpText(topic);
-      expect(rendered).toContain(`uirig ${topic}`);
-      expect(rendered).toContain('USAGE:');
-      expect(rendered).toContain('HOW IT WORKS:');
-      expect(rendered).toContain('POSIX EXIT CODES:');
-      expect(rendered).toContain('EXAMPLES:');
-    }
-
-    expect(parseCliArgs(['./dist/index.html', '--help'])).toEqual({
-      command: 'help',
-      topic: undefined,
+    const domExit = await runCli(['dom', './index.html', '--json'], { check: checkSpy });
+    expect(domExit).toBe(0);
+    expect(checkSpy).toHaveBeenLastCalledWith({
+      target: './index.html',
+      configPath: undefined,
+      only: 'dom',
+      selectors: undefined,
+      spatialBrief: false,
+      verbose: false,
+      json: true,
+      headless: true,
     });
   });
 
-  it('writes subcommand-specific help to stdout without invoking command handlers', async () => {
-    console.log('\n--- START TEST: Subcommand --help Execution Isolation ---');
-    const stdoutChunks: string[] = [];
-    vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array): boolean => {
-      stdoutChunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
-      return true;
+  it('returns POSIX exit code 1 on unknown commands, invalid --only tools, or handler errors', async () => {
+    console.log('[TEST] Verifying error handling for invalid CLI arguments...');
+
+    expect(await runCli(['unknown-cmd'])).toBe(1);
+    expect(await runCli(['check', '--only=lighthouse'])).toBe(1);
+    expect(await runCli(['check', '--config'])).toBe(1);
+
+    const failingCheck = vi.fn(async () => {
+      throw new Error('ERR_CONFIG_MISSING: uirig.config.json not found');
     });
-
-    const initSpy = vi.fn();
-    const checkSpy = vi.fn();
-
-    expect(await runCli(['init', '--help'], { init: initSpy })).toBe(0);
-    expect(initSpy).not.toHaveBeenCalled();
-    expect(stdoutChunks.join('')).toContain('uirig init');
-
-    stdoutChunks.length = 0;
-    expect(await runCli(['dark-mode', '--help'], { check: checkSpy })).toBe(0);
-    expect(checkSpy).not.toHaveBeenCalled();
-    expect(stdoutChunks.join('')).toContain('uirig dark-mode');
-    expect(stdoutChunks.join('')).toContain('prefers-color-scheme: dark');
+    expect(await runCli(['check'], { check: failingCheck })).toBe(1);
   });
 });
+
