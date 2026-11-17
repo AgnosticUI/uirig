@@ -1,15 +1,11 @@
 /**
  * @file src/utils/spatial-brief.ts
- * @description Pure data structures and deterministic formatter for the
- * `--spatial-brief` flag (Issue #5). Compresses viewport-relative layout
- * geometry into an ultra-compact plain-text string (~40-60 tokens) so AI
- * coding agents can verify macro-layout without expensive vision screenshots.
+ * @description Pure data structures, Shadow-DOM-aware browser collector, and
+ * deterministic formatter for the `--spatial-brief` flag (Issue #5). Compresses
+ * viewport-relative layout geometry into an ultra-compact plain-text string
+ * (~40-60 tokens) so AI coding agents can verify macro-layout without vision tokens.
  */
 
-/**
- * Represents a single measured landmark, custom element host, or target selector
- * extracted from the rendered DOM / Shadow DOM tree.
- */
 export interface SpatialNode {
   /** Compact identifier such as `header`, `aside`, `main`, or `ag-card#hero`. */
   label: string;
@@ -23,9 +19,6 @@ export interface SpatialNode {
   height: number;
 }
 
-/**
- * Configuration options for `formatSpatialBrief`.
- */
 export interface FormatSpatialBriefOptions {
   /** Maximum number of nodes emitted before truncating (defaults to 20). */
   maxNodes?: number;
@@ -35,17 +28,115 @@ export interface FormatSpatialBriefOptions {
 export const DEFAULT_MAX_SPATIAL_NODES = 20;
 
 /**
+ * Browser-context collector designed to be passed directly to `page.evaluate()`.
+ * Self-contained (zero external closure references) so Playwright can serialize it cleanly.
+ */
+export function collectSpatialNodes(
+  selectors: ReadonlyArray<string> = new Array<string>(),
+): Array<SpatialNode> {
+  const LANDMARK_TAGS = new Set(['HEADER', 'NAV', 'ASIDE', 'MAIN', 'FOOTER']);
+  const LANDMARK_ROLES = new Set([
+    'banner',
+    'navigation',
+    'complementary',
+    'main',
+    'contentinfo',
+  ]);
+
+  const results = new Array<SpatialNode>();
+  const visitedElements = new Set<Element>();
+
+  const buildLabel = (el: Element): string => {
+    const tag = el.tagName.toLowerCase();
+    if (el.id) {
+      return `${tag}#${el.id}`;
+    }
+    const role = el.getAttribute('role');
+    if (role && !LANDMARK_TAGS.has(el.tagName)) {
+      return `${tag}[role=${role}]`;
+    }
+    return tag;
+  };
+
+  const isVisible = (el: Element): boolean => {
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+      return false;
+    }
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+
+  const recordElement = (el: Element): void => {
+    if (visitedElements.has(el) || !isVisible(el)) {
+      return;
+    }
+    visitedElements.add(el);
+    const rect = el.getBoundingClientRect();
+    results.push({
+      label: buildLabel(el),
+      x: Math.round(rect.x),
+      y: Math.round(rect.y),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    });
+  };
+  const walkTree = (root: Document | ShadowRoot, insideCustomHost: boolean): void => {
+    const elements = root.querySelectorAll('*');
+    for (const el of Array.from(elements)) {
+      const isCustomHost = el.tagName.includes('-');
+      const role = (el.getAttribute('role') ?? '').toLowerCase();
+      const isLandmark = LANDMARK_TAGS.has(el.tagName) || LANDMARK_ROLES.has(role);
+      const isTopLevelCustom = isCustomHost && !insideCustomHost;
+
+      if (isLandmark || isTopLevelCustom) {
+        recordElement(el);
+      }
+
+      if (el.shadowRoot) {
+        walkTree(el.shadowRoot, insideCustomHost || isCustomHost);
+      }
+    }
+  };
+
+  const collectExplicitSelectors = (root: Document | ShadowRoot): void => {
+    for (const selector of selectors) {
+      const trimmed = selector.trim();
+      if (!trimmed) continue;
+      try {
+        const matches = root.querySelectorAll(trimmed);
+        for (const match of Array.from(matches)) {
+          recordElement(match);
+        }
+      } catch {
+        // Ignore invalid CSS selectors in browser context; CLI validation handles syntax errors.
+      }
+    }
+
+    const allHosts = root.querySelectorAll('*');
+    for (const el of Array.from(allHosts)) {
+      if (el.shadowRoot) {
+        collectExplicitSelectors(el.shadowRoot);
+      }
+    }
+  };
+
+  if (document.body) {
+    walkTree(document, false);
+    if (selectors.length > 0) {
+      collectExplicitSelectors(document);
+    }
+  }
+
+  return results;
+}
+
+/**
  * Formats an array of measured `SpatialNode` entries into a single-line,
  * pipe-delimited spatial summary: `header[0,0 1440x64] | main[0,64 1440x836]`.
- *
- * Processing pipeline:
- * 1. Round coordinates to integers and discard non-rendered (`<= 0`) boxes.
- * 2. Deduplicate identical `(label, x, y, width, height)` entries.
- * 3. Sort in visual reading order (`y` ascending, then `x` ascending, then `label`).
- * 4. Cap output length to `maxNodes` (appending `|+N more` if truncated).
  */
 export function formatSpatialBrief(
-  nodes: readonly SpatialNode[],
+  nodes: ReadonlyArray<SpatialNode>,
   options: FormatSpatialBriefOptions = {},
 ): string {
   const maxNodes = options.maxNodes ?? DEFAULT_MAX_SPATIAL_NODES;
@@ -53,9 +144,8 @@ export function formatSpatialBrief(
     `[uirig:spatial-brief] Formatting ${nodes.length} raw spatial nodes (maxNodes=${maxNodes})`,
   );
 
-  // Step 1 & 2: Normalize numbers, drop zero/negative dimensions, and deduplicate.
   const seenKeys = new Set<string>();
-  const normalized: SpatialNode[] = [];
+  const normalized = new Array<SpatialNode>();
 
   for (const node of nodes) {
     const label = node.label.trim();
@@ -64,7 +154,6 @@ export function formatSpatialBrief(
     const width = Math.round(node.width);
     const height = Math.round(node.height);
 
-    // Skip empty labels or unrendered/collapsed elements.
     if (!label || width <= 0 || height <= 0) {
       continue;
     }
@@ -78,7 +167,6 @@ export function formatSpatialBrief(
     normalized.push({ label, x, y, width, height });
   }
 
-  // Step 3: Sort top-to-bottom (y), then left-to-right (x), then lexicographically.
   normalized.sort((a, b) => {
     if (a.y !== b.y) return a.y - b.y;
     if (a.x !== b.x) return a.x - b.x;
@@ -90,7 +178,6 @@ export function formatSpatialBrief(
     return '';
   }
 
-  // Step 4: Enforce maxNodes cap so output stays within the ~40-60 token budget.
   const visibleSlice = normalized.slice(0, Math.max(0, maxNodes));
   const omittedCount = normalized.length - visibleSlice.length;
 
