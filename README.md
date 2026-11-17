@@ -35,6 +35,9 @@ npx @rlevin/uirig ./dist/index.html --verbose
 # Scope checks to specific components or CSS selectors (Light DOM + Shadow DOM)
 npx @rlevin/uirig http://localhost:5173 --selectors="#hero, ag-button, .pricing-card"
 
+# Use repeated flags if you prefer
+npx @rlevin/uirig <URL> -s="#hero" -s="ag-button" -s=".pricing-card"
+
 # Stream deduplicated JSON remediation diffs for an AI coding agent
 npx @rlevin/uirig http://localhost:5173 --json
 ```
@@ -170,19 +173,6 @@ npx @rlevin/uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--v
 npx @rlevin/uirig http://localhost:5173 --selectors="ag-card" --json
 ```
 Each deduplicated entry in `violations[]` includes `engine`, `hostComponent`, `offendingSelectorPath`, `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
-
-#### How to pass multiple selectors
-
-* Comma-separated string (recommended):
-```bash
-npx @rlevin/uirig <URL> --selectors="ag-card, ag-button, ag-input"
-```
-
-* Repeated flags:
-```bash
-npx @rlevin/uirig <URL> -s="ag-card" -s="ag-button" -s="ag-input"
-```
-
 
 ### 2. GitHub Actions CI/CD Gate
 ```yaml
