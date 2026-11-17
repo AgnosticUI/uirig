@@ -4,6 +4,7 @@
  TIMESTAMP BASELINE : 2026-11-17T07:25:00-06:00 (Anchored to Nov 17, 2026 Timeline)
  REPOSITORY         : AgnosticUI/uirig
  ACTIVE WORKSPACE   : Post-MVP Roadmap — Issue #12 Complete; Issue #15 Next on Deck
+ ACTIVE BRANCH: feat/issue-15-token-budget
  GITHUB ROADMAP MAP (AgnosticUI/uirig) :
    - #8  : Native MCP (Model Context Protocol) Server Mode (`uirig mcp`) [pillar: agent-workflow]
    - #9  : Framework Source-Map & `file:line` Attribution [pillar: agent-workflow]
