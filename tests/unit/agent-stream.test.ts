@@ -7,6 +7,8 @@
  *    `hostComponent` attribution, `suggestedToken` hints, and concrete `remediationAdvice`.
  * 3. Repeating pattern violations deduplicate into a single entry with `occurrenceCount`
  *    and `sampleSelectors` to prevent AI context bloat.
+ * 4. Violations are ranked from highest impact (`cls` / `stress`) to lowest (`tokens` / `dom`)
+ *    and obey `--top` / `--max-tokens` limits with `totalViolations` and `truncatedCount`.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -37,13 +39,13 @@ function createCleanReport(): ICheckExecutionReport {
       {
         url: 'http://localhost:5173',
         viewport: { name: 'desktop', width: 1280, height: 800 },
-        tokenViolations: [],
-        contrastViolations: [],
-        darkModeViolations: [],
-        stressViolations: [],
+        tokenViolations: new Array(),
+        contrastViolations: new Array(),
+        darkModeViolations: new Array(),
+        stressViolations: new Array(),
         clsEvaluation: { maxSessionCls: 0.01, violation: null },
-        domViolations: [],
-        runtimeErrors: [],
+        domViolations: new Array(),
+        runtimeErrors: new Array(),
       },
     ],
   };
@@ -62,9 +64,10 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     expect(parsed.tool).toBe('uirig');
     expect(parsed.exitCode).toBe(0);
     expect(parsed.passed).toBe(true);
-    expect(parsed.violations).toEqual([]);
+    expect(parsed.violations).toEqual(new Array());
     expect(parsed.summary.totalViewportsAudited).toBe(1);
   });
+
   it('normalizes violations across engines with hostComponent, suggestedToken, and remediationAdvice', () => {
     console.log('\n--- START TEST: Violation Normalization & Remediation Advice ---');
     const failingViewport: IViewportAuditReport = {
@@ -205,7 +208,7 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     ]);
   });
 
-  it('always ranks violations from highest impact (cls/stress) to lowest (tokens/dom) in JSON stream', () => {
+    it('always ranks violations from highest impact (cls/stress) to lowest (tokens/dom) in JSON stream', () => {
     console.log('[TEST] Verifying priority ranking order in formatAgenticJsonStream...');
 
     const report: ICheckExecutionReport = {
@@ -310,5 +313,4 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     expect(cappedTokens.violations.length).toBeGreaterThanOrEqual(1);
     expect(cappedTokens.violations.at(0)?.engine).toBe('cls');
   });
-
 });

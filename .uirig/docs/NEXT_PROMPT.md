@@ -1,11 +1,11 @@
 ================================================================================
           uirig : Chronological Session Continuity Bridge Capsule              
 ================================================================================
- TIMESTAMP BASELINE : 2026-11-17T12:28:00-06:00 (Anchored to Nov 17, 2026 Timeline)
+ TIMESTAMP BASELINE : 2026-11-17T13:34:00-06:00 (Anchored to Nov 17, 2026 Timeline)
  REPOSITORY         : AgnosticUI/uirig
  ACTIVE BRANCH      : feat/issue-15-token-budget
  ACTIVE WORKSPACE   : Post-MVP Roadmap — Issue #15 (`--top <n>` / `--max-tokens <budget>`)
- PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_15.md (Chunks 0–1 Complete; Chunk 2 Next)
+ PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_15.md (Chunks 0–2 Complete; Chunk 3 Next)
  GITHUB ROADMAP MAP (AgnosticUI/uirig) :
    - #8  : Native MCP (Model Context Protocol) Server Mode (`uirig mcp`) [pillar: agent-workflow]
    - #9  : Framework Source-Map & `file:line` Attribution [pillar: agent-workflow]
@@ -25,18 +25,18 @@
 2. Co-Develop Behavior & 1-to-1 Specs: Every implementation file must have a corresponding test file covering happy paths, edge cases, and expected errors without `any` or `@ts-ignore`.
 3. Plain, Straightforward Naming & Comments: Always use clear, everyday descriptive names and plain-English comments/explanations—avoid academic buzzwords or opaque jargon.
 4. Motive First, Syntax Second: Always explain the engineering "WHY" in plain language before showing code.
-5. Full Files & Small Widget Blocks: Always provide full copy-pasteable files (or numbered parts under ~110 lines) with all changes fully integrated. Never use "// ... rest of code" or nest triple-backtick fences inside outer markdown fences. Use `Array<T>` / `new Array<T>()` so brackets are never stripped.
+5. Complete Copy-Pasteable Files Only (No Partial Snippets): Every time a file is created or modified, output the ENTIRE file from line 1 to EOF with all changes fully integrated (split into sequentially numbered parts under ~110 lines each if the file exceeds 110 lines). Never output isolated diff hunks, partial snippets, or "// ... rest of code" placeholders that require manual splicing. Never nest triple-backtick fences inside outer markdown fences, and use `Array<T>` / `new Array<T>()` so brackets are never stripped.
 6. Explanatory Logging: Inject descriptive console.log / logTelemetry flow telemetry in both production code and tests.
 7. Verification & Git Checkpoint: Stop at the end of every chunk, provide `npm run build && npm run typecheck:all && npm test`, suggest a conventional commit message on the active topic branch, and wait for user permission before advancing.
 
 --- TARGET RUNTIME DELTA ---
- EXACT NEXT TASK    : Issue #15 Micro-Chunk 2 — Wire violation priority ranking and `--top` / `--max-tokens` limits into `src/utils/agent-stream.ts`, `src/commands/check.ts`, and `tests/unit/agent-stream.test.ts`.
+ EXACT NEXT TASK    : Issue #15 Micro-Chunk 3 — Parse `--top <n>` and `--max-tokens <budget>` CLI flags in `src/index.ts` and update `tests/unit/index.test.ts` (delivering both files in full from line 1 to EOF).
  ENGINEERING "WHY"  :
-   1. `formatAgenticJsonStream()` in `src/utils/agent-stream.ts` should always rank deduplicated violations from highest impact to lowest and trim them safely when `--top` or `--max-tokens` is passed, adding `totalViolations` and `truncatedCount` when items are omitted.
-   2. `executeCheckCommand()` in `src/commands/check.ts` needs `top?: number` and `maxTokens?: number` so both JSON mode and terminal output respect the limits.
+   1. `executeCheckCommand({ top, maxTokens })` is ready in `src/commands/check.ts`, so `src/index.ts` needs to parse and validate positive integers for `--top` and `--max-tokens`, forward them in `runCli()`, and list them in `--help`.
+   2. 1-to-1 unit specs in `tests/unit/index.test.ts` verify default `undefined` values, valid parsing, invalid input rejection (`--top=0`, `--top=-1`, `--max-tokens=abc`), and `--help` output.
  CODE BOUNDARIES    :
-   - Micro-Chunk 2: `src/utils/agent-stream.ts`, `src/commands/check.ts`, `tests/unit/agent-stream.test.ts` (+ mark Chunk 2 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_15.md` and update `.uirig/docs/NEXT_PROMPT.md`)
+   - Micro-Chunk 3: `src/index.ts` & `tests/unit/index.test.ts` (+ mark Chunk 3 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_15.md` and update `.uirig/docs/NEXT_PROMPT.md`)
 
 --- SYSTEM BOOT TRIGGER COMMAND ---
-::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #15 MICRO-CHUNK 2 :::
+::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #15 MICRO-CHUNK 3 :::
 ================================================================================
