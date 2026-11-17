@@ -171,6 +171,19 @@ npx @rlevin/uirig http://localhost:5173 --selectors="ag-card" --json
 ```
 Each deduplicated entry in `violations[]` includes `engine`, `hostComponent`, `offendingSelectorPath`, `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
 
+#### How to pass multiple selectors
+
+* Comma-separated string (recommended):
+```bash
+npx @rlevin/uirig <URL> --selectors="ag-card, ag-button, ag-input" --json
+```
+
+* Repeated flags:
+```bash
+npx @rlevin/uirig <URL> -s="ag-card" -s="ag-button" -s="ag-input" --json
+```
+
+
 ### 2. GitHub Actions CI/CD Gate
 ```yaml
 - name: Run uirig UI verification gate
