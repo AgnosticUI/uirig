@@ -2,7 +2,7 @@
 
 - **Issue:** `#5` — `"No-Vision Required" Semantic Spatial Brief (--spatial-brief)`
 - **Pillar:** Pillar 2: Token & AI Cost Savers (`ai-native`, `pillar: token-efficiency`)
-- **Status:** Planned (No code written yet)
+- **Status:** In Progress (Chunks 0–3 complete; Chunk 4 next)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -29,74 +29,57 @@ Add a `--spatial-brief` CLI flag (and `spatialBrief` field in `--json` output) t
 
 ## 2. Architectural Design
 
-1. **In-Page Geometry Collector (Browser Context):**
-   - Runs inside the active browser evaluation context and traverses open `ShadowRoot` boundaries.
+1. **In-Page Geometry Collector (`collectSpatialNodes` in `src/utils/spatial-brief.ts`):**
+   - Self-contained browser evaluation function traversing `document` and open `ShadowRoot` boundaries.
    - Extracts viewport-relative `getBoundingClientRect()` values rounded to integers (`x`, `y`, `width`, `height`).
-   - Skips non-rendered elements (`width === 0 || height === 0`, `display: none`, `visibility: hidden`).
-   - Collects:
-     1. Semantic HTML5 & ARIA landmarks (`header`, `nav`, `aside`, `main`, `footer`, `[role="banner"]`, `[role="navigation"]`, `[role="complementary"]`, `[role="main"]`, `[role="contentinfo"]`).
-     2. Top-level custom element hosts (`tagName.includes('-')`) acting as structural containers.
-     3. Any explicit `--selectors` passed by the user.
-   - Sorts nodes in deterministic reading order: top-to-bottom (`y`), then left-to-right (`x`).
+   - Skips non-rendered elements (`width <= 0 || height <= 0`, `display: none`, `visibility: hidden`, `opacity: 0`).
+   - Collects semantic HTML5/ARIA landmarks, top-level custom element hosts (`tagName.includes('-')`), and explicit `--selectors` targets.
 
-2. **Pure Formatter (`formatSpatialBrief`):**
-   - Pure TypeScript helper taking `SpatialNode` and returning `tag[x,y wxh] | ...`.
-   - Deduplicates identical elements/rects (e.g., `<header role="banner">`) and enforces a safety node cap so large DOMs never exceed the token budget.
+2. **Pure Formatter (`formatSpatialBrief` in `src/utils/spatial-brief.ts`):**
+   - Deduplicates identical `(label, x, y, width, height)` entries, sorts in reading order (`y` then `x`), and enforces `DEFAULT_MAX_SPATIAL_NODES = 20`.
 
-3. **Runner & CLI Integration:**
-   - Wire `spatialBrief?: boolean` into CLI flags, run options, text reporter, and `--json` output.
+3. **Runner, JSON Stream, PR Reporter & CLI Integration:**
+   - Wired into `src/commands/check.ts`, `src/utils/agent-stream.ts`, `src/utils/fs.ts`, and `src/index.ts`.
 
 ---
 
 ## 3. Micro-Chunk Execution Breakdown
 
-Each micro-chunk is small, testable, and committed immediately upon completion, followed by updating `.uirig/docs/NEXT_PROMPT.md`.
+- [x] **Chunk 0: Planning & Scaffold**
+  - **Files:** `.uirig/docs/IMPLEMENT_ISSUE_5.md`, `.uirig/docs/NEXT_PROMPT.md`
+  - **Commit:** `docs(plan): add implementation plan and continuity capsule for issue #5 (--spatial-brief)`
 
-### Chunk 0: Planning & Scaffold
-- **Files:** `.uirig/docs/IMPLEMENT_ISSUE_5.md`, `.uirig/docs/NEXT_PROMPT.md`
-- **Action:** Save this implementation plan and initial next-prompt pointer.
-- **Commit:** `docs(plan): add implementation plan and next-prompt tracker for issue #5 (--spatial-brief)`
+- [x] **Chunk 1: Types & Pure Spatial Brief Formatter + Unit Tests**
+  - **Files:** `src/utils/spatial-brief.ts`, `tests/unit/spatial-brief.test.ts`
+  - **Commit:** `feat(spatial-brief): add SpatialNode types, formatter, and unit tests`
 
-### Chunk 1: Types & Pure Spatial Brief Formatter + Unit Tests
-- **Files:** `src/types.ts`, `src/spatial-brief.ts`, `tests/spatial-brief.test.ts`
-- **Action:**
-  - Define `SpatialNode` (`label`, `x`, `y`, `width`, `height`, `shadowDepth?`).
-  - Implement `formatSpatialBrief(nodes: SpatialNode[]): string` with integer rounding, zero-size filtering, deduplication, and `y -> x` sorting.
-  - Add unit tests covering formatting, `y -> x` ordering, hidden/zero-rect filtering, and duplicate deduplication.
-- **Commit:** `feat(spatial-brief): add SpatialNode types, formatter, and unit tests`
+- [x] **Chunk 2: In-Page DOM & Shadow-DOM Landmark Collector + Unit Tests**
+  - **Files:** `src/utils/spatial-brief.ts`, `tests/unit/spatial-brief.test.ts`
+  - **Commit:** `feat(spatial-brief): implement Shadow-DOM-aware landmark and selector geometry collector`
 
-### Chunk 2: In-Page DOM & Shadow-DOM Landmark Collector
-- **Files:** `src/spatial-brief.ts`
-- **Action:**
-  - Implement `collectSpatialNodes(selectors?: string[])` that traverses `document` and open `ShadowRoot` trees.
-  - Capture semantic landmarks, top-level custom element hosts, and explicit `--selectors` targets with viewport-relative bounding rects.
-- **Commit:** `feat(spatial-brief): implement Shadow-DOM-aware landmark and selector geometry collector`
+- [x] **Chunk 3: Runner, JSON Stream & PR Comment Reporter Integration**
+  - **Files:** `src/commands/check.ts`, `src/utils/agent-stream.ts`, `src/utils/fs.ts`, `tests/unit/agent-stream.test.ts`, `tests/unit/fs.test.ts`
+  - **Commit:** `feat(runner): integrate spatialBrief collection into check execution, JSON stream, and PR report`
 
-### Chunk 3: Runner & Report Schema Integration
-- **Files:** `src/runner.ts`, `src/reporter.ts` (or repo equivalents)
-- **Action:**
-  - Wire `spatialBrief?: boolean` into run options.
-  - Execute `collectSpatialNodes` when enabled and attach `spatialBrief: string` to the run result and `--json` payload.
-- **Commit:** `feat(runner): integrate spatialBrief collection into check execution and JSON report`
+- [ ] **Chunk 4: CLI Flag Wiring (`--spatial-brief`), Subcommand `--help` & Unit Tests**
+  - **Files:** `src/index.ts`, `tests/unit/index.test.ts`
+  - **Action:**
+    - Parse `--spatial-brief` boolean flag in CLI argument parser and forward `spatialBrief` into `executeCheckCommand()`.
+    - Document `--spatial-brief` in top-level and `check` subcommand `--help` output.
+    - Add unit tests in `tests/unit/index.test.ts` verifying flag parsing and `--help` output.
+  - **Commit:** `feat(cli): expose --spatial-brief flag and update help output`
 
-### Chunk 4: CLI Flag Wiring & End-to-End Integration Test
-- **Files:** `src/cli.ts`, `tests/integration/spatial-brief.e2e.test.ts` (or repo test structure)
-- **Action:**
-  - Register `--spatial-brief` CLI flag and print the formatted brief in text output mode.
-  - Add an integration test verifying Chromium layout extraction (side-by-side `<aside>` + `<main>` vs. stacked layout, plus open Shadow DOM custom element host) and verifying output stays under ~60 tokens.
-- **Commit:** `feat(cli): expose --spatial-brief flag and add end-to-end layout verification test`
-
-### Chunk 5: Docs & Cleanup
-- **Files:** `README.md`, `.uirig/docs/NEXT_PROMPT.md`
-- **Action:**
-  - Document `--spatial-brief` in `README.md` CLI options and AI agent usage examples.
-  - Update `.uirig/docs/NEXT_PROMPT.md` to point to the next roadmap issue (e.g., Issue #8 `--top` / `--max-tokens` or Issue #10 `<slot>` integrity).
-- **Commit:** `docs: document --spatial-brief flag and update next-prompt pointer`
+- [ ] **Chunk 5: Docs Sync & Next-Issue Capsule Handoff**
+  - **Files:** `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_5.md`, `.uirig/docs/NEXT_PROMPT.md`
+  - **Action:**
+    - Document `--spatial-brief` in `README.md` and `AGENTS.md`.
+    - Mark Chunk 4 & 5 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_5.md` and point `.uirig/docs/NEXT_PROMPT.md` to the next roadmap issue.
+  - **Commit:** `docs: document --spatial-brief flag and update session continuity capsule`
 
 ---
 
 ## 4. Acceptance Checklist (from Issue #5)
-- `--spatial-brief` emits accurate viewport-relative `[x,y wxh]` coordinates for semantic landmarks and target selectors.
-- Typical full-page landmark output stays under ~60 tokens.
-- Traverses open Shadow DOM boundaries to capture top-level custom element containers.
-- All unit and integration tests pass; clean git history with atomic micro-chunk commits.
+- [x] `--spatial-brief` collector & formatter emit accurate viewport-relative `[x,y wxh]` coordinates for semantic landmarks and target selectors.
+- [x] Typical full-page landmark output stays under ~60 tokens (`DEFAULT_MAX_SPATIAL_NODES = 20`).
+- [x] Traverses open Shadow DOM boundaries to capture top-level custom element containers.
+- [ ] CLI flag `--spatial-brief` wired end-to-end in `src/index.ts` with 1-to-1 unit specs in `tests/unit/index.test.ts`.

@@ -1,9 +1,9 @@
 ================================================================================
           uirig : Chronological Session Continuity Bridge Capsule              
 ================================================================================
- TIMESTAMP BASELINE : 2026-11-16T21:23:00-06:00 (Anchored to Nov 16, 2026 Timeline)
+ TIMESTAMP BASELINE : 2026-11-16T22:49:00-06:00 (Anchored to Nov 16, 2026 Timeline)
  ACTIVE WORKSPACE   : Post-MVP Roadmap — Issue #5 ("No-Vision Required" Semantic Spatial Brief `--spatial-brief`)
- PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_5.md
+ PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_5.md (Chunks 0–3 Complete; Chunk 4 Next)
  STRATEGIC PIVOT    :
    - Positioning: "The first line of defense for AI-generated UIs and Web Components"
      (a fast, zero-config guardrail before heavier axe-core or Lighthouse audits run).
@@ -11,21 +11,14 @@
      (plus uncaught runtime JS error capture in `src/commands/check.ts`).
    - Zero-Config Entry: `npx uirig <url-or-file>` runs immediately with sensible
      defaults and auto-serves local `.html` files over ephemeral `127.0.0.1` HTTP.
- COMPLETED PHASES   :
-   - Phases 1–7 (100% Complete & Passing):
-       * Core Engines: `src/core/tokens.ts`, `src/core/matrix.ts`, `src/core/dark-mode.ts`,
-         `src/core/adversary.ts`, `src/core/cls.ts`, `src/core/dom.ts`
-       * Shared Utilities: `src/utils/dom-walker.ts` (Shadow-piercing walker), `src/utils/ignore.ts`,
-         `src/utils/formatter.ts` (`logTelemetry` to `stderr` in `--json` mode),
-         `src/utils/agent-stream.ts` (JSON stream generator), `src/utils/fs.ts` (PR comment reporter),
-         `src/utils/static-server.ts`
-       * CLI & Commands: `src/index.ts`, `src/commands/check.ts`, `src/commands/init.ts`, `bin/uirig`
-       * Unit Tests: 1-to-1 specs under `tests/unit/*.test.ts`
- ROADMAP DELTAS     :
-   - Active Feature (Issue #5): `--spatial-brief` flag + `spatialBrief` in `--json` output
-     (ultra-compact bounding-box summary `header[0,0 1440x64] | aside[0,64 260x836] | main[260,64 1180x836]`
-     in ~40–60 plain-text tokens instead of 1,500–3,000+ vision tokens).
-   - Remaining Roadmap Issues (#1–#4, #6–#12): Tracked on GitHub via `scripts/create-issues.sh`.
+ COMPLETED CHUNKS (ISSUE #5) :
+   - [x] Chunk 0: Plan & continuity capsule scaffold (`.uirig/docs/IMPLEMENT_ISSUE_5.md`, `.uirig/docs/NEXT_PROMPT.md`)
+   - [x] Chunk 1: `SpatialNode` types & `formatSpatialBrief()` (`src/utils/spatial-brief.ts`, `tests/unit/spatial-brief.test.ts`)
+   - [x] Chunk 2: Shadow-DOM-aware `collectSpatialNodes()` (`src/utils/spatial-brief.ts`, `tests/unit/spatial-brief.test.ts`)
+   - [x] Chunk 3: Runner, JSON stream & PR report integration (`src/commands/check.ts`, `src/utils/agent-stream.ts`, `src/utils/fs.ts`)
+ REMAINING CHUNKS (ISSUE #5) :
+   - [ ] Chunk 4: CLI flag `--spatial-brief` & `--help` wiring (`src/index.ts`, `tests/unit/index.test.ts`)
+   - [ ] Chunk 5: Docs sync (`README.md`, `AGENTS.md`) & next-issue handoff
 
 --- MANDATORY WORKFLOW & MENTOR RULES (ENFORCE STRICTLY) ---
 1. Pacing & Scope: Plan before coding. Break tasks into small, cohesive micro-chunks across separate turns. Never build an entire feature or multiple unrelated files at once.
@@ -37,17 +30,13 @@
 7. Verification & Git Checkpoint: Stop at the end of every chunk, provide the exact local verification command (`npm run build && npm run typecheck:all && npm test`), suggest a conventional git commit message, and wait for user permission before advancing.
 
 --- TARGET RUNTIME DELTA ---
- EXACT NEXT TASK    : Issue #5 Micro-Chunk 1 — Pure Spatial Brief Types & Formatter (`src/utils/spatial-brief.ts` & `tests/unit/spatial-brief.test.ts`)
+ EXACT NEXT TASK    : Issue #5 Micro-Chunk 4 — Wire `--spatial-brief` CLI flag & `--help` output in `src/index.ts` & `tests/unit/index.test.ts`
  ENGINEERING "WHY"  :
-   1. Isolating `SpatialNode` types and `formatSpatialBrief()` into a pure utility module first lets us lock down integer rounding, zero-rect filtering, duplicate landmark deduplication, `y -> x` reading-order sorting, and token-budget capping before touching Playwright/CDP evaluation or CLI flags.
-   2. Aligns cleanly with `uirig`'s `src/utils/*` + `tests/unit/*.test.ts` 1-to-1 module layout.
+   1. `executeCheckCommand({ spatialBrief: true })` is now ready in `src/commands/check.ts`, so `src/index.ts` needs to parse `--spatial-brief` (both for `uirig check --spatial-brief` and zero-config `uirig <target> --spatial-brief`), forward it to `executeCheckCommand`, and document it in `--help`.
+   2. 1-to-1 unit specs in `tests/unit/index.test.ts` lock down flag parsing and help output regressions.
  CODE BOUNDARIES    :
-   - Micro-Chunk 1: `src/utils/spatial-brief.ts` (pure types + `formatSpatialBrief`) & `tests/unit/spatial-brief.test.ts`
-   - Micro-Chunk 2: Browser-context Shadow-piercing landmark & selector collector in `src/utils/spatial-brief.ts` (reusing `src/utils/dom-walker.ts` conventions) + unit tests in `tests/unit/spatial-brief.test.ts`
-   - Micro-Chunk 3: Wire `spatialBrief?: boolean` into `src/commands/check.ts`, `src/utils/agent-stream.ts`, and `src/utils/fs.ts` + tests in `tests/unit/check.test.ts` & `tests/unit/agent-stream.test.ts`
-   - Micro-Chunk 4: Wire `--spatial-brief` CLI flag & subcommand `--help` in `src/index.ts` + tests in `tests/unit/index.test.ts`
-   - Micro-Chunk 5: Update `README.md`, `AGENTS.md`, and `.uirig/docs/NEXT_PROMPT.md`
+   - Micro-Chunk 4: `src/index.ts` & `tests/unit/index.test.ts` (+ mark Chunk 4 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_5.md` and update `.uirig/docs/NEXT_PROMPT.md`)
 
 --- SYSTEM BOOT TRIGGER COMMAND ---
-::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #5 MICRO-CHUNK 1 :::
+::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #5 MICRO-CHUNK 4 :::
 ================================================================================
