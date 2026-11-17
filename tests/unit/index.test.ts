@@ -2,8 +2,8 @@
  * tests/unit/index.test.ts
  * Unit test suite for the root CLI entry router (`src/index.ts`), including
  * zero-config direct target invocations (`uirig <url-or-file>`), `--selectors`
- * / `-s` scoping flags, `--spatial-brief`, `--verbose`, subcommand routing,
- * subcommand-specific `--help` pages, and POSIX exit code forwarding.
+ * / `-s` scoping flags, `--top` & `--max-tokens` output limits, `--spatial-brief`,
+ * `--verbose`, subcommand routing, subcommand-specific `--help` pages, and POSIX exit codes.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -47,7 +47,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     stderrSpy.mockRestore();
   });
 
-  it('parses `check` defaults cleanly and captures --only, --config, --spatial-brief, --verbose, --json, and --headed flags', () => {
+  it('parses `check` defaults cleanly and captures --only, --config, --top, --max-tokens, --spatial-brief, --verbose, --json, and --headed flags', () => {
     console.log('[TEST] Verifying parseCliArgs for check command and flags...');
 
     expect(parseCliArgs(['check'])).toEqual({
@@ -56,6 +56,8 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: undefined,
       selectors: undefined,
       configPath: undefined,
+      top: undefined,
+      maxTokens: undefined,
       spatialBrief: false,
       verbose: false,
       json: false,
@@ -67,6 +69,8 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
         'check',
         '--only=contrast',
         '--config=./custom/uirig.config.json',
+        '--top=5',
+        '--max-tokens=1200',
         '--spatial-brief',
         '--verbose',
         '--json',
@@ -78,6 +82,8 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: 'contrast',
       selectors: undefined,
       configPath: './custom/uirig.config.json',
+      top: 5,
+      maxTokens: 1200,
       spatialBrief: true,
       verbose: true,
       json: true,
@@ -94,17 +100,32 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: undefined,
       selectors: undefined,
       configPath: undefined,
+      top: undefined,
+      maxTokens: undefined,
       spatialBrief: false,
       verbose: false,
       json: true,
       headless: true,
     });
-    expect(parseCliArgs(['./index.html', '--only=contrast', '--headed', '--spatial-brief'])).toEqual({
+    expect(
+      parseCliArgs([
+        './index.html',
+        '--only=contrast',
+        '--headed',
+        '--spatial-brief',
+        '--top',
+        '3',
+        '--max-tokens',
+        '800',
+      ])
+    ).toEqual({
       command: 'check',
       target: './index.html',
       only: 'contrast',
       selectors: undefined,
       configPath: undefined,
+      top: 3,
+      maxTokens: 800,
       spatialBrief: true,
       verbose: false,
       json: false,
@@ -117,6 +138,8 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: undefined,
       selectors: undefined,
       configPath: 'alt.config.json',
+      top: undefined,
+      maxTokens: undefined,
       spatialBrief: false,
       verbose: false,
       json: false,
@@ -141,6 +164,8 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: undefined,
       selectors: ['#hero', '.pricing-card', 'ag-button'],
       configPath: undefined,
+      top: undefined,
+      maxTokens: undefined,
       spatialBrief: false,
       verbose: false,
       json: false,
@@ -181,6 +206,8 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     const checkOutput = String(stdoutSpy.mock.calls.at(-1)?.at(0) ?? '');
     expect(checkOutput).toContain('uirig check');
     expect(checkOutput).toContain('--only=<tool>');
+    expect(checkOutput).toContain('--top=<n>');
+    expect(checkOutput).toContain('--max-tokens=<budget>');
     expect(checkOutput).toContain('--spatial-brief');
     expect(checkOutput).toContain('POSIX EXIT CODES:');
 
@@ -191,7 +218,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     expect(renderHelpText('nonexistent-topic')).toBe(CLI_HELP_TEXT.trim());
   });
 
-    it('routes `init`, `manifest`, and `check` (including zero-config target, selectors, spatialBrief & verbose) to handlers and forwards POSIX exit code', async () => {
+    it('routes `init`, `manifest`, and `check` (including zero-config target, selectors, top, maxTokens, spatialBrief & verbose) to handlers and forwards POSIX exit code', async () => {
     console.log('[TEST] Verifying subcommand routing and exit code propagation...');
 
     const initSpy = vi.fn(async () => {});
@@ -210,6 +237,8 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
         '--only=stress',
         '-s',
         '.card',
+        '--top=4',
+        '--max-tokens=900',
         '--spatial-brief',
         '--verbose',
         '--json',
@@ -222,6 +251,8 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       configPath: undefined,
       only: 'stress',
       selectors: ['.card'],
+      top: 4,
+      maxTokens: 900,
       spatialBrief: true,
       verbose: true,
       json: true,
@@ -242,6 +273,8 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: 'tokens',
       selectors: ['ag-button'],
       configPath: 'uirig.config.json',
+      top: undefined,
+      maxTokens: undefined,
       spatialBrief: false,
       verbose: false,
       json: false,
@@ -254,18 +287,24 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: 'dark-mode',
       selectors: undefined,
       configPath: undefined,
+      top: undefined,
+      maxTokens: undefined,
       spatialBrief: false,
       verbose: true,
       json: false,
       headless: true,
     });
-    const domExit = await runCli(['dom', './index.html', '--json'], { check: checkSpy });
+
+
+        const domExit = await runCli(['dom', './index.html', '--json'], { check: checkSpy });
     expect(domExit).toBe(0);
     expect(checkSpy).toHaveBeenLastCalledWith({
       target: './index.html',
       configPath: undefined,
       only: 'dom',
       selectors: undefined,
+      top: undefined,
+      maxTokens: undefined,
       spatialBrief: false,
       verbose: false,
       json: true,
@@ -273,12 +312,18 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     });
   });
 
-  it('returns POSIX exit code 1 on unknown commands, invalid --only tools, or handler errors', async () => {
+  it('returns POSIX exit code 1 on unknown commands, invalid --only tools, invalid --top/--max-tokens values, or handler errors', async () => {
     console.log('[TEST] Verifying error handling for invalid CLI arguments...');
 
     expect(await runCli(['unknown-cmd'])).toBe(1);
     expect(await runCli(['check', '--only=lighthouse'])).toBe(1);
     expect(await runCli(['check', '--config'])).toBe(1);
+    expect(await runCli(['check', '--top=0'])).toBe(1);
+    expect(await runCli(['check', '--top=-3'])).toBe(1);
+    expect(await runCli(['check', '--top'])).toBe(1);
+    expect(await runCli(['check', '--max-tokens=abc'])).toBe(1);
+    expect(await runCli(['check', '--max-tokens=0'])).toBe(1);
+    expect(await runCli(['check', '--max-tokens'])).toBe(1);
 
     const failingCheck = vi.fn(async () => {
       throw new Error('ERR_CONFIG_MISSING: uirig.config.json not found');
@@ -286,4 +331,3 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     expect(await runCli(['check'], { check: failingCheck })).toBe(1);
   });
 });
-

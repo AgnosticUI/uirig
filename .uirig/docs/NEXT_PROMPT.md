@@ -1,11 +1,11 @@
 ================================================================================
           uirig : Chronological Session Continuity Bridge Capsule              
 ================================================================================
- TIMESTAMP BASELINE : 2026-11-17T13:34:00-06:00 (Anchored to Nov 17, 2026 Timeline)
+ TIMESTAMP BASELINE : 2026-11-17T15:07:00-06:00 (Anchored to Nov 17, 2026 Timeline)
  REPOSITORY         : AgnosticUI/uirig
  ACTIVE BRANCH      : feat/issue-15-token-budget
  ACTIVE WORKSPACE   : Post-MVP Roadmap — Issue #15 (`--top <n>` / `--max-tokens <budget>`)
- PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_15.md (Chunks 0–2 Complete; Chunk 3 Next)
+ PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_15.md (Chunks 0–3 Complete; Chunk 4 Final Docs Sync Next)
  GITHUB ROADMAP MAP (AgnosticUI/uirig) :
    - #8  : Native MCP (Model Context Protocol) Server Mode (`uirig mcp`) [pillar: agent-workflow]
    - #9  : Framework Source-Map & `file:line` Attribution [pillar: agent-workflow]
@@ -30,13 +30,10 @@
 7. Verification & Git Checkpoint: Stop at the end of every chunk, provide `npm run build && npm run typecheck:all && npm test`, suggest a conventional commit message on the active topic branch, and wait for user permission before advancing.
 
 --- TARGET RUNTIME DELTA ---
- EXACT NEXT TASK    : Issue #15 Micro-Chunk 3 — Parse `--top <n>` and `--max-tokens <budget>` CLI flags in `src/index.ts` and update `tests/unit/index.test.ts` (delivering both files in full from line 1 to EOF).
- ENGINEERING "WHY"  :
-   1. `executeCheckCommand({ top, maxTokens })` is ready in `src/commands/check.ts`, so `src/index.ts` needs to parse and validate positive integers for `--top` and `--max-tokens`, forward them in `runCli()`, and list them in `--help`.
-   2. 1-to-1 unit specs in `tests/unit/index.test.ts` verify default `undefined` values, valid parsing, invalid input rejection (`--top=0`, `--top=-1`, `--max-tokens=abc`), and `--help` output.
+ EXACT NEXT TASK    : Issue #15 Micro-Chunk 4 (Final) — Document `--top` and `--max-tokens` in `README.md` and `AGENTS.md`, mark Chunk 4 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_15.md`, and set `.uirig/docs/NEXT_PROMPT.md` to the next roadmap issue (`#11` `--group-by-root` or `#17` Web Component `<slot>` integrity).
  CODE BOUNDARIES    :
-   - Micro-Chunk 3: `src/index.ts` & `tests/unit/index.test.ts` (+ mark Chunk 3 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_15.md` and update `.uirig/docs/NEXT_PROMPT.md`)
+   - Micro-Chunk 4: `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_15.md`, `.uirig/docs/NEXT_PROMPT.md`
 
 --- SYSTEM BOOT TRIGGER COMMAND ---
-::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #15 MICRO-CHUNK 3 :::
+::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #15 MICRO-CHUNK 4 :::
 ================================================================================
