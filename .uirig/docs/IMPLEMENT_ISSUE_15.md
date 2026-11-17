@@ -2,7 +2,7 @@
 
 - **Issue:** `AgnosticUI/uirig#15` — `Token-Budgeted & Priority-Ranked Output (--top / --max-tokens)`
 - **Branch:** `feat/issue-15-token-budget`
-- **Status:** In Progress (Chunks 0–3 Complete; Chunk 4 Final Docs Sync Next)
+- **Status:** Complete (All Chunks 0–4 implemented, verified, and documented)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -33,9 +33,7 @@ Rank violations from most important to least important and let users limit outpu
 - [x] **Chunk 1: Violation Priority Sorter & Output Limiter + Unit Tests** (`feat(budget): add violation priority sorter and token-budget limiter with unit tests`)
 - [x] **Chunk 2: JSON Stream & Console Report Ranking Integration** (`feat(runner): integrate violation priority ranking and --top / --max-tokens limits into JSON stream and check command`)
 - [x] **Chunk 3: CLI Flag Parsing (`--top` / `--max-tokens`), Subcommand `--help` & Unit Tests** (`feat(cli): expose --top and --max-tokens flags with validation and help docs`)
-- **Chunk 4: Docs Sync & Next-Issue Capsule Handoff**
-  - **Files:** `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_15.md`, `.uirig/docs/NEXT_PROMPT.md`
-  - **Commit:** `docs: document --top and --max-tokens flags and update session continuity capsule`
+- [x] **Chunk 4: Docs Sync & Next-Issue Capsule Handoff** (`docs: document --top and --max-tokens flags and update session continuity capsule`)
 
 ---
 
@@ -44,4 +42,4 @@ Rank violations from most important to least important and let users limit outpu
 - [x] `--top <n>` returns at most `n` violations plus `totalViolations` and `truncatedCount` metadata when trimmed.
 - [x] `--max-tokens <budget>` keeps serialized JSON output within the estimated token limit without ever producing broken JSON.
 - [x] Invalid flag values (`--top=0`, `--top=-3`, `--max-tokens=abc`) fail fast with POSIX exit code `1` and a clear CLI error message.
-- All unit tests pass and documentation is synced (`README.md`, `AGENTS.md`).
+- [x] All unit tests pass and documentation is synced (`README.md`, `AGENTS.md`).
