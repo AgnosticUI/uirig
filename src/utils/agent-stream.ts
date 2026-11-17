@@ -4,12 +4,17 @@
  * Single Responsibility: Translates heterogeneous violation structures from all
  * core audit engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`, `runtime`)
  * into a flat, uniform `IAgenticViolation` stream with Shadow host attribution,
- * pattern deduplication (`occurrenceCount`), and deterministic `remediationAdvice` for AI agents.
+ * pattern deduplication (`occurrenceCount`), priority ranking, and optional
+ * `--top` / `--max-tokens` output limits for AI agents.
  */
 
 import type { ICheckExecutionReport, IViewportAuditReport } from '../commands/check.js';
 import type { UirigEngineName } from '../interfaces/locator.js';
 import { extractHostComponentFromSelector } from './dom-walker.js';
+import {
+  applyViolationBudget,
+  type IViolationBudgetOptions,
+} from './violation-budget.js';
 
 /**
  * Unified, flat violation contract consumed by AI coding agents (Claude Code, Cursor, Codex).
@@ -51,6 +56,10 @@ export interface IAgenticJsonStreamPayload {
   timestamp: string;
   /** Compact plain-text layout geometry emitted when `--spatial-brief` is enabled. */
   spatialBrief?: string;
+  /** Total unique violations before `--top` or `--max-tokens` trimming (included when truncated). */
+  totalViolations?: number;
+  /** Number of lower-priority violations omitted due to `--top` or `--max-tokens` (included when truncated). */
+  truncatedCount?: number;
   summary: ICheckExecutionReport['summary'];
   violations: Array<IAgenticViolation>;
 }
@@ -309,12 +318,17 @@ export function deduplicateAgenticViolations(
 
 /**
  * Builds the complete machine-readable JSON string emitted to `stdout` when
- * `uirig check --json` is executed. Contains zero ANSI codes or prose wrappers.
+ * `uirig check --json` is executed. Always ranks violations from highest priority
+ * to lowest and applies `--top` / `--max-tokens` limits when provided.
  *
  * @param report - Full execution report returned by `executeCheckCommand()`.
+ * @param budgetOptions - Optional `--top` and `--max-tokens` output limits.
  * @returns Deterministic, pretty-printed JSON string ready for `process.stdout.write()`.
  */
-export function formatAgenticJsonStream(report: ICheckExecutionReport): string {
+export function formatAgenticJsonStream(
+  report: ICheckExecutionReport,
+  budgetOptions: Pick<IViolationBudgetOptions, 'top' | 'maxTokens'> = {}
+): string {
   const rawViolations = new Array<IAgenticViolation>();
 
   for (const viewportResult of report.results) {
@@ -322,7 +336,7 @@ export function formatAgenticJsonStream(report: ICheckExecutionReport): string {
     rawViolations.push(...viewportViolations);
   }
 
-  const violations = deduplicateAgenticViolations(rawViolations);
+  const deduplicated = deduplicateAgenticViolations(rawViolations);
 
   const briefEntries = report.results.filter((r) => r.spatialBrief !== undefined);
   let spatialBrief: string | undefined;
@@ -339,14 +353,43 @@ export function formatAgenticJsonStream(report: ICheckExecutionReport): string {
       .join(' || ');
   }
 
+  // Measure the exact character size of the outer JSON wrapper so `--max-tokens` is accurate.
+  const emptyEnvelopeSize = JSON.stringify(
+    {
+      tool: 'uirig',
+      exitCode: report.exitCode,
+      passed: report.exitCode === 0,
+      timestamp: report.timestamp,
+      ...(spatialBrief !== undefined ? { spatialBrief } : {}),
+      totalViolations: deduplicated.length,
+      truncatedCount: 0,
+      summary: report.summary,
+      violations: new Array<IAgenticViolation>(),
+    },
+    null,
+    2
+  ).length;
+
+  const budgeted = applyViolationBudget(deduplicated, {
+    top: budgetOptions.top,
+    maxTokens: budgetOptions.maxTokens,
+    basePayloadOverheadChars: emptyEnvelopeSize,
+  });
+
   const payload: IAgenticJsonStreamPayload = {
     tool: 'uirig',
     exitCode: report.exitCode,
     passed: report.exitCode === 0,
     timestamp: report.timestamp,
     ...(spatialBrief !== undefined ? { spatialBrief } : {}),
+    ...(budgeted.truncatedCount > 0
+      ? {
+          totalViolations: budgeted.totalViolations,
+          truncatedCount: budgeted.truncatedCount,
+        }
+      : {}),
     summary: report.summary,
-    violations,
+    violations: budgeted.violations,
   };
 
   return JSON.stringify(payload, null, 2);

@@ -204,4 +204,111 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
       'li#card-3 > span.muted',
     ]);
   });
+
+  it('always ranks violations from highest impact (cls/stress) to lowest (tokens/dom) in JSON stream', () => {
+    console.log('[TEST] Verifying priority ranking order in formatAgenticJsonStream...');
+
+    const report: ICheckExecutionReport = {
+      timestamp: '2026-11-17T12:00:00.000Z',
+      configPath: 'zero-config',
+      reportPath: '.uirig/github_pr_comment.md',
+      exitCode: 2,
+      results: [
+        {
+          url: 'http://127.0.0.1:4173',
+          viewport: { name: 'desktop', width: 1440, height: 900 },
+          tokenViolations: [
+            {
+              selector: 'button.cta',
+              property: 'backgroundColor',
+              actualValue: '#3b82f6',
+              inShadowDom: false,
+            },
+          ],
+          contrastViolations: [
+            {
+              selector: 'p.subtitle',
+              contrastRatio: 2.5,
+              foregroundRgb: 'rgb(150, 150, 150)',
+              backgroundRgb: 'rgb(255, 255, 255)',
+              inShadowDom: false,
+            },
+          ],
+          stressViolations: [
+            {
+              violationType: 'horizontal_scrollbar',
+              selector: 'div.grid',
+              measuredLeakPixels: 48,
+              inShadowDom: false,
+            },
+          ],
+          clsEvaluation: {
+            maxSessionCls: 0.25,
+            violation: {
+              measuredClsScore: 0.25,
+              clsMaxLimit: 0.1,
+              shiftCountInWorstWindow: 2,
+              offendingSelectors: ['main.feed'],
+            },
+          },
+          domViolations: [
+            {
+              rule: 'broken_image',
+              selector: 'img.banner',
+              detail: 'Image failed to load (naturalWidth === 0)',
+              inShadowDom: false,
+            },
+          ],
+        },
+      ],
+      summary: {
+        totalViewportsAudited: 1,
+        totalTokenViolations: 1,
+        totalContrastViolations: 1,
+        totalStressViolations: 1,
+        totalClsViolations: 1,
+        totalDomViolations: 1,
+      },
+    };
+
+    const parsed = JSON.parse(formatAgenticJsonStream(report)) as {
+      totalViolations?: number;
+      truncatedCount?: number;
+      violations: Array<{ engine: string }>;
+    };
+
+    expect(parsed.violations.map((v) => v.engine)).toEqual([
+      'cls',
+      'stress',
+      'contrast',
+      'tokens',
+      'dom',
+    ]);
+    // Uncapped output omits truncation metadata
+    expect(parsed.totalViolations).toBeUndefined();
+    expect(parsed.truncatedCount).toBeUndefined();
+
+    // Capped via --top=2 includes totalViolations and truncatedCount
+    const cappedTop = JSON.parse(formatAgenticJsonStream(report, { top: 2 })) as {
+      totalViolations?: number;
+      truncatedCount?: number;
+      violations: Array<{ engine: string }>;
+    };
+    expect(cappedTop.totalViolations).toBe(5);
+    expect(cappedTop.truncatedCount).toBe(3);
+    expect(cappedTop.violations.map((v) => v.engine)).toEqual(['cls', 'stress']);
+
+    // Tight --max-tokens produces valid parseable JSON with top violation retained
+    const cappedTokens = JSON.parse(
+      formatAgenticJsonStream(report, { maxTokens: 220 })
+    ) as {
+      totalViolations?: number;
+      truncatedCount?: number;
+      violations: Array<{ engine: string }>;
+    };
+    expect(cappedTokens.totalViolations).toBe(5);
+    expect(cappedTokens.violations.length).toBeGreaterThanOrEqual(1);
+    expect(cappedTokens.violations.at(0)?.engine).toBe('cls');
+  });
+
 });
