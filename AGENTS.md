@@ -11,10 +11,10 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
 
          npx @rlevin/uirig check --json
 
-   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly (add `--spatial-brief` to verify macro-layout alignment in ~40 text tokens without taking screenshots):
+   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly (add `--spatial-brief` for ~40-token layout coordinates and `--top` / `--max-tokens` to focus on the highest-priority defects):
 
-         npx @rlevin/uirig http://localhost:5173 --spatial-brief --json
-         npx @rlevin/uirig ./dist/index.html --selectors="ag-button, .pricing-card" --spatial-brief --json
+         npx @rlevin/uirig http://localhost:5173 --spatial-brief --top=5 --json
+         npx @rlevin/uirig ./dist/index.html --selectors="ag-button, .pricing-card" --max-tokens=1200 --json
 
    *(If `@rlevin/uirig` is already installed in `node_modules`, `npx uirig ...` works interchangeably.)*
 2. **Evaluate the POSIX exit code and JSON `stdout` payload:**
@@ -23,7 +23,8 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
    - **Exit Code `2`:** Structural layout break (`stress`: container overflow, `100vw` scrollbar bleed, squished avatar, `<24px` tap target) or Cumulative Layout Shift budget breach (`cls`).
 3. **Verify Macro-Layout via `spatialBrief` (No Vision Screenshots Required):**
    - When `--spatial-brief` is passed, inspect the top-level `"spatialBrief"` field (e.g. `header[0,0 1440x64] | aside[0,64 260x836] | main[260,64 1180x836]`) to confirm side-by-side vs. stacked alignment and bounding-box dimensions without attaching vision screenshots.
-4. **Self-Heal & Re-Verify:**
+4. **Self-Heal & Re-Verify (Highest Impact First):**
+   - `violations` is always sorted from highest impact (`cls` / `runtime` = 100 pts, `stress` = 80 pts) to lowest (`tokens` = 40 pts, `dom` = 20 pts). When `--top` or `--max-tokens` trims the list, `totalViolations` and `truncatedCount` tell you how many lower-priority items remain.
    - Inspect each deduplicated entry in `violations`:
      - `engine` & `violationType`
      - `hostComponent` (the enclosing Web Component tag, e.g., `ag-button`)
