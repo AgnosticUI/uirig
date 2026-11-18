@@ -1,11 +1,11 @@
 ================================================================================
           uirig : Chronological Session Continuity Bridge Capsule              
 ================================================================================
- TIMESTAMP BASELINE : 2026-11-17T18:10:00-06:00 (Anchored to Nov 17, 2026 Timeline)
+ TIMESTAMP BASELINE : 2026-11-17T18:29:00-06:00 (Anchored to Nov 17, 2026 Timeline)
  REPOSITORY         : AgnosticUI/uirig
  ACTIVE BRANCH      : feat/issue-11-group-by-root
  ACTIVE WORKSPACE   : Post-MVP Roadmap — Issue #11 (`--group-by-root`)
- PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_11.md (Chunk 0 Planned; Chunk 1 Next)
+ PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_11.md (Chunks 0–1 Complete; Chunk 2 Next)
  GITHUB ROADMAP MAP (AgnosticUI/uirig) :
    - #8  : Native MCP (Model Context Protocol) Server Mode (`uirig mcp`) [pillar: agent-workflow]
    - #9  : Framework Source-Map & `file:line` Attribution [pillar: agent-workflow]
@@ -30,12 +30,10 @@
 7. Verification & Git Checkpoint: Stop at the end of every chunk, provide `npm run build && npm run typecheck:all && npm test`, suggest a conventional commit message on the active topic branch, and wait for user permission before advancing.
 
 --- TARGET RUNTIME DELTA ---
- EXACT NEXT TASK    : Issue #11 Micro-Chunk 1 — Build the pure parent-container violation grouper (`src/utils/root-cause-grouper.ts`) and its 1-to-1 unit tests (`tests/unit/root-cause-grouper.test.ts`), delivering both files in full from line 1 to EOF.
- ENGINEERING "WHY"  :
-   1. When a single `<ag-card>` container has a bad background color or narrow width, 15 child elements fail contrast or overflow at once. Grouping those child failures under their shared parent container before deduplication/ranking cuts JSON size by 70–90% and points the agent directly at the parent cause.
+ EXACT NEXT TASK    : Issue #11 Micro-Chunk 2 — Wire `groupViolationsByRootCause()` into `src/utils/agent-stream.ts`, `src/commands/check.ts`, and `tests/unit/agent-stream.test.ts` (delivering every modified file in full from line 1 to EOF).
  CODE BOUNDARIES    :
-   - Micro-Chunk 1: `src/utils/root-cause-grouper.ts` & `tests/unit/root-cause-grouper.test.ts` (+ mark Chunk 1 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_11.md` and update `.uirig/docs/NEXT_PROMPT.md`)
+   - Micro-Chunk 2: `src/utils/agent-stream.ts`, `src/commands/check.ts`, `tests/unit/agent-stream.test.ts` (+ mark Chunk 2 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_11.md` and update `.uirig/docs/NEXT_PROMPT.md`)
 
 --- SYSTEM BOOT TRIGGER COMMAND ---
-::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #11 MICRO-CHUNK 1 :::
+::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #11 MICRO-CHUNK 2 :::
 ================================================================================

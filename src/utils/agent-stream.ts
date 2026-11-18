@@ -4,8 +4,8 @@
  * Single Responsibility: Translates heterogeneous violation structures from all
  * core audit engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`, `runtime`)
  * into a flat, uniform `IAgenticViolation` stream with Shadow host attribution,
- * pattern deduplication (`occurrenceCount`), priority ranking, and optional
- * `--top` / `--max-tokens` output limits for AI agents.
+ * pattern deduplication (`occurrenceCount`), parent-container grouping (`--group-by-root`),
+ * priority ranking, and optional `--top` / `--max-tokens` output limits for AI agents.
  */
 
 import type { ICheckExecutionReport, IViewportAuditReport } from '../commands/check.js';
@@ -15,6 +15,7 @@ import {
   applyViolationBudget,
   type IViolationBudgetOptions,
 } from './violation-budget.js';
+import { groupViolationsByRootCause } from './root-cause-grouper.js';
 
 /**
  * Unified, flat violation contract consumed by AI coding agents (Claude Code, Cursor, Codex).
@@ -38,6 +39,10 @@ export interface IAgenticViolation {
   occurrenceCount: number;
   /** Sample selector paths when multiple repeating elements share the exact same defect. */
   sampleSelectors?: Array<string>;
+  /** Total child violations collapsed under this shared parent container when `--group-by-root` is enabled. */
+  childCount?: number;
+  /** Up to 3 representative child selectors that failed beneath this parent when `--group-by-root` is enabled. */
+  sampleChildren?: Array<string>;
   /** Human- and machine-readable measurement showing how far the value drifted from budget. */
   measuredDelta: string;
   /** Nearest passing design token when available. */
@@ -317,17 +322,22 @@ export function deduplicateAgenticViolations(
 }
 
 /**
+ * Options controlling JSON stream grouping, priority ranking, and output limits.
+ */
+export interface IAgenticJsonStreamOptions
+  extends Pick<IViolationBudgetOptions, 'top' | 'maxTokens'> {
+  /** When true, collapses child failures under their shared parent container or Web Component host. */
+  groupByRoot?: boolean;
+}
+
+/**
  * Builds the complete machine-readable JSON string emitted to `stdout` when
  * `uirig check --json` is executed. Always ranks violations from highest priority
- * to lowest and applies `--top` / `--max-tokens` limits when provided.
- *
- * @param report - Full execution report returned by `executeCheckCommand()`.
- * @param budgetOptions - Optional `--top` and `--max-tokens` output limits.
- * @returns Deterministic, pretty-printed JSON string ready for `process.stdout.write()`.
+ * to lowest and applies `--group-by-root`, `--top`, and `--max-tokens` when provided.
  */
 export function formatAgenticJsonStream(
   report: ICheckExecutionReport,
-  budgetOptions: Pick<IViolationBudgetOptions, 'top' | 'maxTokens'> = {}
+  streamOptions: IAgenticJsonStreamOptions = {}
 ): string {
   const rawViolations = new Array<IAgenticViolation>();
 
@@ -336,7 +346,11 @@ export function formatAgenticJsonStream(
     rawViolations.push(...viewportViolations);
   }
 
-  const deduplicated = deduplicateAgenticViolations(rawViolations);
+  const rootGrouped = streamOptions.groupByRoot
+    ? groupViolationsByRootCause(rawViolations)
+    : rawViolations;
+
+  const deduplicated = deduplicateAgenticViolations(rootGrouped);
 
   const briefEntries = report.results.filter((r) => r.spatialBrief !== undefined);
   let spatialBrief: string | undefined;
@@ -353,7 +367,6 @@ export function formatAgenticJsonStream(
       .join(' || ');
   }
 
-  // Measure the exact character size of the outer JSON wrapper so `--max-tokens` is accurate.
   const emptyEnvelopeSize = JSON.stringify(
     {
       tool: 'uirig',
@@ -371,8 +384,8 @@ export function formatAgenticJsonStream(
   ).length;
 
   const budgeted = applyViolationBudget(deduplicated, {
-    top: budgetOptions.top,
-    maxTokens: budgetOptions.maxTokens,
+    top: streamOptions.top,
+    maxTokens: streamOptions.maxTokens,
     basePayloadOverheadChars: emptyEnvelopeSize,
   });
 
