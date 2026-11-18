@@ -8,7 +8,7 @@
  * 3. Repeating pattern violations deduplicate into a single entry with `occurrenceCount`
  *    and `sampleSelectors` to prevent AI context bloat.
  * 4. Violations are ranked from highest impact (`cls` / `stress`) to lowest (`tokens` / `dom`)
- *    and obey `--top` / `--max-tokens` limits with `totalViolations` and `truncatedCount`.
+ *    and obey `--group-by-root`, `--top`, and `--max-tokens` options.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -57,7 +57,6 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     const cleanReport = createCleanReport();
     const jsonOutput = formatAgenticJsonStream(cleanReport);
 
-    // Ensure zero ANSI escape codes leak into stdout JSON stream
     expect(jsonOutput).not.toContain('\x1b[');
     const parsed = JSON.parse(jsonOutput) as IAgenticJsonStreamPayload;
 
@@ -92,7 +91,8 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
           inShadowDom: false,
         },
       ],
-      stressViolations: [
+
+            stressViolations: [
         {
           violationType: 'container_overflow',
           selector: 'span.card-title',
@@ -128,7 +128,6 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     const normalized = normalizeViewportViolations(failingViewport);
     expect(normalized).toHaveLength(6);
 
-    // 1. Token violation check with Shadow host attribution
     expect(normalized.at(0)).toMatchObject({
       engine: 'tokens',
       violationType: 'token_drift',
@@ -140,7 +139,6 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     });
     expect(normalized.at(0)?.remediationAdvice).toContain('tokensPath');
 
-    // 2. Contrast violation check with nearest passing token suggestion
     expect(normalized.at(1)).toMatchObject({
       engine: 'contrast',
       violationType: 'contrast_drop',
@@ -149,7 +147,6 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     });
     expect(normalized.at(1)?.remediationAdvice).toContain('rgb(71, 85, 105)');
 
-    // 3. Stress overflow, scrollbar, and touch collision checks
     expect(normalized.at(2)?.violationType).toBe('container_overflow');
     expect(normalized.at(2)?.remediationAdvice).toContain('div.narrow-card');
     expect(normalized.at(3)?.violationType).toBe('horizontal_scrollbar');
@@ -157,7 +154,6 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     expect(normalized.at(4)?.violationType).toBe('touch_target_collision');
     expect(normalized.at(4)?.remediationAdvice).toContain('button#cancel');
 
-    // 4. CLS breach check
     expect(normalized.at(5)).toMatchObject({
       engine: 'cls',
       violationType: 'cls_breach',
@@ -287,11 +283,9 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
       'tokens',
       'dom',
     ]);
-    // Uncapped output omits truncation metadata
     expect(parsed.totalViolations).toBeUndefined();
     expect(parsed.truncatedCount).toBeUndefined();
 
-    // Capped via --top=2 includes totalViolations and truncatedCount
     const cappedTop = JSON.parse(formatAgenticJsonStream(report, { top: 2 })) as {
       totalViolations?: number;
       truncatedCount?: number;
@@ -301,7 +295,6 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     expect(cappedTop.truncatedCount).toBe(3);
     expect(cappedTop.violations.map((v) => v.engine)).toEqual(['cls', 'stress']);
 
-    // Tight --max-tokens produces valid parseable JSON with top violation retained
     const cappedTokens = JSON.parse(
       formatAgenticJsonStream(report, { maxTokens: 220 })
     ) as {
@@ -312,5 +305,54 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     expect(cappedTokens.totalViolations).toBe(5);
     expect(cappedTokens.violations.length).toBeGreaterThanOrEqual(1);
     expect(cappedTokens.violations.at(0)?.engine).toBe('cls');
+  });
+
+  it('collapses child violations under their shared parent container when groupByRoot is true', () => {
+    console.log('[TEST] Verifying --group-by-root integration in formatAgenticJsonStream...');
+
+    const report = createCleanReport();
+    report.exitCode = 1;
+    const firstResult = report.results.at(0);
+    if (firstResult) {
+      firstResult.contrastViolations = [
+        {
+          selector: 'ag-card#pricing >> shadow-root >> h3.title',
+          hostComponent: 'ag-card',
+          foregroundRgb: 'rgb(160, 160, 160)',
+          backgroundRgb: 'rgb(255, 255, 255)',
+          contrastRatio: 2.3,
+          inShadowDom: true,
+        },
+        {
+          selector: 'ag-card#pricing >> shadow-root >> p.subtitle',
+          hostComponent: 'ag-card',
+          foregroundRgb: 'rgb(160, 160, 160)',
+          backgroundRgb: 'rgb(255, 255, 255)',
+          contrastRatio: 2.3,
+          inShadowDom: true,
+        },
+        {
+          selector: 'ag-card#pricing >> shadow-root >> span.footnote',
+          hostComponent: 'ag-card',
+          foregroundRgb: 'rgb(160, 160, 160)',
+          backgroundRgb: 'rgb(255, 255, 255)',
+          contrastRatio: 2.3,
+          inShadowDom: true,
+        },
+      ];
+    }
+
+    const parsed = JSON.parse(
+      formatAgenticJsonStream(report, { groupByRoot: true })
+    ) as IAgenticJsonStreamPayload;
+
+    expect(parsed.violations).toHaveLength(1);
+    expect(parsed.violations.at(0)?.selector).toBe('ag-card#pricing');
+    expect(parsed.violations.at(0)?.childCount).toBe(3);
+    expect(parsed.violations.at(0)?.sampleChildren).toEqual([
+      'ag-card#pricing >> shadow-root >> h3.title',
+      'ag-card#pricing >> shadow-root >> p.subtitle',
+      'ag-card#pricing >> shadow-root >> span.footnote',
+    ]);
   });
 });
