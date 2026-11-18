@@ -19,7 +19,7 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
    *(If `@rlevin/uirig` is already installed in `node_modules`, `npx uirig ...` works interchangeably.)*
 2. **Evaluate the POSIX exit code and JSON `stdout` payload:**
    - **Exit Code `0` (`"passed": true`):** All 6 engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`) and runtime JS error checks passed. You may finish your task.
-   - **Exit Code `1`:** Design token drift (`tokens`), light/dark WCAG contrast failure (`contrast`, `dark-mode`), structural DOM/ARIA/hygiene violation (`dom`), or uncaught runtime JS error.
+   - **Exit Code `1`:** Design token drift (`tokens`), light/dark WCAG contrast failure (`contrast`, `dark-mode`), structural DOM/ARIA/Web Component `<slot>` violation (`dom`), or uncaught runtime JS error.
    - **Exit Code `2`:** Structural layout break (`stress`: container overflow, `100vw` scrollbar bleed, squished avatar, `<24px` tap target) or Cumulative Layout Shift budget breach (`cls`).
 3. **Verify Macro-Layout via `spatialBrief` (No Vision Screenshots Required):**
    - When `--spatial-brief` is passed, inspect the top-level `"spatialBrief"` field (e.g. `header[0,0 1440x64] | aside[0,64 260x836] | main[260,64 1180x836]`) to confirm side-by-side vs. stacked alignment and bounding-box dimensions without attaching vision screenshots.
@@ -27,12 +27,12 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
    - When `--group-by-root` is passed, cascading child failures inside the same container or Web Component host collapse into a single parent entry with `childCount` and `sampleChildren`—fix the parent container/host rather than patching individual children.
    - `violations` is always sorted from highest impact (`cls` / `runtime` = 100 pts, `stress` = 80 pts) to lowest (`tokens` = 40 pts, `dom` = 20 pts). When `--top` or `--max-tokens` trims the list, `totalViolations` and `truncatedCount` tell you how many lower-priority items remain.
    - Inspect each entry in `violations`:
-     - `engine` & `violationType`
+     - `engine` & `violationType` (including `orphaned_slot_content` when a light-DOM child targets a nonexistent `<slot>` or lacks a default `<slot>`)
      - `hostComponent` (the enclosing Web Component tag, e.g., `ag-button`)
      - `selector` (including `::shadow` boundaries, or the shared parent container when grouped)
      - `occurrenceCount` / `childCount` / `sampleChildren`
      - `suggestedToken` (nearest passing design token when available)
-     - `remediationAdvice`
+     - `remediationAdvice` (lists the custom element's valid slot names for `orphaned_slot_content`)
    - Patch the offending CSS or component template directly using `suggestedToken` and `remediationAdvice`.
    - Re-run `npx @rlevin/uirig check --json` (or `npx @rlevin/uirig <target> --selectors="..." --json`) until `exitCode` is `0`.
 

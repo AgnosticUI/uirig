@@ -2,7 +2,7 @@
 
 - **Issue:** `AgnosticUI/uirig#17` — `Web Component <slot> & Content-Model Integrity (dom)`
 - **Branch:** `feat/issue-17-slot-integrity`
-- **Status:** In Progress (Chunks 0–1 Complete; Chunk 2 Final Docs Sync Next)
+- **Status:** Complete (Chunks 0–2 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -38,6 +38,7 @@ For every custom element host (`el.tagName.includes('-')`) with an open `el.shad
      `Orphaned light-DOM child <span slot="card-header"> inside <ag-card>: slot "card-header" does not exist. Valid slots: "header", "footer" (or default unnamed slot).`
    - When the custom element defines no `<slot>` elements at all:
      `Orphaned light-DOM child <p> inside <ag-badge>: <ag-badge> defines no <slot> elements in its ShadowRoot.`
+
 ---
 
 ## 3. Micro-Chunk Execution Breakdown
@@ -57,7 +58,7 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
     - Update `tests/unit/dom.test.ts` with unit specs covering hallucinated `slot="card-header"`, unslotted children when no default `<slot>` exists, valid slot assignments, and `data-uirig-ignore="dom"`.
   - **Commit:** `feat(dom): detect orphaned Web Component <slot> content with valid slot hints`
 
-- **Chunk 2: Agentic Stream Remediation & Docs Sync (`agent-stream.ts`, `README.md`, `AGENTS.md`)**
+- [x] **Chunk 2: Agentic Stream Remediation & Docs Sync (`agent-stream.ts`, `README.md`, `AGENTS.md`)**
   - **Files:** `src/utils/agent-stream.ts`, `tests/unit/agent-stream.test.ts`, `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_17.md`, `.uirig/docs/NEXT_PROMPT.md`
   - **Action:**
     - Ensure `normalizeViewportViolations()` in `src/utils/agent-stream.ts` emits clear, targeted `remediationAdvice` for `orphaned_slot_content` (instructing the agent to update or remove the `slot` attribute to match one of the host's valid slots).
@@ -73,4 +74,4 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
 - [x] Error details and JSON `remediationAdvice` list the valid slot names defined by the custom element's `ShadowRoot`.
 - [x] Valid named and default `<slot>` assignments pass with zero false positives.
 - [x] Respects `data-uirig-ignore="dom"`, `uirig.config.json` `ignore`, and `--selectors`.
-- All unit tests pass and documentation (`README.md`, `AGENTS.md`) is synced.
+- [x] All unit tests pass and documentation (`README.md`, `AGENTS.md`) is synced.
