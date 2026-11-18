@@ -2,7 +2,7 @@
 
 - **Issue:** `AgnosticUI/uirig#17` — `Web Component <slot> & Content-Model Integrity (dom)`
 - **Branch:** `feat/issue-17-slot-integrity`
-- **Status:** Planned (Chunk 0 — No code written yet)
+- **Status:** In Progress (Chunks 0–1 Complete; Chunk 2 Final Docs Sync Next)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -49,33 +49,28 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
   - **Action:** Cut branch `feat/issue-17-slot-integrity`, save this implementation plan, and initialize the continuity capsule.
   - **Commit:** `docs(plan): add implementation plan and continuity capsule for issue #17 (<slot> integrity)`
 
-- **Chunk 1: Core `<slot>` Integrity Audit in `src/core/dom.ts` + Locator Type & 1-to-1 Unit Tests**
+- [x] **Chunk 1: Core `<slot>` Integrity Audit in `src/core/dom.ts` + Locator Type & 1-to-1 Unit Tests**
   - **Files:** `src/interfaces/locator.ts`, `src/core/dom.ts`, `tests/unit/dom.test.ts`
   - **Action:**
     - Add `'orphaned_slot_content'` to `DomViolationRule` in `src/interfaces/locator.ts`.
-    - Add `auditWebComponentSlots()` inside `src/core/dom.ts` (traversing Light DOM and nested open `ShadowRoot` trees, respecting `data-uirig-ignore="dom"` / `ignoreRules` and `--selectors`, and listing valid slot names in `detail`).
-    - Update `tests/unit/dom.test.ts` with unit specs covering:
-      1. Hallucinated `slot="card-header"` inside `<ag-card>` listing valid slots (`header`, `footer`).
-      2. Unslotted light-DOM child when `<ag-card>` only defines named slots and no default `<slot>`.
-      3. Valid named + default slot assignments passing cleanly with zero false positives.
-      4. `data-uirig-ignore="dom"` exemption support.
-    - Output every modified file in full from line 1 to EOF.
+    - Add Web Component `<slot>` audit inside `src/core/dom.ts` (traversing Light DOM and nested open `ShadowRoot` trees, respecting `data-uirig-ignore="dom"` / `ignoreRules` and `--selectors`, and listing valid slot names in `detail`).
+    - Update `tests/unit/dom.test.ts` with unit specs covering hallucinated `slot="card-header"`, unslotted children when no default `<slot>` exists, valid slot assignments, and `data-uirig-ignore="dom"`.
   - **Commit:** `feat(dom): detect orphaned Web Component <slot> content with valid slot hints`
 
 - **Chunk 2: Agentic Stream Remediation & Docs Sync (`agent-stream.ts`, `README.md`, `AGENTS.md`)**
-  - **Files:** `src/utils/agent-stream.ts`, `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_17.md`, `.uirig/docs/NEXT_PROMPT.md`
+  - **Files:** `src/utils/agent-stream.ts`, `tests/unit/agent-stream.test.ts`, `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_17.md`, `.uirig/docs/NEXT_PROMPT.md`
   - **Action:**
     - Ensure `normalizeViewportViolations()` in `src/utils/agent-stream.ts` emits clear, targeted `remediationAdvice` for `orphaned_slot_content` (instructing the agent to update or remove the `slot` attribute to match one of the host's valid slots).
     - Document `<slot>` & content-model integrity under the `dom` engine in `README.md` and `AGENTS.md` (outputting all modified files in full from line 1 to EOF).
-    - Mark all chunks `[x]` complete in `.uirig/docs/IMPLEMENT_ISSUE_17.md` and point `.uirig/docs/NEXT_PROMPT.md` to the next roadmap issue.
+    - Mark all chunks `[x]` complete in `.uirig/docs/IMPLEMENT_ISSUE_17.md` and point `.uirig/docs/NEXT_PROMPT.md` to the next roadmap issue (`#10` Zero-Config Design Token Auto-Discovery `--auto-tokens`).
   - **Commit:** `docs: document Web Component <slot> integrity checks and update session continuity capsule`
 
 ---
 
 ## 4. Acceptance Checklist (from `AgnosticUI/uirig#17`)
-- Hallucinated `slot="invalid-name"` attributes on light-DOM children of custom elements are caught by `uirig dom` and `uirig check`.
-- Unslotted light-DOM children inside custom elements lacking a default `<slot>` are caught with `rule: 'orphaned_slot_content'`.
-- Error details and JSON `remediationAdvice` list the valid slot names defined by the custom element's `ShadowRoot`.
-- Valid named and default `<slot>` assignments pass with zero false positives.
-- Respects `data-uirig-ignore="dom"`, `uirig.config.json` `ignore`, and `--selectors`.
-- All unit tests pass with zero `any` or `@ts-ignore`.
+- [x] Hallucinated `slot="invalid-name"` attributes on light-DOM children of custom elements are caught by `uirig dom` and `uirig check`.
+- [x] Unslotted light-DOM children inside custom elements lacking a default `<slot>` are caught with `rule: 'orphaned_slot_content'`.
+- [x] Error details and JSON `remediationAdvice` list the valid slot names defined by the custom element's `ShadowRoot`.
+- [x] Valid named and default `<slot>` assignments pass with zero false positives.
+- [x] Respects `data-uirig-ignore="dom"`, `uirig.config.json` `ignore`, and `--selectors`.
+- All unit tests pass and documentation (`README.md`, `AGENTS.md`) is synced.

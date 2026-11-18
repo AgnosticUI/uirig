@@ -1,11 +1,11 @@
 ================================================================================
           uirig : Chronological Session Continuity Bridge Capsule              
 ================================================================================
- TIMESTAMP BASELINE : 2026-11-18T06:59:00-06:00 (Anchored to Nov 18, 2026 Timeline)
+ TIMESTAMP BASELINE : 2026-11-18T07:25:00-06:00 (Anchored to Nov 18, 2026 Timeline)
  REPOSITORY         : AgnosticUI/uirig
  ACTIVE BRANCH      : feat/issue-17-slot-integrity
  ACTIVE WORKSPACE   : Post-MVP Roadmap — Issue #17 (Web Component `<slot>` & Content-Model Integrity)
- PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_17.md (Chunk 0 Planned; Chunk 1 Next)
+ PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_17.md (Chunks 0–1 Complete; Chunk 2 Final Docs Sync Next)
  GITHUB ROADMAP MAP (AgnosticUI/uirig) :
    - #8  : Native MCP (Model Context Protocol) Server Mode (`uirig mcp`) [pillar: agent-workflow]
    - #9  : Framework Source-Map & `file:line` Attribution [pillar: agent-workflow]
@@ -30,13 +30,10 @@
 7. Verification & Git Checkpoint: Stop at the end of every chunk, provide `npm run build && npm run typecheck:all && npm test`, suggest a conventional commit message on the active topic branch, and wait for user permission before advancing.
 
 --- TARGET RUNTIME DELTA ---
- EXACT NEXT TASK    : Issue #17 Micro-Chunk 1 — Add `'orphaned_slot_content'` to `src/interfaces/locator.ts`, implement Web Component `<slot>` integrity checks in `src/core/dom.ts`, and add 1-to-1 unit tests in `tests/unit/dom.test.ts` (delivering all 3 files in full from line 1 to EOF).
- ENGINEERING "WHY"  :
-   1. AI agents frequently hallucinate `slot="..."` names on light-DOM children of Web Components, causing the browser to silently drop those children from rendering with zero console errors.
-   2. Inspecting open `ShadowRoot` `<slot>` definitions inside `src/core/dom.ts` catches orphaned children immediately and tells the agent the exact valid slot names.
+ EXACT NEXT TASK    : Issue #17 Micro-Chunk 2 (Final) — Add tailored `remediationAdvice` for `orphaned_slot_content` in `src/utils/agent-stream.ts` + `tests/unit/agent-stream.test.ts`, document `<slot>` integrity in `README.md` and `AGENTS.md`, mark Chunk 2 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_17.md`, and advance `.uirig/docs/NEXT_PROMPT.md` to Issue #10 (`--auto-tokens`).
  CODE BOUNDARIES    :
-   - Micro-Chunk 1: `src/interfaces/locator.ts`, `src/core/dom.ts`, `tests/unit/dom.test.ts` (+ mark Chunk 1 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_17.md` and update `.uirig/docs/NEXT_PROMPT.md`)
+   - Micro-Chunk 2: `src/utils/agent-stream.ts`, `tests/unit/agent-stream.test.ts`, `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_17.md`, `.uirig/docs/NEXT_PROMPT.md`
 
 --- SYSTEM BOOT TRIGGER COMMAND ---
-::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #17 MICRO-CHUNK 1 :::
+::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #17 MICRO-CHUNK 2 :::
 ================================================================================

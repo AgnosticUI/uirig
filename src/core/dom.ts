@@ -2,8 +2,9 @@
  * src/core/dom.ts
  * Unified DOM & Markup Integrity Gate (uirig dom).
  * Performs a read-only sweep across Light DOM, open ShadowRoots, and HTTP response
- * headers to catch structural AI hallucinations and passive security/prompt-injection traps,
- * with optional `--selectors` subtree scoping and Shadow DOM `<slot>` label resolution.
+ * headers to catch structural AI hallucinations (including orphaned Web Component
+ * `<slot>` content) and passive security/prompt-injection traps, with optional
+ * `--selectors` subtree scoping and Shadow DOM `<slot>` label resolution.
  */
 
 import type { Page, Response } from 'playwright';
@@ -17,9 +18,9 @@ export interface IDomAuditOptions {
   /** Optional HTTP navigation response used to verify frame-ancestors / X-Frame-Options headers. */
   navigationResponse?: Response | null;
   /** Optional runtime ignore rules from `uirig.config.json`. */
-  ignoreRules?: IUirigIgnoreRule[];
+  ignoreRules?: Array<IUirigIgnoreRule>;
   /** Optional CSS selectors limiting the DOM integrity sweep to matching subtrees. */
-  selectors?: string[];
+  selectors?: Array<string>;
 }
 
 /**
@@ -67,22 +68,69 @@ export function evaluateFrameProtectionHeaders(
 }
 
 /**
+ * Pure helper that checks whether a light-DOM child of a custom element (`<ag-card>`)
+ * is orphaned because its `slot="..."` attribute does not match any `<slot>` inside the
+ * host's `ShadowRoot` (or because no default `<slot>` exists for unslotted content).
+ *
+ * Returns a human-readable detail string when orphaned, or `null` when valid.
+ */
+export function describeOrphanedSlotReason(params: {
+  hostTag: string;
+  childTag: string;
+  requestedSlot: string | null;
+  namedSlots: ReadonlyArray<string>;
+  hasDefaultSlot: boolean;
+}): string | null {
+  const { hostTag, childTag, requestedSlot, namedSlots, hasDefaultSlot } = params;
+  const trimmedSlot = (requestedSlot ?? '').trim();
+
+  // Valid case 1: Child targets a named slot that exists in the ShadowRoot.
+  if (trimmedSlot.length > 0 && namedSlots.includes(trimmedSlot)) {
+    return null;
+  }
+
+  // Valid case 2: Child has no `slot` attribute and a default unnamed `<slot>` exists.
+  if (trimmedSlot.length === 0 && hasDefaultSlot) {
+    return null;
+  }
+
+  // Format available slots for clear remediation guidance.
+  const validSlotLabels = namedSlots.map((name) => `"${name}"`);
+  if (hasDefaultSlot) {
+    validSlotLabels.push('default (no slot attribute)');
+  }
+
+  if (validSlotLabels.length === 0) {
+    const childPreview =
+      trimmedSlot.length > 0 ? `<${childTag} slot="${trimmedSlot}">` : `<${childTag}>`;
+    return `Orphaned light-DOM child ${childPreview} inside <${hostTag}>: <${hostTag}> defines no <slot> elements in its ShadowRoot.`;
+  }
+
+  const validSummary = `Valid slots: ${validSlotLabels.join(', ')}.`;
+  if (trimmedSlot.length > 0) {
+    return `Orphaned light-DOM child <${childTag} slot="${trimmedSlot}"> inside <${hostTag}>: slot "${trimmedSlot}" does not exist. ${validSummary}`;
+  }
+
+  return `Orphaned unslotted light-DOM child <${childTag}> inside <${hostTag}>: <${hostTag}> has no default unnamed <slot>. ${validSummary}`;
+}
+
+/**
  * Runs the read-only Light + Shadow DOM integrity sweep against an active Playwright Page.
  */
 export async function runDomIntegrityAudit(
   page: Page,
   options: IDomAuditOptions = {}
-): Promise<IDomIntegrityViolation[]> {
-  const ignoreRules = options.ignoreRules ?? [];
+): Promise<Array<IDomIntegrityViolation>> {
+  const ignoreRules = options.ignoreRules ?? new Array<IUirigIgnoreRule>();
   const selectors = options.selectors;
   const isScopedAudit = Boolean(selectors && selectors.length > 0);
 
   logTelemetry(
     'dom:audit',
-    'Running Light + Shadow DOM structural, media, and prompt-injection integrity sweep...'
+    'Running Light + Shadow DOM structural, media, <slot>, and prompt-injection integrity sweep...'
   );
 
-  const violations: IDomIntegrityViolation[] = [];
+  const violations = new Array<IDomIntegrityViolation>();
 
   if (options.navigationResponse && !isScopedAudit) {
     const headerViolation = evaluateFrameProtectionHeaders(
@@ -102,12 +150,12 @@ export async function runDomIntegrityAudit(
       ignoreHelperSrc,
       scopeHelperSrc,
     }: {
-      rules: IUirigIgnoreRule[];
-      activeSelectors?: string[];
+      rules: Array<IUirigIgnoreRule>;
+      activeSelectors?: Array<string>;
       walkerFactorySrc: string;
       ignoreHelperSrc: string;
       scopeHelperSrc: string;
-    }): IDomIntegrityViolation[] => {
+    }): Array<IDomIntegrityViolation> => {
       const buildWalker = new Function(
         `return (${walkerFactorySrc});`
       )() as typeof createBrowserDomWalker;
@@ -118,11 +166,12 @@ export async function runDomIntegrityAudit(
         activeSelectors,
         scopeHelperSrc
       );
-      const found: IDomIntegrityViolation[] = [];
+      const found = new Array<IDomIntegrityViolation>();
 
       const zeroWidthRegex = /[\u200B-\u200D\u2060\uFEFF]/;
       const formControlTags = new Set(['INPUT', 'SELECT', 'TEXTAREA']);
       const ignoredInputTypes = new Set(['hidden', 'submit', 'reset', 'button', 'image']);
+      const nonRenderedChildTags = new Set(['STYLE', 'SCRIPT', 'TEMPLATE', 'LINK', 'META']);
 
       function resolveIdInRoot(rootNode: Node, id: string): Element | null {
         if (rootNode instanceof Document || rootNode instanceof ShadowRoot) {
@@ -158,7 +207,7 @@ export async function runDomIntegrityAudit(
         return false;
       }
 
-            function hasAccessibleLabel(el: Element): boolean {
+      function hasAccessibleLabel(el: Element): boolean {
         if (hasDirectAriaOrLabel(el)) {
           return true;
         }
@@ -171,7 +220,7 @@ export async function runDomIntegrityAudit(
         return false;
       }
 
-      function hasSlottedAccessibleContent(el: Element): boolean {
+            function hasSlottedAccessibleContent(el: Element): boolean {
         const slots = Array.from(el.querySelectorAll('slot'));
         for (const slot of slots) {
           const assigned = slot.assignedNodes({ flatten: true });
@@ -280,7 +329,6 @@ export async function runDomIntegrityAudit(
             });
           }
         }
-
         // 6. Unmuted `<video autoplay>` elements
         if (tag === 'VIDEO') {
           const videoEl = el as HTMLVideoElement;
@@ -358,6 +406,73 @@ export async function runDomIntegrityAudit(
               detail: `Potential hidden prompt-injection text detected (${reason}).`,
               inShadowDom: meta.inShadowDom,
             });
+          }
+        }
+
+        // 9. Web Component `<slot>` & Content-Model Integrity (open ShadowRoot hosts)
+        if (tag.includes('-') && el.shadowRoot) {
+          const hostTag = tag.toLowerCase();
+          const shadowSlots = Array.from(el.shadowRoot.querySelectorAll('slot'));
+          const namedSlots = new Array<string>();
+          let hasDefaultSlot = false;
+
+          for (const slotEl of shadowSlots) {
+            const slotName = (slotEl.getAttribute('name') ?? '').trim();
+            if (slotName.length > 0) {
+              if (!namedSlots.includes(slotName)) {
+                namedSlots.push(slotName);
+              }
+            } else {
+              hasDefaultSlot = true;
+            }
+          }
+
+          const validSlotLabels = namedSlots.map((name) => `"${name}"`);
+          if (hasDefaultSlot) {
+            validSlotLabels.push('default (no slot attribute)');
+          }
+
+          for (const childEl of Array.from(el.children)) {
+            if (
+              nonRenderedChildTags.has(childEl.tagName) ||
+              childEl.hasAttribute('hidden') ||
+              childEl.getAttribute('aria-hidden') === 'true' ||
+              walker.isIgnored(childEl, 'dom')
+            ) {
+              continue;
+            }
+
+            // Native browser `assignedSlot === null` confirms the light-DOM child was dropped.
+            if (childEl.assignedSlot === null) {
+              const childTag = childEl.tagName.toLowerCase();
+              const requestedSlot = (childEl.getAttribute('slot') ?? '').trim();
+              const childDescriptor =
+                requestedSlot.length > 0
+                  ? `${childTag}[slot="${requestedSlot}"]`
+                  : childTag;
+              const childSelector = `${meta.selector} > ${childDescriptor}`;
+
+              let detail = '';
+              if (validSlotLabels.length === 0) {
+                const preview =
+                  requestedSlot.length > 0
+                    ? `<${childTag} slot="${requestedSlot}">`
+                    : `<${childTag}>`;
+                detail = `Orphaned light-DOM child ${preview} inside <${hostTag}>: <${hostTag}> defines no <slot> elements in its ShadowRoot.`;
+              } else if (requestedSlot.length > 0) {
+                detail = `Orphaned light-DOM child <${childTag} slot="${requestedSlot}"> inside <${hostTag}>: slot "${requestedSlot}" does not exist. Valid slots: ${validSlotLabels.join(', ')}.`;
+              } else {
+                detail = `Orphaned unslotted light-DOM child <${childTag}> inside <${hostTag}>: <${hostTag}> has no default unnamed <slot>. Valid slots: ${validSlotLabels.join(', ')}.`;
+              }
+
+              found.push({
+                rule: 'orphaned_slot_content',
+                selector: childSelector,
+                hostComponent: hostTag,
+                detail,
+                inShadowDom: false,
+              });
+            }
           }
         }
       });
