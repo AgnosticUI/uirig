@@ -123,10 +123,20 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
           offendingSelectors: ['img.hero-banner'],
         },
       },
+      domViolations: [
+        {
+          rule: 'orphaned_slot_content',
+          selector: 'ag-card > span[slot="card-header"]',
+          hostComponent: 'ag-card',
+          detail:
+            'Orphaned light-DOM child <span slot="card-header"> inside <ag-card>: slot "card-header" does not exist. Valid slots: "header", "footer".',
+          inShadowDom: false,
+        },
+      ],
     };
 
     const normalized = normalizeViewportViolations(failingViewport);
-    expect(normalized).toHaveLength(6);
+    expect(normalized).toHaveLength(7);
 
     expect(normalized.at(0)).toMatchObject({
       engine: 'tokens',
@@ -161,9 +171,20 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
       measuredDelta: 'CLS 0.240 (max 0.100)',
     });
     expect(normalized.at(5)?.remediationAdvice).toContain('img.hero-banner');
+
+    expect(normalized.at(6)).toMatchObject({
+      engine: 'dom',
+      violationType: 'orphaned_slot_content',
+      hostComponent: 'ag-card',
+      selector: 'ag-card > span[slot="card-header"]',
+    });
+    expect(normalized.at(6)?.remediationAdvice).toContain(
+      "Update or remove the 'slot' attribute"
+    );
+    expect(normalized.at(6)?.remediationAdvice).toContain('Valid slots: "header", "footer"');
   });
 
-  it('deduplicates repeating pattern violations with occurrenceCount and sampleSelectors', () => {
+    it('deduplicates repeating pattern violations with occurrenceCount and sampleSelectors', () => {
     console.log('\n--- START TEST: Repeating Violation Pattern Deduplication ---');
     const report = createCleanReport();
     report.exitCode = 1;
@@ -204,7 +225,7 @@ describe('agent-stream.ts — Agentic JSON Tool Stream Generator', () => {
     ]);
   });
 
-    it('always ranks violations from highest impact (cls/stress) to lowest (tokens/dom) in JSON stream', () => {
+  it('always ranks violations from highest impact (cls/stress) to lowest (tokens/dom) in JSON stream', () => {
     console.log('[TEST] Verifying priority ranking order in formatAgenticJsonStream...');
 
     const report: ICheckExecutionReport = {

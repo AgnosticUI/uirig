@@ -11,7 +11,7 @@
 `uirig` is not a replacement for comprehensive WCAG audits (`axe-core`) or full performance profiling (`Lighthouse`). Instead, it acts as a fast, deterministic **first line of defense** tailored to modern component architectures and AI-assisted development:
 
 * **Catches Design-System Drift `axe` Misses:** `axe` won't tell you that an AI agent hardcoded `#3b82f6` instead of `--ag-color-primary`, or that `+30%` longer German translation copy overflowed `<ag-card>`.
-* **Pierces Web Component Shadow DOMs:** `Lighthouse` won't climb inside a Lit or Stencil `ShadowRoot` to tell a coding agent *which custom element* (`hostComponent`) broke dark-mode contrast or layout bounds.
+* **Pierces Web Component Shadow DOMs & Audits `<slot>` Integrity:** `Lighthouse` won't climb inside a Lit or Stencil `ShadowRoot` to tell a coding agent *which custom element* (`hostComponent`) broke dark-mode contrast, layout bounds, or silently dropped an orphaned `slot="..."` child.
 * **Zero Screenshot Diff Flakiness & Zero Vision-Token Bloat:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast, and W3C session-window CLS scores—plus `--spatial-brief` delivers macro-layout coordinates in ~40 plain-text tokens instead of 1,500–3,000+ vision tokens.
 * **Root-Cause Grouped, Priority-Ranked & Token-Budgeted for AI Agents:** Collapse cascading child failures under their shared parent container with `--group-by-root`, automatically sort violations from highest page impact (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`), and cap output with `--top=<n>` and `--max-tokens=<budget>`.
 * **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, or scope audits to specific components with `--selectors`.
@@ -54,10 +54,9 @@ Run `uirig` immediately against any running URL or local `.html` file (no instal
 | **3. Dark-Mode Parity** | `dark-mode` | Emulates dark color scheme / `[data-theme="dark"]`, re-audits contrast, and flags surfaces stranded at bright light luminance (`> 0.85`). | `1` |
 | **4. Geometric Stress** | `stress` | Injects `+30%` longer text and long space-free strings (like emails and URLs) to check container overflow, `100vw` bleed, avatar squishing, and `24x24px` tap targets. | `2` |
 | **5. Layout Shift** | `cls` | Enforces W3C 1s/5s session-window `clsMaxLimit` budgets across live page loads, catching unexpected layout jumps before users see them. | `2` |
-| **6. DOM Integrity** | `dom` | Catches dangling `aria-labelledby`/`for` IDs, unlabeled controls, broken `<img>` loads, `javascript:` URIs, and hidden AI prompt-injection traps. | `1` |
+| **6. DOM Integrity** | `dom` | Catches dangling `aria-labelledby`/`for` IDs, unlabeled controls, broken `<img>` loads, `javascript:` URIs, orphaned Web Component `<slot>` children, and hidden AI prompt-injection traps. | `1` |
 
 *(Full suite runs also automatically fail with exit code `1` if the page throws uncaught runtime JavaScript errors during load.)*
-
 ---
 
 ## Installation & Workspace Setup
@@ -128,7 +127,6 @@ Runs all 6 verification engines against a single URL or local `.html` path using
 
 ### `uirig check [options]`
 Launches a single Chromium instance and executes all 6 verification engines across every configured `(url, viewport)` pair in isolated parallel `BrowserContext` sessions. Writes a standalone Markdown PR report to `.uirig/github_pr_comment.md`.
-
 ### Standalone Engine Commands
 Run any individual verification engine in isolation for rapid inner-loop debugging or targeted AI agent re-checks:
 
