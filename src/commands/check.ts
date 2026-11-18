@@ -10,8 +10,8 @@
  * Also supports zero-config runs (`npx @rlevin/uirig <url-or-file>`), component-scoped
  * audits (`--selectors` / `-s`) with matched element counts, runtime ignore rules
  * (`data-uirig-ignore` + `ignore`), structured terminal violation reports (`--verbose`),
- * priority-ranked output limits (`--top` / `--max-tokens`), and ephemeral local HTTP servers
- * for `.html` file targets.
+ * priority-ranked output limits (`--top` / `--max-tokens`), parent-container grouping
+ * (`--group-by-root`), and ephemeral local HTTP servers for `.html` file targets.
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -83,6 +83,8 @@ export interface ICheckCommandOptions {
   verbose?: boolean;
   /** When true, collects and emits a compact viewport-relative landmark bounding-box summary (`--spatial-brief`). */
   spatialBrief?: boolean;
+  /** When true, collapses child failures under their shared parent container or Web Component host (`--group-by-root`). */
+  groupByRoot?: boolean;
   /** Optional cap on the number of highest-priority violations emitted (`--top <n>`). */
   top?: number;
   /** Optional approximate token budget for serialized JSON output (`--max-tokens <budget>`). */
@@ -116,7 +118,6 @@ export interface IViewportAuditReport {
   domViolations?: Array<IDomIntegrityViolation>;
   runtimeErrors?: Array<IRuntimeErrorViolation>;
 }
-
 export interface ICheckExecutionReport {
   timestamp: string;
   configPath: string;
@@ -248,6 +249,7 @@ export function loadUirigConfig(
     ignore: ignoreRules,
   };
 }
+
 export function resolveExecutionConfig(
   options: ICheckCommandOptions,
   cwd: string
@@ -360,6 +362,7 @@ export function evaluatePosixExitCode(results: Array<IViewportAuditReport>): Pos
   }
   return 0;
 }
+
 export async function auditViewportInParallel(
   browser: Browser,
   url: string,
@@ -693,10 +696,11 @@ export async function executeCheckCommand(
       summary,
     };
 
-        writeGithubPrCommentReport(executionReport, resolvedReportPath);
+    writeGithubPrCommentReport(executionReport, resolvedReportPath);
 
     if (options.json) {
       const jsonOutput = formatAgenticJsonStream(executionReport, {
+        groupByRoot: options.groupByRoot,
         top: options.top,
         maxTokens: options.maxTokens,
       });
@@ -705,17 +709,39 @@ export async function executeCheckCommand(
       process.stdout.write(
         formatConsoleAuditReport(executionReport, { verbose: options.verbose })
       );
-      if (options.top !== undefined || options.maxTokens !== undefined) {
+      if (
+        options.groupByRoot ||
+        options.top !== undefined ||
+        options.maxTokens !== undefined
+      ) {
         const parsedSummary = JSON.parse(
           formatAgenticJsonStream(executionReport, {
+            groupByRoot: options.groupByRoot,
             top: options.top,
             maxTokens: options.maxTokens,
           })
         ) as {
           totalViolations?: number;
           truncatedCount?: number;
-          violations: Array<unknown>;
+          violations: Array<{ childCount?: number }>;
         };
+        if (options.groupByRoot) {
+          const groupedParents = parsedSummary.violations.filter(
+            (v) => v.childCount !== undefined && v.childCount > 1
+          );
+          if (groupedParents.length > 0) {
+            const collapsedChildren = groupedParents.reduce(
+              (sum, v) => sum + (v.childCount ?? 0),
+              0
+            );
+            process.stdout.write(
+              `${paint(
+                `🌳 Root-Cause Grouping: Collapsed ${collapsedChildren} child violations into ${groupedParents.length} shared parent container(s).`,
+                'cyan'
+              )}\n`
+            );
+          }
+        }
         if (
           parsedSummary.truncatedCount !== undefined &&
           parsedSummary.truncatedCount > 0 &&
@@ -723,7 +749,7 @@ export async function executeCheckCommand(
         ) {
           process.stdout.write(
             `${paint(
-              `🎯 Output Limit: Showing top ${parsedSummary.violations.length} of ${parsedSummary.totalViolations} deduplicated violations (${parsedSummary.truncatedCount} omitted; re-run without --top/--max-tokens to inspect all).`,
+              `🎯 Output Limit: Showing top ${parsedSummary.violations.length} of ${parsedSummary.totalViolations} violations (${parsedSummary.truncatedCount} omitted; re-run without --top/--max-tokens to inspect all).`,
               'yellow'
             )}\n`
           );

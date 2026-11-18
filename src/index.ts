@@ -2,10 +2,10 @@
  * src/index.ts
  * Main system entry point and zero-dependency CLI argument parser/router for `uirig`.
  * Supports:
- * - `uirig <url-or-file> [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
+ * - `uirig <url-or-file> [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
  * - `uirig init`
- * - `uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
- * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
+ * - `uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
+ * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
  * - `uirig manifest`
  * - `uirig --help` / `uirig <command> --help` / `uirig --version`
  */
@@ -49,6 +49,7 @@ interface ISubcommandHelpSpec {
 const SHARED_AUDIT_OPTIONS = [
   '-s, --selectors=<csv>  Filter element checks to matching CSS selectors (repeatable)',
   '--config=<path>        Path to uirig.config.json (also supports: --config <path>)',
+  '--group-by-root        Collapse child failures under their shared parent container or host',
   '--top=<n>              Keep only the top N highest-priority violations (e.g. --top=5)',
   '--max-tokens=<budget>  Cap JSON output to approximately N LLM tokens (e.g. --max-tokens=1200)',
   '--spatial-brief        Emit compact bounding-box summary of landmarks & target selectors',
@@ -75,11 +76,11 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   check: {
     summary: 'Run all 6 verification engines concurrently across configured or direct targets in isolated contexts.',
-    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Launches a single headless Chromium instance and isolates each (url, viewport) pair in a fresh BrowserContext.',
       'Automatically serves local .html files on an ephemeral 127.0.0.1 HTTP server when given a file path.',
-      'Ranks violations from highest impact to lowest and supports --top / --max-tokens output limits.',
+      'Ranks violations from highest impact to lowest and supports --group-by-root, --top, and --max-tokens.',
     ],
     options: [
       '--only=<tool>          Filter execution to one engine: tokens | contrast | dark-mode | stress | cls | dom',
@@ -93,14 +94,14 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     examples: [
       'npx @rlevin/uirig check',
       'npx @rlevin/uirig check ./dist/index.html --selectors="#hero, .card" --verbose',
-      'npx @rlevin/uirig check ./dist/index.html --top=5 --max-tokens=1200 --json',
+      'npx @rlevin/uirig check ./dist/index.html --group-by-root --top=5 --json',
       'npx @rlevin/uirig check --only=dark-mode --json',
     ],
   },
 
     tokens: {
     summary: 'Audit Light DOM and open ShadowRoot computed styles against your design token scale.',
-    usage: 'uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Climbs Light DOM and nested Web Component ShadowRoot trees to inspect rendered colors, spacing, font sizes, and radii.',
       'Attributes violations to the nearest custom element hostComponent and respects data-uirig-ignore="tokens".',
@@ -117,7 +118,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   contrast: {
     summary: 'Verify WCAG 2.1 AA rendered luminance contrast (>= 4.5:1) using Porter-Duff alpha compositing.',
-    usage: 'uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Walks Light DOM and ShadowRoot.host ancestors to composite translucent backgrounds before computing luminance contrast.',
       'Computes the nearest passing design system color token (suggestedToken) when tokensPath is configured.',
@@ -134,7 +135,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   'dark-mode': {
     summary: 'Emulate dark color scheme / [data-theme="dark"] and audit dark contrast & un-inverted bright surfaces.',
-    usage: 'uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Forces prefers-color-scheme: dark and toggles data-theme="dark" on <html> inside an isolated browser context.',
       'Re-runs Porter-Duff contrast checks and flags large surfaces stranded above 0.85 relative luminance.',
@@ -151,7 +152,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   stress: {
     summary: 'Fuzz text with +30% expansion and space-free strings to catch layout overflow, bleed, and tiny tap targets.',
-    usage: 'uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Injects +30% longer copy and unbreakable email/URL tokens to test flex/grid resilience and container clipping.',
       'Checks horizontal scrollbar bleed (100vw), squished avatars, stuck opacity: 0 elements, and 24x24px minimum tap targets.',
@@ -168,7 +169,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   cls: {
     summary: 'Measure W3C 1s/5s session-window Cumulative Layout Shift (CLS) against clsMaxLimit.',
-    usage: 'uirig cls [<url-or-file>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig cls [<url-or-file>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Injects a pre-navigation PerformanceObserver for layout-shift entries prior to initial page load.',
       'Aggregates shifting bursts using W3C 1-second gap / 5-second max session windows.',
@@ -185,7 +186,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   dom: {
     summary: 'Audit Light + Shadow DOM for broken ARIA/label IDs, broken media, unsafe links, and prompt-injection traps.',
-    usage: 'uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Verifies aria-labelledby / label[for] ID resolution, accessible names on controls, and loaded <img> dimensions.',
       'Flags javascript: URIs, target="_blank" without rel="noopener", and invisible AI prompt-injection text.',
@@ -200,7 +201,8 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       'npx @rlevin/uirig dom http://localhost:5173 --json',
     ],
   },
-  manifest: {
+
+    manifest: {
     summary: 'Print an ASCII repository directory tree blueprint while excluding blocklisted build/vendor directories.',
     usage: 'uirig manifest [--help]',
     mechanics: [
@@ -234,6 +236,7 @@ ${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / cls / d
   -s, --selectors=<csv>           Filter element checks to matching CSS selectors (repeatable)
   --config=<path>                 Path to uirig.config.json (also supports: --config <path>)
   --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls | dom
+  --group-by-root                 Collapse child failures under their shared parent container or host
   --top=<n>                       Keep only the top N highest-priority violations (e.g. --top=5)
   --max-tokens=<budget>           Cap JSON output to approximately N LLM tokens (e.g. --max-tokens=1200)
   --spatial-brief                 Emit compact bounding-box summary of landmarks & target selectors
@@ -296,6 +299,7 @@ export type ParsedCliCommand =
       only?: AuditToolName;
       selectors?: Array<string>;
       configPath?: string;
+      groupByRoot: boolean;
       top?: number;
       maxTokens?: number;
       spatialBrief: boolean;
@@ -342,6 +346,7 @@ function parseAuditCommandArgs(
   let configPath: string | undefined;
   let only: AuditToolName | undefined = presetOnly;
   const collectedSelectors = new Array<string>();
+  let groupByRoot = false;
   let top: number | undefined;
   let maxTokens: number | undefined;
   let spatialBrief = false;
@@ -354,6 +359,8 @@ function parseAuditCommandArgs(
 
     if (token === '--json') {
       json = true;
+    } else if (token === '--group-by-root') {
+      groupByRoot = true;
     } else if (token === '--spatial-brief') {
       spatialBrief = true;
     } else if (token === '--verbose') {
@@ -504,6 +511,7 @@ function parseAuditCommandArgs(
     only,
     selectors: uniqueSelectors,
     configPath,
+    groupByRoot,
     top,
     maxTokens,
     spatialBrief,
@@ -612,6 +620,7 @@ export async function runCli(
       configPath: parsed.configPath,
       only: parsed.only,
       selectors: parsed.selectors,
+      groupByRoot: parsed.groupByRoot,
       top: parsed.top,
       maxTokens: parsed.maxTokens,
       spatialBrief: parsed.spatialBrief,

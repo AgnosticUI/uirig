@@ -13,7 +13,7 @@
 * **Catches Design-System Drift `axe` Misses:** `axe` won't tell you that an AI agent hardcoded `#3b82f6` instead of `--ag-color-primary`, or that `+30%` longer German translation copy overflowed `<ag-card>`.
 * **Pierces Web Component Shadow DOMs:** `Lighthouse` won't climb inside a Lit or Stencil `ShadowRoot` to tell a coding agent *which custom element* (`hostComponent`) broke dark-mode contrast or layout bounds.
 * **Zero Screenshot Diff Flakiness & Zero Vision-Token Bloat:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast, and W3C session-window CLS scores—plus `--spatial-brief` delivers macro-layout coordinates in ~40 plain-text tokens instead of 1,500–3,000+ vision tokens.
-* **Priority-Ranked & Token-Budgeted for AI Agents:** Violations are automatically sorted from highest page impact (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`) and can be capped with `--top=<n>` and `--max-tokens=<budget>` so agent prompts stay high-signal.
+* **Root-Cause Grouped, Priority-Ranked & Token-Budgeted for AI Agents:** Collapse cascading child failures under their shared parent container with `--group-by-root`, automatically sort violations from highest page impact (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`), and cap output with `--top=<n>` and `--max-tokens=<budget>`.
 * **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, or scope audits to specific components with `--selectors`.
 * **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout` while keeping colored telemetry on `stderr`.
 
@@ -38,8 +38,8 @@ Run `uirig` immediately against any running URL or local `.html` file (no instal
     # Use repeated flags if you prefer
     npx @rlevin/uirig <URL> -s="#hero" -s="ag-button" -s=".pricing-card"
 
-    # Emit compact ~40-token layout bounding boxes + top 5 highest-priority violations within 1,200 tokens
-    npx @rlevin/uirig http://localhost:5173 --spatial-brief --top=5 --max-tokens=1200 --json
+    # Group cascading child failures by parent + emit ~40-token layout coordinates + top 5 issues
+    npx @rlevin/uirig http://localhost:5173 --group-by-root --spatial-brief --top=5 --json
 
 *(If `@rlevin/uirig` is already installed in your repository's `node_modules`, you can run `npx uirig ...` directly.)*
 
@@ -132,15 +132,16 @@ Launches a single Chromium instance and executes all 6 verification engines acro
 ### Standalone Engine Commands
 Run any individual verification engine in isolation for rapid inner-loop debugging or targeted AI agent re-checks:
 
-    npx @rlevin/uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig cls [<url-or-file>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig cls [<url-or-file>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
 
 ### Shared Options
 * `-s, --selectors=<csv>`: Filter element-level checks to matching CSS selectors (comma-separated and repeatable; pierces Web Component `ShadowRoot` boundaries).
+* `--group-by-root`: Collapse cascading child failures under their shared parent container or Web Component host (`childCount` + up to 3 `sampleChildren`).
 * `--top=<n>`: Keep only the top `N` highest-priority violations (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`) and include `totalViolations` + `truncatedCount` metadata when trimmed.
 * `--max-tokens=<budget>`: Cap serialized JSON output to approximately `N` LLM tokens without ever cutting off valid JSON object boundaries.
 * `--spatial-brief`: Emit an ultra-compact, plain-text bounding-box summary (`header[0,0 1440x64] | aside[0,64 260x836] | main[260,64 1180x836]`) of semantic landmarks, top-level custom elements, and target selectors (~40 tokens, zero vision screenshots required).
@@ -160,12 +161,12 @@ Run any individual verification engine in isolation for rapid inner-loop debuggi
 
 ## Common Use Cases
 
-### 1. AI Design System Harness Loop (`AGENTS.md` + `--spatial-brief --top=5 --json`)
-`uirig init` generates `.uirig/SKILL.md` so coding agents (Claude Code, Cursor, Codex) can verify macro-layout (`spatialBrief`) and tackle the highest-impact defects first without prompt bloat:
+### 1. AI Design System Harness Loop (`AGENTS.md` + `--group-by-root --spatial-brief --top=5 --json`)
+`uirig init` generates `.uirig/SKILL.md` so coding agents (Claude Code, Cursor, Codex) can verify macro-layout (`spatialBrief`), collapse cascading child failures under their parent (`--group-by-root`), and tackle the highest-impact defects first without prompt bloat:
 
-    npx @rlevin/uirig http://localhost:5173 --selectors="ag-card" --spatial-brief --top=5 --json
+    npx @rlevin/uirig http://localhost:5173 --group-by-root --spatial-brief --top=5 --json
 
-Each deduplicated entry in `violations` includes `engine`, `hostComponent`, `selector`, `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
+Each entry in `violations` includes `engine`, `hostComponent`, `selector`, `childCount` / `sampleChildren` (when grouped), `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
 
 ### 2. GitHub Actions CI/CD Gate
 
