@@ -243,6 +243,11 @@ export function normalizeViewportViolations(
         ? domViolation.hostComponent
         : extractHostComponentFromSelector(domViolation.selector);
 
+    const remediationAdvice =
+      domViolation.rule === 'orphaned_slot_content'
+        ? `Update or remove the 'slot' attribute on '${domViolation.selector}' to match one of the custom element's valid slots, or remove the orphaned light-DOM child if no <slot> exists. (${domViolation.detail})`
+        : `Fix '${domViolation.rule}' on '${domViolation.selector}': ${domViolation.detail}`;
+
     normalized.push({
       engine: 'dom',
       violationType: domViolation.rule,
@@ -253,7 +258,7 @@ export function normalizeViewportViolations(
       inShadowDom: domViolation.inShadowDom,
       occurrenceCount: 1,
       measuredDelta: domViolation.detail,
-      remediationAdvice: `Fix '${domViolation.rule}' on '${domViolation.selector}': ${domViolation.detail}`,
+      remediationAdvice,
     });
   }
 
