@@ -1,11 +1,11 @@
 ================================================================================
           uirig : Chronological Session Continuity Bridge Capsule              
 ================================================================================
- TIMESTAMP BASELINE : 2026-11-17T18:53:00-06:00 (Anchored to Nov 17, 2026 Timeline)
+ TIMESTAMP BASELINE : 2026-11-17T19:10:00-06:00 (Anchored to Nov 17, 2026 Timeline)
  REPOSITORY         : AgnosticUI/uirig
  ACTIVE BRANCH      : feat/issue-11-group-by-root
  ACTIVE WORKSPACE   : Post-MVP Roadmap — Issue #11 (`--group-by-root`)
- PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_11.md (Chunks 0–2 Complete; Chunk 3 Next)
+ PLAN DOCUMENT      : .uirig/docs/IMPLEMENT_ISSUE_11.md (Chunks 0–3 Complete; Chunk 4 Final Docs Sync Next)
  GITHUB ROADMAP MAP (AgnosticUI/uirig) :
    - #8  : Native MCP (Model Context Protocol) Server Mode (`uirig mcp`) [pillar: agent-workflow]
    - #9  : Framework Source-Map & `file:line` Attribution [pillar: agent-workflow]
@@ -30,10 +30,10 @@
 7. Verification & Git Checkpoint: Stop at the end of every chunk, provide `npm run build && npm run typecheck:all && npm test`, suggest a conventional commit message on the active topic branch, and wait for user permission before advancing.
 
 --- TARGET RUNTIME DELTA ---
- EXACT NEXT TASK    : Issue #11 Micro-Chunk 3 — Parse `--group-by-root` CLI flag in `src/index.ts`, forward `groupByRoot` in `runCli()`, document it in `--help`, and update `tests/unit/index.test.ts` (delivering both files in full from line 1 to EOF).
+ EXACT NEXT TASK    : Issue #11 Micro-Chunk 4 (Final) — Document `--group-by-root` in `README.md` and `AGENTS.md` (delivering both files in full from line 1 to EOF), mark Chunk 4 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_11.md`, and advance `.uirig/docs/NEXT_PROMPT.md` to Issue #17 (Web Component `<slot>` & Content-Model Integrity).
  CODE BOUNDARIES    :
-   - Micro-Chunk 3: `src/index.ts` & `tests/unit/index.test.ts` (+ mark Chunk 3 `[x]` in `.uirig/docs/IMPLEMENT_ISSUE_11.md` and update `.uirig/docs/NEXT_PROMPT.md`)
+   - Micro-Chunk 4: `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_11.md`, `.uirig/docs/NEXT_PROMPT.md`
 
 --- SYSTEM BOOT TRIGGER COMMAND ---
-::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #11 MICRO-CHUNK 3 :::
+::: SYSTEM INITIALIZED. AWAITING USER COMMAND TO BEGIN ISSUE #11 MICRO-CHUNK 4 :::
 ================================================================================

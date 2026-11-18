@@ -2,8 +2,9 @@
  * tests/unit/index.test.ts
  * Unit test suite for the root CLI entry router (`src/index.ts`), including
  * zero-config direct target invocations (`uirig <url-or-file>`), `--selectors`
- * / `-s` scoping flags, `--top` & `--max-tokens` output limits, `--spatial-brief`,
- * `--verbose`, subcommand routing, subcommand-specific `--help` pages, and POSIX exit codes.
+ * / `-s` scoping flags, `--group-by-root`, `--top` & `--max-tokens` output limits,
+ * `--spatial-brief`, `--verbose`, subcommand routing, subcommand-specific `--help`
+ * pages, and POSIX exit codes.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -47,7 +48,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     stderrSpy.mockRestore();
   });
 
-  it('parses `check` defaults cleanly and captures --only, --config, --top, --max-tokens, --spatial-brief, --verbose, --json, and --headed flags', () => {
+  it('parses `check` defaults cleanly and captures --only, --config, --group-by-root, --top, --max-tokens, --spatial-brief, --verbose, --json, and --headed flags', () => {
     console.log('[TEST] Verifying parseCliArgs for check command and flags...');
 
     expect(parseCliArgs(['check'])).toEqual({
@@ -56,6 +57,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: undefined,
       selectors: undefined,
       configPath: undefined,
+      groupByRoot: false,
       top: undefined,
       maxTokens: undefined,
       spatialBrief: false,
@@ -69,6 +71,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
         'check',
         '--only=contrast',
         '--config=./custom/uirig.config.json',
+        '--group-by-root',
         '--top=5',
         '--max-tokens=1200',
         '--spatial-brief',
@@ -82,6 +85,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: 'contrast',
       selectors: undefined,
       configPath: './custom/uirig.config.json',
+      groupByRoot: true,
       top: 5,
       maxTokens: 1200,
       spatialBrief: true,
@@ -100,6 +104,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: undefined,
       selectors: undefined,
       configPath: undefined,
+      groupByRoot: false,
       top: undefined,
       maxTokens: undefined,
       spatialBrief: false,
@@ -107,11 +112,13 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       json: true,
       headless: true,
     });
-    expect(
+
+        expect(
       parseCliArgs([
         './index.html',
         '--only=contrast',
         '--headed',
+        '--group-by-root',
         '--spatial-brief',
         '--top',
         '3',
@@ -124,6 +131,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: 'contrast',
       selectors: undefined,
       configPath: undefined,
+      groupByRoot: true,
       top: 3,
       maxTokens: 800,
       spatialBrief: true,
@@ -138,6 +146,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: undefined,
       selectors: undefined,
       configPath: 'alt.config.json',
+      groupByRoot: false,
       top: undefined,
       maxTokens: undefined,
       spatialBrief: false,
@@ -164,6 +173,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: undefined,
       selectors: ['#hero', '.pricing-card', 'ag-button'],
       configPath: undefined,
+      groupByRoot: false,
       top: undefined,
       maxTokens: undefined,
       spatialBrief: false,
@@ -206,6 +216,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     const checkOutput = String(stdoutSpy.mock.calls.at(-1)?.at(0) ?? '');
     expect(checkOutput).toContain('uirig check');
     expect(checkOutput).toContain('--only=<tool>');
+    expect(checkOutput).toContain('--group-by-root');
     expect(checkOutput).toContain('--top=<n>');
     expect(checkOutput).toContain('--max-tokens=<budget>');
     expect(checkOutput).toContain('--spatial-brief');
@@ -218,7 +229,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     expect(renderHelpText('nonexistent-topic')).toBe(CLI_HELP_TEXT.trim());
   });
 
-    it('routes `init`, `manifest`, and `check` (including zero-config target, selectors, top, maxTokens, spatialBrief & verbose) to handlers and forwards POSIX exit code', async () => {
+    it('routes `init`, `manifest`, and `check` (including zero-config target, selectors, groupByRoot, top, maxTokens, spatialBrief & verbose) to handlers and forwards POSIX exit code', async () => {
     console.log('[TEST] Verifying subcommand routing and exit code propagation...');
 
     const initSpy = vi.fn(async () => {});
@@ -237,6 +248,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
         '--only=stress',
         '-s',
         '.card',
+        '--group-by-root',
         '--top=4',
         '--max-tokens=900',
         '--spatial-brief',
@@ -251,6 +263,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       configPath: undefined,
       only: 'stress',
       selectors: ['.card'],
+      groupByRoot: true,
       top: 4,
       maxTokens: 900,
       spatialBrief: true,
@@ -273,6 +286,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: 'tokens',
       selectors: ['ag-button'],
       configPath: 'uirig.config.json',
+      groupByRoot: false,
       top: undefined,
       maxTokens: undefined,
       spatialBrief: false,
@@ -287,6 +301,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       only: 'dark-mode',
       selectors: undefined,
       configPath: undefined,
+      groupByRoot: false,
       top: undefined,
       maxTokens: undefined,
       spatialBrief: false,
@@ -295,7 +310,6 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       headless: true,
     });
 
-
         const domExit = await runCli(['dom', './index.html', '--json'], { check: checkSpy });
     expect(domExit).toBe(0);
     expect(checkSpy).toHaveBeenLastCalledWith({
@@ -303,6 +317,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       configPath: undefined,
       only: 'dom',
       selectors: undefined,
+      groupByRoot: false,
       top: undefined,
       maxTokens: undefined,
       spatialBrief: false,
