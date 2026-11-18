@@ -2,7 +2,7 @@
 
 - **Issue:** `AgnosticUI/uirig#11` — `Root-Cause Grouping & Cascading Deduplication (--group-by-root)`
 - **Branch:** `feat/issue-11-group-by-root`
-- **Status:** In Progress (Chunks 0–3 Complete; Chunk 4 Final Docs Sync Next)
+- **Status:** Complete (All Chunks 0–4 implemented, verified, and documented)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -19,9 +19,7 @@ Add a `--group-by-root` CLI flag that collapses multiple child violations sharin
 - [x] **Chunk 1: Pure Parent Grouper Utility + 1-to-1 Unit Tests** (`feat(grouper): add parent container violation grouper and unit tests`)
 - [x] **Chunk 2: JSON Stream & Runner Integration** (`feat(runner): integrate --group-by-root into JSON stream and check command`)
 - [x] **Chunk 3: CLI Flag Parsing (`--group-by-root`), Subcommand `--help` & Unit Tests** (`feat(cli): expose --group-by-root flag and update help output`)
-- **Chunk 4: Docs Sync & Next-Issue Capsule Handoff**
-  - **Files:** `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_11.md`, `.uirig/docs/NEXT_PROMPT.md`
-  - **Commit:** `docs: document --group-by-root flag and update session continuity capsule`
+- [x] **Chunk 4: Docs Sync & Next-Issue Capsule Handoff** (`docs: document --group-by-root flag and update session continuity capsule`)
 
 ---
 
@@ -30,4 +28,4 @@ Add a `--group-by-root` CLI flag that collapses multiple child violations sharin
 - [x] Collapsed violations include `childCount` and up to 3 `sampleChildren` selectors, while singletons remain untouched.
 - [x] Integrated into `formatAgenticJsonStream()` and `executeCheckCommand()`.
 - [x] CLI flag `--group-by-root` wired in `src/index.ts` with 1-to-1 unit tests in `tests/unit/index.test.ts`.
-- Documentation synced in `README.md` and `AGENTS.md`.
+- [x] Documentation synced in `README.md` and `AGENTS.md`.
