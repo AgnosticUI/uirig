@@ -77,5 +77,5 @@ All tools accept common audit parameters (`target`, `selectors`, `configPath`, `
 ## 4. Acceptance Checklist (from `AgnosticUI/uirig#8`)
 - [x] `uirig mcp` starts a valid MCP server over `stdio` without polluting stdout with non-protocol logs.
 - [x] Subsequent tool calls reuse the existing Chromium process instead of launching a new binary.
-- [ ] Warm component checks execute in `< 300ms` on local dev servers.
-- [ ] Browser crashes or page hangs recover gracefully on the next tool invocation.
+- [x] Warm component checks execute in `< 300ms` on local dev servers.
+- [x] Browser crashes or page hangs recover gracefully on the next tool invocation.

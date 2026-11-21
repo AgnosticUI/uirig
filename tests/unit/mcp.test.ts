@@ -1,7 +1,8 @@
 /**
  * tests/unit/mcp.test.ts
  * End-to-end MCP protocol test suite (`src/commands/mcp.ts`) using the official
- * `@modelcontextprotocol/sdk` Client over `StdioClientTransport`.
+ * `@modelcontextprotocol/sdk` Client over `StdioClientTransport` and `InMemoryTransport`.
+ * Covers tool discovery, pure stdio framing, warm browser reuse, and crash recovery.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -10,6 +11,9 @@ import { join, resolve } from 'path';
 import { tmpdir } from 'os';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { createUirigMcpServer } from '../../src/commands/mcp.js';
+import { WarmBrowserPool } from '../../src/core/browser-pool.js';
 
 describe('uirig mcp — Native MCP Server Mode (src/commands/mcp.ts)', () => {
   let tempDir: string;
@@ -102,10 +106,8 @@ describe('uirig mcp — Native MCP Server Mode (src/commands/mcp.ts)', () => {
       },
     });
 
-    const firstText =
-      Array.isArray(firstRes.content) && firstRes.content[0]?.type === 'text'
-        ? firstRes.content[0].text
-        : '';
+    const firstContent = Array.isArray(firstRes.content) ? firstRes.content[0] : undefined;
+    const firstText = firstContent?.type === 'text' ? firstContent.text : '';
     const firstPayload = JSON.parse(firstText) as {
       tool: string;
       passed: boolean;
@@ -131,10 +133,8 @@ describe('uirig mcp — Native MCP Server Mode (src/commands/mcp.ts)', () => {
     });
     const warmElapsedMs = performance.now() - warmStart;
 
-    const secondText =
-      Array.isArray(secondRes.content) && secondRes.content[0]?.type === 'text'
-        ? secondRes.content[0].text
-        : '';
+    const secondContent = Array.isArray(secondRes.content) ? secondRes.content[0] : undefined;
+    const secondText = secondContent?.type === 'text' ? secondContent.text : '';
     const secondPayload = JSON.parse(secondText) as {
       tool: string;
       passed: boolean;
@@ -143,7 +143,74 @@ describe('uirig mcp — Native MCP Server Mode (src/commands/mcp.ts)', () => {
 
     expect(secondPayload.passed).toBe(true);
     expect(secondPayload.exitCode).toBe(0);
-    // Warm check avoids Chromium binary cold-start (generous 1500ms ceiling for 2018 Intel Mac mini)
+    // Warm check avoids Chromium binary cold-start (generous 1500ms ceiling for Intel hardware)
     expect(warmElapsedMs).toBeLessThan(1500);
+  });
+
+  it('recovers gracefully when the underlying Chromium process crashes between MCP tool invocations', async () => {
+    const htmlPath = join(tempDir, 'recovery.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background: #ffffff; color: #111827; font-family: sans-serif; }
+          </style>
+        </head>
+        <body><h1>Self-Healing MCP Pool</h1></body>
+      </html>`,
+      'utf8'
+    );
+
+    const pool = new WarmBrowserPool({ headless: true, idleTimeoutMs: 60_000 });
+    const mcpServer = createUirigMcpServer(pool, '0.2.4');
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const inMemoryClient = new Client(
+      { name: 'uirig-crash-test-client', version: '1.0.0' },
+      { capabilities: {} }
+    );
+
+    try {
+      await Promise.all([
+        mcpServer.connect(serverTransport),
+        inMemoryClient.connect(clientTransport),
+      ]);
+
+      // 1. First invocation warms Chromium
+      const res1 = await inMemoryClient.callTool({
+        name: 'uirig_contrast',
+        arguments: {
+          target: './recovery.html',
+          viewport: { name: 'desktop', width: 1280, height: 800 },
+          cwd: tempDir,
+        },
+      });
+      const text1 = Array.isArray(res1.content) && res1.content[0]?.type === 'text' ? res1.content[0].text : '';
+      expect((JSON.parse(text1) as { passed: boolean }).passed).toBe(true);
+      expect(pool.isHealthy()).toBe(true);
+
+      // 2. Simulate unexpected Chromium crash
+      const activeBrowser = await pool.acquire();
+      await activeBrowser.close();
+      expect(pool.isHealthy()).toBe(false);
+
+      // 3. Next MCP invocation transparently relaunches Chromium and passes
+      const res2 = await inMemoryClient.callTool({
+        name: 'uirig_dom',
+        arguments: {
+          target: './recovery.html',
+          viewport: { name: 'desktop', width: 1280, height: 800 },
+          cwd: tempDir,
+        },
+      });
+      const text2 = Array.isArray(res2.content) && res2.content[0]?.type === 'text' ? res2.content[0].text : '';
+      expect((JSON.parse(text2) as { passed: boolean }).passed).toBe(true);
+      expect(pool.isHealthy()).toBe(true);
+    } finally {
+      await inMemoryClient.close().catch(() => {});
+      await mcpServer.close().catch(() => {});
+      await pool.dispose();
+    }
   });
 });
