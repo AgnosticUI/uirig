@@ -23,6 +23,7 @@ import { executeManifestCommand } from './commands/manifest.js';
 import { logTelemetry, paint } from './utils/formatter.js';
 import { parseSelectorList } from './utils/scope.js';
 import { readFileSync } from 'fs';
+import { executeMcpCommand } from './commands/mcp.js';
 
 const pkg = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
@@ -746,15 +747,13 @@ export async function runCli(
 
     if (parsed.command === 'mcp') {
       process.env.UIRIG_JSON_MODE = '1';
-      if (handlers.mcp) {
-        await handlers.mcp({
-          transport: parsed.transport,
-          port: parsed.port,
-          idleTimeoutMs: parsed.idleTimeoutMs,
-        });
-        return 0;
-      }
-      throw new Error('ERR_MCP_NOT_IMPLEMENTED: MCP server handler is not wired yet.');
+      const runMcp = handlers.mcp ?? executeMcpCommand;
+      await runMcp({
+        transport: parsed.transport,
+        port: parsed.port,
+        idleTimeoutMs: parsed.idleTimeoutMs,
+      });
+      return 0;
     }
 
     const runCheck = handlers.check ?? executeCheckCommand;
