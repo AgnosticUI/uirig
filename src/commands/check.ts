@@ -611,17 +611,44 @@ export async function executeCheckCommand(
         ? options.viewportsOverride
         : config.viewports;
 
+    const tokenAgnosticEngines = new Set<AuditToolName>(['stress', 'cls', 'dom']);
+    const softTokenEngines = new Set<AuditToolName>(['contrast', 'dark-mode']);
     let tokenScale: ITokenScaleConfig | null = null;
+
     if (options.tokenScaleOverride) {
       tokenScale = options.tokenScaleOverride;
+    } else if (options.only && tokenAgnosticEngines.has(options.only)) {
+      logTelemetry(
+        'tokens:skip',
+        `Skipping token scale load for '${options.only}' engine.`
+      );
     } else if (config.tokensPath) {
-      tokenScale = loadTokenScale(config.tokensPath, configLabel);
+      try {
+        tokenScale = loadTokenScale(config.tokensPath, configLabel);
+      } catch (err: unknown) {
+        const isMissingTokens =
+          err instanceof Error && err.message.startsWith('ERR_TOKENS_MISSING');
+        if (
+          isMissingTokens &&
+          options.target &&
+          options.only &&
+          softTokenEngines.has(options.only)
+        ) {
+          console.error(
+            `[tokens:warn] Missing tokensPath (${config.tokensPath}); continuing '${options.only}' audit without token suggestions.`
+          );
+          tokenScale = null;
+        } else {
+          throw err;
+        }
+      }
     } else {
       logTelemetry(
         'tokens:skip',
         'No tokensPath configured; skipping design token scale audit.'
       );
     }
+
 
     const resolvedTargets = new Array<{ displayUrl: string; liveUrl: string; isLocal: boolean }>();
     for (const rawTarget of config.targetUrls) {

@@ -695,4 +695,142 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     }
   });
 
+  /**
+   * GIVEN a uirig.config.json whose tokensPath does not exist on disk
+   * WHEN executeCheckCommand runs with only: 'dom' (or 'stress' / 'cls')
+   * THEN it skips loading tokensPath completely and succeeds without throwing ERR_TOKENS_MISSING
+   */
+  it('skips loading tokensPath when only is stress, cls, or dom', async () => {
+    const htmlPath = join(tempDir, 'page.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html><html><body><h1>Clean DOM</h1></body></html>`,
+      'utf8'
+    );
+
+    const configFile = join(tempDir, 'uirig.config.json');
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: ['./page.html'],
+        tokensPath: './missing-tokens.json',
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+
+    const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+    for (const engine of ['stress', 'cls', 'dom'] as const) {
+      const report = await executeCheckCommand({
+        cwd: tempDir,
+        only: engine,
+        headless: true,
+        reportOutputPath: reportOutput,
+      });
+      expect(report.exitCode).toBe(0);
+    }
+  });
+
+  /**
+   * GIVEN a uirig.config.json whose tokensPath does not exist on disk
+   * WHEN executeCheckCommand runs with only: 'contrast' (or 'dark-mode') and an explicit target
+   * THEN it logs a warning to stderr and gracefully degrades with tokenScale = null
+   */
+  it('warns to stderr and falls back to null when tokensPath is missing for contrast or dark-mode with explicit target', async () => {
+    const htmlPath = join(tempDir, 'card.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background: #0f172a; color: #f8fafc; font-family: sans-serif; }
+          </style>
+        </head>
+        <body><h1>Accessible Dark Card</h1></body>
+      </html>`,
+      'utf8'
+    );
+
+    const configFile = join(tempDir, 'uirig.config.json');
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: ['http://localhost:3000'],
+        tokensPath: './missing-tokens.json',
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+
+    const stderrSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+
+    try {
+      for (const engine of ['contrast', 'dark-mode'] as const) {
+        stderrSpy.mockClear();
+        const report = await executeCheckCommand({
+          cwd: tempDir,
+          target: './card.html',
+          only: engine,
+          headless: true,
+          reportOutputPath: reportOutput,
+        });
+        expect(report.exitCode).toBe(0);
+        expect(stderrSpy).toHaveBeenCalled();
+        expect(stderrSpy.mock.calls.flat().join(' ')).toMatch(/ERR_TOKENS_MISSING|tokensPath/i);
+      }
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
+
+  /**
+   * GIVEN a uirig.config.json whose tokensPath does not exist on disk
+   * WHEN executeCheckCommand runs with tokens-dependent or un-targeted workspace modes
+   * THEN it still rejects with ERR_TOKENS_MISSING
+   */
+  it.each([
+    { label: 'only is tokens with explicit target', options: { only: 'tokens' as const, target: 'http://localhost:3000' } },
+    { label: 'full check (only is undefined)', options: { only: undefined, target: 'http://localhost:3000' } },
+    { label: 'only is contrast without explicit target', options: { only: 'contrast' as const, target: undefined } },
+    { label: 'only is dark-mode without explicit target', options: { only: 'dark-mode' as const, target: undefined } },
+  ])('rejects with ERR_TOKENS_MISSING when tokensPath is missing and $label', async ({ options }) => {
+    const configFile = join(tempDir, 'uirig.config.json');
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: ['http://localhost:3000'],
+        tokensPath: './missing-tokens.json',
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+
+    await expect(
+      executeCheckCommand({
+        cwd: tempDir,
+        headless: true,
+        reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+        ...options,
+      })
+    ).rejects.toThrow(/ERR_TOKENS_MISSING/);
+  });
+
+
 });
