@@ -58,4 +58,26 @@ describe('::: PHASE 2 TASK 2.5: CRAWLER SUBSET VALIDATION GATES :::', () => {
       rmSync(tempWorkspace, { recursive: true, force: true });
     }
   });
+
+  it('==> Should explicitly exclude runtime .uirig/ directories from repository crawls', () => {
+    const tempWorkspace = mkdtempSync(join(tmpdir(), 'uirig-crawler-dotuirig-'));
+
+    try {
+      mkdirSync(join(tempWorkspace, 'src'));
+      writeFileSync(join(tempWorkspace, 'src', 'index.ts'), 'export {};\n', 'utf8');
+      mkdirSync(join(tempWorkspace, '.uirig'));
+      writeFileSync(join(tempWorkspace, '.uirig', 'session.test.json'), '{}\n', 'utf8');
+
+      expect(BLOCKLIST_DIRECTORIES.has('.uirig')).toBe(true);
+
+      const scannedTree = generateDirectoryTree(tempWorkspace);
+      const scannedNames = scannedTree.children?.map((child) => child.name) ?? [];
+
+      expect(scannedNames).toContain('src');
+      expect(scannedNames).not.toContain('.uirig');
+    } finally {
+      rmSync(tempWorkspace, { recursive: true, force: true });
+    }
+  });
+
 });

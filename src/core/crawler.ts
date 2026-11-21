@@ -22,10 +22,13 @@ export interface IFSNode {
  *   to prevent traversal bottlenecks and noise.
  * - `'playground'` is blocklisted so our isolated Vite + Lit spot-checking sandbox
  *   never leaks into production repository manifests or source audits.
+ * - `'.uirig'` is blocklisted so runtime audit ledgers, session files, and PR reports
+ *   never pollute repository source scans or cause transient file races.
  */
 export const BLOCKLIST_DIRECTORIES = new Set([
   'node_modules',
   '.git',
+  '.uirig',
   'dist',
   'build',
   'docs_old',
