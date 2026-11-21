@@ -795,18 +795,42 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     }
   });
 
+  /**
+   * GIVEN a uirig.config.json whose tokensPath does not exist on disk
+   * WHEN executeCheckCommand runs with tokens-dependent or un-targeted workspace modes
+   * THEN it still rejects with ERR_TOKENS_MISSING
+   */
   it.each([
     { label: 'only is tokens with explicit target', options: { only: 'tokens' as const, target: 'http://localhost:3000' } },
     { label: 'full check (only is undefined)', options: { only: undefined, target: 'http://localhost:3000' } },
     { label: 'only is contrast without explicit target', options: { only: 'contrast' as const, target: undefined } },
     { label: 'only is dark-mode without explicit target', options: { only: 'dark-mode' as const, target: undefined } },
   ])('rejects with ERR_TOKENS_MISSING when tokensPath is missing and $label', async ({ options }) => {
+    const configFile = join(tempDir, 'uirig.config.json');
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: ['http://localhost:3000'],
+        tokensPath: './missing-tokens.json',
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+
     await expect(
       executeCheckCommand({
+        cwd: tempDir,
+        headless: true,
+        reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
         ...options,
-        // Keep your existing missing-tokensPath config setup here
-      }),
+      })
     ).rejects.toThrow(/ERR_TOKENS_MISSING/);
   });
+
 
 });
