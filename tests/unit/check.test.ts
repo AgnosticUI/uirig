@@ -18,6 +18,7 @@ import {
   executeCheckCommand,
   type IViewportAuditReport,
 } from '../../src/commands/check.js';
+import { WarmBrowserPool } from '../../src/core/browser-pool.js';
 
 function createCleanViewportReport(): IViewportAuditReport {
   return {
@@ -635,4 +636,63 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       })
     ).rejects.toThrow(/ERR_INVALID_SELECTOR/);
   });
+
+  it('reuses an injected WarmBrowserPool across runs without closing the shared browser and honors silentStdout', async () => {
+    const htmlPath = join(tempDir, 'warm-check.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root { --bg: #ffffff; --fg: #111827; }
+            :root[data-theme="dark"] { --bg: #0f172a; --fg: #f8fafc; }
+            body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); }
+          </style>
+        </head>
+        <body><h1>Warm MCP Pool Reuse</h1></body>
+      </html>`,
+      'utf8'
+    );
+
+    const pool = new WarmBrowserPool({ headless: true, idleTimeoutMs: 60_000 });
+    const acquireSpy = vi.spyOn(pool, 'acquire');
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    try {
+      const reportOutput = join(tempDir, '.uirig', 'github_pr_comment.md');
+
+      const first = await executeCheckCommand({
+        target: './warm-check.html',
+        cwd: tempDir,
+        only: 'contrast',
+        browserPool: pool,
+        silentStdout: true,
+        reportOutputPath: reportOutput,
+      });
+
+      expect(first.exitCode).toBe(0);
+      expect(acquireSpy).toHaveBeenCalledTimes(1);
+      expect(pool.isHealthy()).toBe(true);
+      expect(stdoutSpy).not.toHaveBeenCalled();
+
+      const second = await executeCheckCommand({
+        target: './warm-check.html',
+        cwd: tempDir,
+        only: 'dom',
+        browserPool: pool,
+        silentStdout: true,
+        reportOutputPath: reportOutput,
+      });
+
+      expect(second.exitCode).toBe(0);
+      expect(acquireSpy).toHaveBeenCalledTimes(2);
+      expect(pool.isHealthy()).toBe(true);
+      expect(stdoutSpy).not.toHaveBeenCalled();
+    } finally {
+      stdoutSpy.mockRestore();
+      await pool.dispose();
+    }
+  });
+
 });
