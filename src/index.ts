@@ -7,6 +7,7 @@
  * - `uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
  * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
  * - `uirig manifest`
+ * - `uirig mcp [--transport=<mode>] [--port=<n>] [--idle-timeout=<ms>]`
  * - `uirig --help` / `uirig <command> --help` / `uirig --version`
  */
 
@@ -98,8 +99,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       'npx @rlevin/uirig check --only=dark-mode --json',
     ],
   },
-
-    tokens: {
+  tokens: {
     summary: 'Audit Light DOM and open ShadowRoot computed styles against your design token scale.',
     usage: 'uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
@@ -201,8 +201,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       'npx @rlevin/uirig dom http://localhost:5173 --json',
     ],
   },
-
-    manifest: {
+  manifest: {
     summary: 'Print an ASCII repository directory tree blueprint while excluding blocklisted build/vendor directories.',
     usage: 'uirig manifest [--help]',
     mechanics: [
@@ -211,6 +210,30 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     options: ['-h, --help          Show help for the manifest subcommand'],
     exitCodes: ['0                   Repository tree printed successfully'],
     examples: ['npx @rlevin/uirig manifest'],
+  },
+  mcp: {
+    summary: 'Start a persistent Model Context Protocol (MCP) server with a warm headless Chromium instance.',
+    usage: 'uirig mcp [--transport=<mode>] [--port=<n>] [--idle-timeout=<ms>] [--help]',
+    mechanics: [
+      'Exposes uirig_check and all 6 individual verification engines as typed MCP tools.',
+      'Reuses a single warm Chromium browser across tool calls while isolating each run in fresh BrowserContexts.',
+      'Routes all telemetry to stderr so stdout stays 100% pure for stdio JSON-RPC frames.',
+    ],
+    options: [
+      '--transport=<mode>     Transport protocol: stdio (default) | sse',
+      '--port=<n>             HTTP port when --transport=sse is active (default: 3333)',
+      '--idle-timeout=<ms>    Close warm Chromium after N ms of inactivity (default: 300000)',
+      '-h, --help             Show help for the mcp subcommand',
+    ],
+    exitCodes: [
+      '0                   MCP server exited cleanly',
+      '1                   Invalid CLI flags or fatal server startup error',
+    ],
+    examples: [
+      'npx @rlevin/uirig mcp',
+      'npx @rlevin/uirig mcp --transport=sse --port=3333',
+      'npx @modelcontextprotocol/inspector node dist/index.js mcp',
+    ],
   },
 };
 
@@ -231,6 +254,7 @@ ${paint('COMMANDS:', 'bold')}
   cls [<url-or-file>]             Run only the W3C session-window Cumulative Layout Shift monitor
   dom [<url-or-file>]             Run only the structural DOM, ARIA, media & prompt-injection gate
   manifest                        Print ASCII repository tree blueprint (excluding blocklisted dirs)
+  mcp                             Start persistent MCP server with warm Chromium (stdio or SSE)
 
 ${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / cls / dom):', 'bold')}
   -s, --selectors=<csv>           Filter element checks to matching CSS selectors (repeatable)
@@ -288,11 +312,20 @@ export function renderHelpText(topic?: string): string {
   ].join('\n');
 }
 
+export type McpTransportMode = 'stdio' | 'sse';
+
+export interface IMcpCommandOptions {
+  transport: McpTransportMode;
+  port: number;
+  idleTimeoutMs: number;
+}
+
 export type ParsedCliCommand =
   | { command: 'help'; topic?: string }
   | { command: 'version' }
   | { command: 'init' }
   | { command: 'manifest' }
+  | ({ command: 'mcp' } & IMcpCommandOptions)
   | {
       command: 'check';
       target?: string;
@@ -324,7 +357,7 @@ export function isDirectTargetArg(arg: string): boolean {
 }
 
 /**
- * Parses a positive whole number (>= 1) for `--top` and `--max-tokens`.
+ * Parses a positive whole number (>= 1) for `--top`, `--max-tokens`, `--port`, and `--idle-timeout`.
  * Returns `null` if the input is missing, non-numeric, decimal, zero, or negative.
  */
 function parsePositiveIntegerFlag(rawValue: string): number | null {
@@ -334,6 +367,98 @@ function parsePositiveIntegerFlag(rawValue: string): number | null {
   }
   const parsed = Number(trimmed);
   return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : null;
+}
+
+function parseMcpCommandArgs(restArgs: Array<string>): ParsedCliCommand {
+  let transport: McpTransportMode = 'stdio';
+  let port = 3333;
+  let idleTimeoutMs = 300_000;
+
+  for (let i = 0; i < restArgs.length; i++) {
+    const token = restArgs.at(i) ?? '';
+
+    if (token === '-h' || token === '--help') {
+      return { command: 'help', topic: 'mcp' };
+    } else if (token.startsWith('--transport=')) {
+      const mode = token.slice('--transport='.length).trim();
+      if (mode !== 'stdio' && mode !== 'sse') {
+        return {
+          command: 'unknown',
+          rawCommand: 'mcp',
+          reason: `Invalid --transport value '${mode}'. Expected 'stdio' or 'sse'.`,
+        };
+      }
+      transport = mode;
+    } else if (token === '--transport') {
+      const nextToken = restArgs.at(i + 1);
+      if (nextToken !== 'stdio' && nextToken !== 'sse') {
+        return {
+          command: 'unknown',
+          rawCommand: 'mcp',
+          reason: `Invalid --transport value '${nextToken ?? ''}'. Expected 'stdio' or 'sse'.`,
+        };
+      }
+      transport = nextToken;
+      i++;
+    } else if (token.startsWith('--port=')) {
+      const parsedPort = parsePositiveIntegerFlag(token.slice('--port='.length));
+      if (parsedPort === null || parsedPort > 65535) {
+        return {
+          command: 'unknown',
+          rawCommand: 'mcp',
+          reason: `Invalid --port value '${token.slice('--port='.length)}'. Expected an integer between 1 and 65535.`,
+        };
+      }
+      port = parsedPort;
+    } else if (token === '--port') {
+      const nextToken = restArgs.at(i + 1);
+      const parsedPort = nextToken ? parsePositiveIntegerFlag(nextToken) : null;
+      if (parsedPort === null || parsedPort > 65535) {
+        return {
+          command: 'unknown',
+          rawCommand: 'mcp',
+          reason: `Invalid --port value '${nextToken ?? ''}'. Expected an integer between 1 and 65535.`,
+        };
+      }
+      port = parsedPort;
+      i++;
+    } else if (token.startsWith('--idle-timeout=')) {
+      const parsedTimeout = parsePositiveIntegerFlag(token.slice('--idle-timeout='.length));
+      if (parsedTimeout === null) {
+        return {
+          command: 'unknown',
+          rawCommand: 'mcp',
+          reason: `Invalid --idle-timeout value '${token.slice('--idle-timeout='.length)}'. Expected a positive integer in ms.`,
+        };
+      }
+      idleTimeoutMs = parsedTimeout;
+    } else if (token === '--idle-timeout') {
+      const nextToken = restArgs.at(i + 1);
+      const parsedTimeout = nextToken ? parsePositiveIntegerFlag(nextToken) : null;
+      if (parsedTimeout === null) {
+        return {
+          command: 'unknown',
+          rawCommand: 'mcp',
+          reason: `Invalid --idle-timeout value '${nextToken ?? ''}'. Expected a positive integer in ms.`,
+        };
+      }
+      idleTimeoutMs = parsedTimeout;
+      i++;
+    } else {
+      return {
+        command: 'unknown',
+        rawCommand: 'mcp',
+        reason: `Unrecognized option for 'mcp': ${token}`,
+      };
+    }
+  }
+
+  return {
+    command: 'mcp',
+    transport,
+    port,
+    idleTimeoutMs,
+  };
 }
 
 function parseAuditCommandArgs(
@@ -555,6 +680,10 @@ export function parseCliArgs(argv: Array<string>): ParsedCliCommand {
     return { command: 'manifest' };
   }
 
+  if (firstArg === 'mcp') {
+    return parseMcpCommandArgs(argv.slice(1));
+  }
+
   if (firstArg === 'check') {
     return parseAuditCommandArgs('check', argv.slice(1));
   }
@@ -578,6 +707,7 @@ export interface ICliCommandHandlers {
   init?: () => Promise<void>;
   manifest?: () => Promise<void>;
   check?: typeof executeCheckCommand;
+  mcp?: (options: IMcpCommandOptions) => Promise<void>;
 }
 
 export async function runCli(
@@ -614,6 +744,19 @@ export async function runCli(
       return 0;
     }
 
+    if (parsed.command === 'mcp') {
+      process.env.UIRIG_JSON_MODE = '1';
+      if (handlers.mcp) {
+        await handlers.mcp({
+          transport: parsed.transport,
+          port: parsed.port,
+          idleTimeoutMs: parsed.idleTimeoutMs,
+        });
+        return 0;
+      }
+      throw new Error('ERR_MCP_NOT_IMPLEMENTED: MCP server handler is not wired yet.');
+    }
+
     const runCheck = handlers.check ?? executeCheckCommand;
     const report = await runCheck({
       target: parsed.target,
@@ -640,8 +783,12 @@ const currentScriptPath = fileURLToPath(import.meta.url);
 const invokedScriptPath = process.argv.at(1) ? resolve(process.argv.at(1) as string) : '';
 
 if (currentScriptPath === invokedScriptPath) {
+  const rawArgs = process.argv.slice(2);
+  if (rawArgs.at(0) === 'mcp' || rawArgs.includes('--json')) {
+    process.env.UIRIG_JSON_MODE = '1';
+  }
   logTelemetry('cli:boot', `Starting uirig v${UIRIG_VERSION}...`);
-  runCli(process.argv.slice(2)).then((exitCode) => {
+  runCli(rawArgs).then((exitCode) => {
     process.exit(exitCode);
   });
 }
