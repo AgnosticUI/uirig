@@ -795,4 +795,18 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     }
   });
 
+  it.each([
+    { label: 'only is tokens with explicit target', options: { only: 'tokens' as const, target: 'http://localhost:3000' } },
+    { label: 'full check (only is undefined)', options: { only: undefined, target: 'http://localhost:3000' } },
+    { label: 'only is contrast without explicit target', options: { only: 'contrast' as const, target: undefined } },
+    { label: 'only is dark-mode without explicit target', options: { only: 'dark-mode' as const, target: undefined } },
+  ])('rejects with ERR_TOKENS_MISSING when tokensPath is missing and $label', async ({ options }) => {
+    await expect(
+      executeCheckCommand({
+        ...options,
+        // Keep your existing missing-tokensPath config setup here
+      }),
+    ).rejects.toThrow(/ERR_TOKENS_MISSING/);
+  });
+
 });
