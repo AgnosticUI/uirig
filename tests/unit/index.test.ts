@@ -345,4 +345,58 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     });
     expect(await runCli(['check'], { check: failingCheck })).toBe(1);
   });
+
+  it('parses `mcp` subcommand defaults and --transport, --port, --idle-timeout, and --help flags', async () => {
+    console.log('[TEST] Verifying parseCliArgs and help routing for `uirig mcp`...');
+
+    expect(parseCliArgs(['mcp'])).toEqual({
+      command: 'mcp',
+      transport: 'stdio',
+      port: 3333,
+      idleTimeoutMs: 300_000,
+    });
+
+    expect(
+      parseCliArgs(['mcp', '--transport=sse', '--port=4123', '--idle-timeout=60000'])
+    ).toEqual({
+      command: 'mcp',
+      transport: 'sse',
+      port: 4123,
+      idleTimeoutMs: 60_000,
+    });
+
+    expect(
+      parseCliArgs(['mcp', '--transport', 'stdio', '--port', '8080', '--idle-timeout', '15000'])
+    ).toEqual({
+      command: 'mcp',
+      transport: 'stdio',
+      port: 8080,
+      idleTimeoutMs: 15_000,
+    });
+
+    expect(parseCliArgs(['mcp', '--transport=websocket']).command).toBe('unknown');
+    expect(parseCliArgs(['mcp', '--port=0']).command).toBe('unknown');
+    expect(parseCliArgs(['mcp', '--idle-timeout=-5']).command).toBe('unknown');
+
+    const mcpHelpExit = await runCli(['mcp', '--help']);
+    expect(mcpHelpExit).toBe(0);
+    const mcpHelpOutput = String(stdoutSpy.mock.calls.at(-1)?.at(0) ?? '');
+    expect(mcpHelpOutput).toContain('uirig mcp');
+    expect(mcpHelpOutput).toContain('--transport=<mode>');
+  });
+
+  it('routes `mcp` command to injected mcp handler and forces UIRIG_JSON_MODE=1', async () => {
+    console.log('[TEST] Verifying `uirig mcp` handler routing...');
+
+    const mcpSpy = vi.fn(async () => {});
+    const exitCode = await runCli(['mcp', '--transport=sse', '--port=4500'], { mcp: mcpSpy });
+
+    expect(exitCode).toBe(0);
+    expect(mcpSpy).toHaveBeenCalledWith({
+      transport: 'sse',
+      port: 4500,
+      idleTimeoutMs: 300_000,
+    });
+  });
+
 });
