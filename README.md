@@ -197,8 +197,13 @@ On every `uirig check` run, `.uirig/github_pr_comment.md` is generated and ready
 
 ### 4. Local Development & Playground
 
-    # Typecheck and run the unit test suite
+    # Build, typecheck, and run the full unit & MCP integration test suite
     npm run typecheck:all && npm test
+
+    # Build and launch the interactive MCP Inspector UI against local dist/index.js
+    npm run build && npx @modelcontextprotocol/inspector node dist/index.js mcp
+    # Tip: When auditing external URLs in MCP Inspector from the uirig repo root, pass
+    # `"cwd": "/tmp"` in tool arguments to bypass the repo's local uirig.config.json.
 
     # Start the interactive Vite + Lit playground
     npm run playground:dev
