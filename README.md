@@ -166,6 +166,20 @@ Run any individual verification engine in isolation for rapid inner-loop debuggi
 
 Each entry in `violations` includes `engine`, `hostComponent`, `selector`, `childCount` / `sampleChildren` (when grouped), `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
 
+### 1b. Native MCP Server Mode (`uirig mcp`)
+Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Cursor, Windsurf, Codex) by registering `uirig mcp`, which keeps a warm headless Chromium pool alive across edits and exposes `uirig_check`, `uirig_tokens`, `uirig_contrast`, `uirig_dark_mode`, `uirig_stress`, `uirig_cls`, and `uirig_dom` as native MCP tools:
+
+    {
+      "mcpServers": {
+        "uirig": {
+          "command": "npx",
+          "args": ["-y", "@rlevin/uirig", "mcp"]
+        }
+      }
+    }
+
+*(You can also inspect or debug tools interactively via `npx @modelcontextprotocol/inspector npx @rlevin/uirig mcp`, or run over HTTP/SSE with `npx @rlevin/uirig mcp --transport=sse --port=3333`.)*
+
 ### 2. GitHub Actions CI/CD Gate
 
     - name: Run uirig UI verification gate
@@ -183,8 +197,13 @@ On every `uirig check` run, `.uirig/github_pr_comment.md` is generated and ready
 
 ### 4. Local Development & Playground
 
-    # Typecheck and run the unit test suite
+    # Build, typecheck, and run the full unit & MCP integration test suite
     npm run typecheck:all && npm test
+
+    # Build and launch the interactive MCP Inspector UI against local dist/index.js
+    npm run build && npx @modelcontextprotocol/inspector node dist/index.js mcp
+    # Tip: When auditing external URLs in MCP Inspector from the uirig repo root, pass
+    # `"cwd": "/tmp"` in tool arguments to bypass the repo's local uirig.config.json.
 
     # Start the interactive Vite + Lit playground
     npm run playground:dev

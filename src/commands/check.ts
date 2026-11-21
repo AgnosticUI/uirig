@@ -1,17 +1,11 @@
 /**
  * src/commands/check.ts
  * Isolated Parallel Context Dispatcher (uirig check).
- * Launches a single Playwright Chromium instance and orchestrates isolated
- * BrowserContext sessions concurrently (`Promise.all`) per target URL/viewport
- * so read-only audits (`tokens`, `contrast`, `dom`), dark-mode parity (`dark-mode`),
+ * Launches a single Playwright Chromium instance (or reuses an injected WarmBrowserPool)
+ * and orchestrates isolated BrowserContext sessions concurrently (`Promise.all`) per target
+ * URL/viewport so read-only audits (`tokens`, `contrast`, `dom`), dark-mode parity (`dark-mode`),
  * mutated DOM fuzzing (`stress`), and pre-navigation `PerformanceObserver` monitoring (`cls`)
  * execute without cross-tool pollution or multiple browser startup overhead.
- *
- * Also supports zero-config runs (`npx @rlevin/uirig <url-or-file>`), component-scoped
- * audits (`--selectors` / `-s`) with matched element counts, runtime ignore rules
- * (`data-uirig-ignore` + `ignore`), structured terminal violation reports (`--verbose`),
- * priority-ranked output limits (`--top` / `--max-tokens`), parent-container grouping
- * (`--group-by-root`), and ephemeral local HTTP servers for `.html` file targets.
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -21,6 +15,7 @@ import { crawlPageTokens, type ITokenScaleConfig, type ITokenViolation } from '.
 import { auditPageContrast, type IContrastViolation, MIN_WCAG_AA_CONTRAST } from '../core/matrix.js';
 import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
 import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '../core/cls.js';
+import { type WarmBrowserPool } from '../core/browser-pool.js';
 import { logTelemetry, paint } from '../utils/formatter.js';
 import { formatConsoleAuditReport } from '../utils/console-report.js';
 import { formatAgenticJsonStream } from '../utils/agent-stream.js';
@@ -95,6 +90,12 @@ export interface ICheckCommandOptions {
   only?: AuditToolName;
   /** Optional inline token scale override (useful for programmatic calls & tests). */
   tokenScaleOverride?: ITokenScaleConfig;
+  /** Optional viewport list override (e.g., single-viewport fast path for MCP tool calls). */
+  viewportsOverride?: Array<IViewportConfig>;
+  /** Optional persistent warm browser pool (used by `uirig mcp` to eliminate Chromium cold starts). */
+  browserPool?: WarmBrowserPool;
+  /** When true, suppresses writing CLI output to `process.stdout` (used by `uirig mcp` over stdio). */
+  silentStdout?: boolean;
   /** Optional custom output path for the Markdown PR comment report (defaults to `.uirig/github_pr_comment.md`). */
   reportOutputPath?: string;
   /** Optional working directory override for resolving relative paths in tests. */
@@ -118,6 +119,7 @@ export interface IViewportAuditReport {
   domViolations?: Array<IDomIntegrityViolation>;
   runtimeErrors?: Array<IRuntimeErrorViolation>;
 }
+
 export interface ICheckExecutionReport {
   timestamp: string;
   configPath: string;
@@ -505,7 +507,7 @@ export async function auditViewportInParallel(
     }
   };
 
-    const runDarkModeTrack = async (): Promise<Array<IDarkModeViolation>> => {
+  const runDarkModeTrack = async (): Promise<Array<IDarkModeViolation>> => {
     if (!runDarkMode) {
       return new Array<IDarkModeViolation>();
     }
@@ -599,11 +601,15 @@ export async function executeCheckCommand(
     process.env.UIRIG_JSON_MODE = '1';
   }
 
-  let browser: Browser | null = null;
+  let ownedBrowser: Browser | null = null;
   const ephemeralServers = new Array<IEphemeralStaticServer>();
 
   try {
     const { config, configLabel } = resolveExecutionConfig(options, cwd);
+    const activeViewports =
+      options.viewportsOverride && options.viewportsOverride.length > 0
+        ? options.viewportsOverride
+        : config.viewports;
 
     let tokenScale: ITokenScaleConfig | null = null;
     if (options.tokenScaleOverride) {
@@ -628,12 +634,19 @@ export async function executeCheckCommand(
       }
     }
 
-    const headless = options.headless ?? true;
-    logTelemetry(
-      'check:browser',
-      `Launching single Chromium instance (headless=${String(headless)})...`
-    );
-    browser = await chromium.launch({ headless });
+    let browser: Browser;
+    if (options.browserPool) {
+      logTelemetry('check:browser', 'Acquiring warm Chromium instance from pool...');
+      browser = await options.browserPool.acquire();
+    } else {
+      const headless = options.headless ?? true;
+      logTelemetry(
+        'check:browser',
+        `Launching single Chromium instance (headless=${String(headless)})...`
+      );
+      ownedBrowser = await chromium.launch({ headless });
+      browser = ownedBrowser;
+    }
 
     if (options.selectors && options.selectors.length > 0) {
       const validationContext = await browser.newContext();
@@ -648,7 +661,7 @@ export async function executeCheckCommand(
     const results = new Array<IViewportAuditReport>();
 
     for (const targetEntry of resolvedTargets) {
-      for (const viewport of config.viewports) {
+      for (const viewport of activeViewports) {
         const viewportReport = await auditViewportInParallel(
           browser,
           targetEntry.liveUrl,
@@ -698,88 +711,90 @@ export async function executeCheckCommand(
 
     writeGithubPrCommentReport(executionReport, resolvedReportPath);
 
-    if (options.json) {
-      const jsonOutput = formatAgenticJsonStream(executionReport, {
-        groupByRoot: options.groupByRoot,
-        top: options.top,
-        maxTokens: options.maxTokens,
-      });
-      process.stdout.write(`${jsonOutput}\n`);
-    } else {
-      process.stdout.write(
-        formatConsoleAuditReport(executionReport, { verbose: options.verbose })
-      );
-      if (
-        options.groupByRoot ||
-        options.top !== undefined ||
-        options.maxTokens !== undefined
-      ) {
-        const parsedSummary = JSON.parse(
-          formatAgenticJsonStream(executionReport, {
-            groupByRoot: options.groupByRoot,
-            top: options.top,
-            maxTokens: options.maxTokens,
-          })
-        ) as {
-          totalViolations?: number;
-          truncatedCount?: number;
-          violations: Array<{ childCount?: number }>;
-        };
-        if (options.groupByRoot) {
-          const groupedParents = parsedSummary.violations.filter(
-            (v) => v.childCount !== undefined && v.childCount > 1
-          );
-          if (groupedParents.length > 0) {
-            const collapsedChildren = groupedParents.reduce(
-              (sum, v) => sum + (v.childCount ?? 0),
-              0
+    if (!options.silentStdout) {
+      if (options.json) {
+        const jsonOutput = formatAgenticJsonStream(executionReport, {
+          groupByRoot: options.groupByRoot,
+          top: options.top,
+          maxTokens: options.maxTokens,
+        });
+        process.stdout.write(`${jsonOutput}\n`);
+      } else {
+        process.stdout.write(
+          formatConsoleAuditReport(executionReport, { verbose: options.verbose })
+        );
+        if (
+          options.groupByRoot ||
+          options.top !== undefined ||
+          options.maxTokens !== undefined
+        ) {
+          const parsedSummary = JSON.parse(
+            formatAgenticJsonStream(executionReport, {
+              groupByRoot: options.groupByRoot,
+              top: options.top,
+              maxTokens: options.maxTokens,
+            })
+          ) as {
+            totalViolations?: number;
+            truncatedCount?: number;
+            violations: Array<{ childCount?: number }>;
+          };
+          if (options.groupByRoot) {
+            const groupedParents = parsedSummary.violations.filter(
+              (v) => v.childCount !== undefined && v.childCount > 1
             );
+            if (groupedParents.length > 0) {
+              const collapsedChildren = groupedParents.reduce(
+                (sum, v) => sum + (v.childCount ?? 0),
+                0
+              );
+              process.stdout.write(
+                `${paint(
+                  `🌳 Root-Cause Grouping: Collapsed ${collapsedChildren} child violations into ${groupedParents.length} shared parent container(s).`,
+                  'cyan'
+                )}\n`
+              );
+            }
+          }
+          if (
+            parsedSummary.truncatedCount !== undefined &&
+            parsedSummary.truncatedCount > 0 &&
+            parsedSummary.totalViolations !== undefined
+          ) {
             process.stdout.write(
               `${paint(
-                `🌳 Root-Cause Grouping: Collapsed ${collapsedChildren} child violations into ${groupedParents.length} shared parent container(s).`,
-                'cyan'
+                `🎯 Output Limit: Showing top ${parsedSummary.violations.length} of ${parsedSummary.totalViolations} violations (${parsedSummary.truncatedCount} omitted; re-run without --top/--max-tokens to inspect all).`,
+                'yellow'
               )}\n`
             );
           }
         }
-        if (
-          parsedSummary.truncatedCount !== undefined &&
-          parsedSummary.truncatedCount > 0 &&
-          parsedSummary.totalViolations !== undefined
-        ) {
-          process.stdout.write(
-            `${paint(
-              `🎯 Output Limit: Showing top ${parsedSummary.violations.length} of ${parsedSummary.totalViolations} violations (${parsedSummary.truncatedCount} omitted; re-run without --top/--max-tokens to inspect all).`,
-              'yellow'
-            )}\n`
-          );
-        }
-      }
-      if (options.spatialBrief) {
-        for (const vpReport of executionReport.results) {
-          if (vpReport.spatialBrief !== undefined) {
-            const vpTag = paint(
-              `${vpReport.viewport.name} (${vpReport.viewport.width}x${vpReport.viewport.height})`,
-              'bold',
-              'cyan'
-            );
-            process.stdout.write(
-              `📐 Spatial Brief [${vpTag}]: ${vpReport.spatialBrief || '(no visible landmarks)'}\n`
-            );
+        if (options.spatialBrief) {
+          for (const vpReport of executionReport.results) {
+            if (vpReport.spatialBrief !== undefined) {
+              const vpTag = paint(
+                `${vpReport.viewport.name} (${vpReport.viewport.width}x${vpReport.viewport.height})`,
+                'bold',
+                'cyan'
+              );
+              process.stdout.write(
+                `📐 Spatial Brief [${vpTag}]: ${vpReport.spatialBrief || '(no visible landmarks)'}\n`
+              );
+            }
           }
         }
+        const exitBadge =
+          exitCode === 0
+            ? paint('0 (PASS)', 'bold', 'green')
+            : paint(`${exitCode} (FAIL)`, 'bold', 'red');
+        logTelemetry('check:complete', `Audit finished. POSIX Exit Code: ${exitBadge}`);
       }
-      const exitBadge =
-        exitCode === 0
-          ? paint('0 (PASS)', 'bold', 'green')
-          : paint(`${exitCode} (FAIL)`, 'bold', 'red');
-      logTelemetry('check:complete', `Audit finished. POSIX Exit Code: ${exitBadge}`);
     }
 
     return executionReport;
   } finally {
-    if (browser) {
-      await browser.close();
+    if (ownedBrowser) {
+      await ownedBrowser.close();
     }
     for (const server of ephemeralServers) {
       await server.close();
