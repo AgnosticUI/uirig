@@ -832,5 +832,197 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     ).rejects.toThrow(/ERR_TOKENS_MISSING/);
   });
 
+  it('populates suggestedToken from live :root CSS variables when autoTokens is enabled with zero config files', async () => {
+    const htmlPath = join(tempDir, 'auto-tokens-hero.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root {
+              --color-surface: #ffffff;
+              --color-ink-strong: #0f172a;
+              --color-muted: #9ca3af;
+            }
+            body { margin: 0; padding: 16px; background: var(--color-surface); color: var(--color-ink-strong); }
+            p.low-contrast { margin: 0; font-size: 16px; color: var(--color-muted); }
+          </style>
+        </head>
+        <body>
+          <p class="low-contrast">Low contrast text with auto-discovered tokens</p>
+        </body>
+      </html>`,
+      'utf8'
+    );
+
+    const report = await executeCheckCommand({
+      target: './auto-tokens-hero.html',
+      cwd: tempDir,
+      only: 'contrast',
+      autoTokens: true,
+      headless: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    expect(report.exitCode).toBe(1);
+    const violation = report.results.at(0)?.contrastViolations.at(0);
+    expect(violation).toBeDefined();
+    expect(violation?.suggestedToken).toBe('rgb(15, 23, 42)');
+  });
+
+  it('gives explicit tokensPath precedence over autoTokens when both are configured', async () => {
+    const htmlPath = join(tempDir, 'precedence.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root { --color-auto-only: #2563eb; }
+            body { margin: 0; padding: 16px; background: #ffffff; color: #2563eb; font-size: 16px; }
+          </style>
+        </head>
+        <body><p>Styled with auto-only token</p></body>
+      </html>`,
+      'utf8'
+    );
+
+    const explicitTokensFile = join(tempDir, 'explicit-tokens.json');
+    writeFileSync(
+      explicitTokensFile,
+      JSON.stringify({
+        colors: ['rgb(255, 255, 255)', 'rgb(0, 0, 0)'],
+        spacing: ['0px', '16px'],
+        fontSizes: ['16px'],
+        radii: ['0px'],
+      }),
+      'utf8'
+    );
+
+    const configFile = join(tempDir, 'uirig.config.json');
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: ['./precedence.html'],
+        tokensPath: './explicit-tokens.json',
+        autoTokens: true,
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1024, height: 768 }],
+      }),
+      'utf8'
+    );
+
+    const report = await executeCheckCommand({
+      cwd: tempDir,
+      only: 'tokens',
+      autoTokens: true,
+      headless: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    // Explicit tokensPath does NOT include rgb(37, 99, 235), so tokens engine flags drift
+    expect(report.exitCode).toBe(1);
+    expect(report.summary.totalTokenViolations).toBeGreaterThan(0);
+  });
+  it('auto-discovers :root CSS variables when autoTokens is true and populates suggestedToken with zero config', async () => {
+    const htmlPath = join(tempDir, 'auto-tokens-hero.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root {
+              --color-ink-strong: #0f172a;
+              --color-surface: #ffffff;
+              --space-md: 16px;
+              --text-base: 16px;
+            }
+            body { margin: 0; padding: 16px; background: #ffffff; color: #0f172a; font-size: 16px; }
+            p.muted { margin: 0; font-size: 16px; color: rgb(156, 163, 175); }
+          </style>
+        </head>
+        <body>
+          <p class="muted">Low contrast subtitle</p>
+        </body>
+      </html>`,
+      'utf8'
+    );
+
+    const report = await executeCheckCommand({
+      target: './auto-tokens-hero.html',
+      cwd: tempDir,
+      only: 'contrast',
+      autoTokens: true,
+      headless: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    expect(report.exitCode).toBe(1);
+    const violation = report.results.at(0)?.contrastViolations.at(0);
+    expect(violation).toBeDefined();
+    expect(violation?.suggestedToken).toBe('rgb(15, 23, 42)');
+  });
+
+  it('gives explicit tokensPath precedence over autoTokens when both are configured', async () => {
+    const htmlPath = join(tempDir, 'precedence.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root { --color-auto: #16a34a; }
+            body { margin: 0; padding: 16px; background: #ffffff; color: #000000; font-size: 16px; }
+          </style>
+        </head>
+        <body><p>Explicit tokensPath wins</p></body>
+      </html>`,
+      'utf8'
+    );
+
+    writeFileSync(
+      join(tempDir, 'explicit-tokens.json'),
+      JSON.stringify({
+        colors: ['rgb(255, 255, 255)', 'rgb(0, 0, 0)'],
+        spacing: ['0px', '16px'],
+        fontSizes: ['16px'],
+        radii: ['0px'],
+      }),
+      'utf8'
+    );
+
+    writeFileSync(
+      join(tempDir, 'uirig.config.json'),
+      JSON.stringify({
+        targetUrls: ['./precedence.html'],
+        tokensPath: './explicit-tokens.json',
+        autoTokens: true,
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+
+    const report = await executeCheckCommand({
+      cwd: tempDir,
+      autoTokens: true,
+      only: 'tokens',
+      headless: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    expect(report.exitCode).toBe(0);
+    expect(report.summary.totalTokenViolations).toBe(0);
+  });
 
 });

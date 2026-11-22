@@ -29,6 +29,10 @@ export interface IMcpServerOptions {
 }
 
 const AUDIT_INPUT_SHAPE = {
+  autoTokens: z
+    .boolean()
+    .optional()
+    .describe('Auto-discover design tokens from workspace files and live :root CSS custom properties when tokensPath is not configured.'),
   target: z
     .string()
     .optional()
@@ -158,6 +162,7 @@ export function createUirigMcpServer(
             target: rawArgs.target,
             selectors: rawArgs.selectors,
             configPath: rawArgs.configPath,
+            autoTokens: rawArgs.autoTokens,
             groupByRoot: rawArgs.groupByRoot,
             top: rawArgs.top,
             maxTokens: rawArgs.maxTokens,
