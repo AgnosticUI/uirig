@@ -18,6 +18,17 @@
 * **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, pass `--auto-tokens` to auto-discover `:root` CSS variables, Tailwind v4 `@theme`, and W3C `.tokens.json` scales, evaluate multiple theme skins with `--themes`, or scope audits to specific components with `--selectors`.
 * **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout` while keeping colored telemetry on `stderr`.
 
+### Works Alongside Google Modern Web Guidance
+
+`uirig` and **Google's Modern Web Guidance** solve complementary halves of the AI UI engineering loop without overlapping:
+
+| Layer | Tool | Role in the Agent Loop |
+| :--- | :--- | :--- |
+| **1. Static Authoring & Refactoring** | **Google Modern Web Guidance** *(Agent Skill + CLI)* | Injects Baseline web-platform patterns (native `<dialog>`, Popover API, modern CSS layout) before code is generated—and scans source files (`legacy-scan`) to modernize outdated patterns. |
+| **2. Live Runtime Verification** | **`uirig`** *(MCP Server + CLI)* | Audits the live rendered DOM and Shadow DOM in headless Chromium to catch design-system token drift, Porter-Duff contrast drops, `<slot>` mismatches, CLS, and geometric overflow that static guidance and source scanners cannot observe. |
+
+Pairing Modern Web Guidance's skill with the `uirig` MCP server gives coding agents a complete **"Author with Modern Web Guidance → Verify with `uirig`"** closed loop (documented automatically in `.uirig/SKILL.md` when you run `uirig init`).
+
 ---
 
 ## Quick Start (Zero Config)
@@ -90,7 +101,7 @@ npx @rlevin/uirig init
 
 ```json
 {
-  "\$schema": "https://json-schema.org",
+  "\$schema": "https://json-schema.org/draft/2020-12/schema",
   "targetUrls": ["http://localhost:5173"],
   "tokensPath": "./config/default_tokens.json",
   "autoTokens": false,

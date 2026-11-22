@@ -151,7 +151,7 @@ Optional when passing a direct target (`npx uirig <url-or-file>`), and used in C
 
 ```json
 {
-  "$schema": "https://json-schema.org",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "uirigConfigurationProfile",
   "type": "object",
   "properties": {

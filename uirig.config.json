@@ -1,8 +1,6 @@
 {
-  "$schema": "https://json-schema.org",
-  "targetUrls": [
-    "http://localhost:3000"
-  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "targetUrls": ["http://localhost:3000"],
   "tokensPath": "./config/default_tokens.json",
   "thresholdBudgets": {
     "clsMaxLimit": 0.1,
