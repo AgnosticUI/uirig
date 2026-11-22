@@ -10,7 +10,7 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, A2UI sur
    - If `uirig.config.json` is configured and your dev server is running:
 
 ```bash
-npx @rlevin/uirig check --json
+npx @rlevin/uirig check --changed --base=main --json
 ```
 
    - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly (add `--auto-tokens` when no `tokensPath` is configured, `--themes="light, dark"` or `--themes="enterprise-light, enterprise-dark"` for multi-theme matrix evaluation, `--fix` to auto-apply safe 1-to-1 patches on disk, and `--group-by-root`, `--spatial-brief`, and `--top` / `--max-tokens` for compact feedback):

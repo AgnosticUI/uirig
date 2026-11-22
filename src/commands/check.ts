@@ -47,6 +47,7 @@ import {
   countMatchedSelectorsInBrowser,
   validateSelectorsInBrowser,
 } from '../utils/scope.js';
+import { resolveChangedComponentSelectors } from '../core/git-diff.js';
 import type { IUirigIgnoreRule } from '../utils/ignore.js';
 import { resolveA2uiAttributionsForSelectors } from '../utils/a2ui-attribution.js';
 import { resolveViolationSourceLocations } from '../core/source-map.js';
@@ -104,6 +105,10 @@ export interface ICheckCommandOptions {
   maxTokens?: number;
   /** Optional CSS (Cascading Style Sheets) selectors limiting element-level audits to matching subtrees (`--selectors` / `-s`). */
   selectors?: Array<string>;
+  /** When true, inspects `git diff` to infer modified custom element selectors and exits cleanly (`0`) if no UI files changed (`--changed`). */
+  changed?: boolean;
+  /** Optional Git base ref (e.g. `main`, `origin/main`) used with `--changed` (`--base <ref>`). */
+  baseRef?: string;
   /** Optional single-engine filter. Runs all enabled engines when omitted. */
   only?: AuditToolName;
   /** When true, auto-discovers design tokens from workspace files and live `:root` CSS variables when `tokensPath` is not set. */
@@ -735,12 +740,84 @@ export async function executeCheckCommand(
   const ephemeralServers = new Array<IEphemeralStaticServer>();
 
   try {
+    let effectiveSelectors: Array<string> | undefined = options.selectors
+      ? [...options.selectors]
+      : undefined;
+
+    if (options.changed) {
+      const diffResolution = resolveChangedComponentSelectors(cwd, options.baseRef);
+      if (!diffResolution.isGitRepo) {
+        logTelemetry(
+          'check:changed',
+          'Not inside a Git work tree; running full audit without --changed scoping.'
+        );
+      } else if (diffResolution.changedUiFiles.length === 0) {
+        const refLabel = options.baseRef ? ' against ' + options.baseRef : '';
+        const noChangeMessage =
+          'No UI/component files changed' + refLabel + '; skipping browser audit (0 violations).';
+        logTelemetry('check:changed', noChangeMessage);
+
+        const emptyReport: ICheckExecutionReport = {
+          timestamp: new Date().toISOString(),
+          configPath: options.configPath ?? '(changed-diff-skip)',
+          reportPath: resolvedReportPath,
+          exitCode: 0,
+          results: new Array<IViewportAuditReport>(),
+          summary: {
+            totalViewportsAudited: 0,
+            totalTokenViolations: 0,
+            totalContrastViolations: 0,
+            totalDarkModeViolations: 0,
+            totalStressViolations: 0,
+            totalClsViolations: 0,
+            totalDomViolations: 0,
+            totalRuntimeErrors: 0,
+          },
+        };
+
+        if (!options.silentStdout) {
+          if (options.json) {
+            process.stdout.write(
+              formatAgenticJsonStream(emptyReport, {
+                groupByRoot: options.groupByRoot,
+                top: options.top,
+                maxTokens: options.maxTokens,
+                cwd,
+              }) + '\n'
+            );
+          } else {
+            process.stdout.write(paint(noChangeMessage, 'green') + '\n');
+          }
+        }
+        return emptyReport;
+      } else if (diffResolution.inferredSelectors.length > 0) {
+        const merged = new Set<string>([
+          ...(effectiveSelectors ?? new Array<string>()),
+          ...diffResolution.inferredSelectors,
+        ]);
+        effectiveSelectors = Array.from(merged);
+        logTelemetry(
+          'check:changed',
+          'Scoped audit to ' +
+            paint(String(effectiveSelectors.length), 'bold', 'cyan') +
+            ' changed component selector(s): ' +
+            paint(effectiveSelectors.join(', '), 'cyan')
+        );
+      } else {
+        logTelemetry(
+          'check:changed',
+          'UI files changed (' +
+            diffResolution.changedUiFiles.join(', ') +
+            ') without custom element tags; running full-page audit.'
+        );
+      }
+    }
+
     const { config, configLabel } = resolveExecutionConfig(options, cwd);
     const activeViewports =
       options.viewportsOverride && options.viewportsOverride.length > 0
         ? options.viewportsOverride
         : config.viewports;
-
     const autoTokensEnabled = Boolean(options.autoTokens ?? config.autoTokens);
     const tokenAgnosticEngines = new Set<AuditToolName>(['stress', 'cls', 'dom']);
     const softTokenEngines = new Set<AuditToolName>(['contrast', 'dark-mode']);
@@ -817,11 +894,11 @@ export async function executeCheckCommand(
       browser = ownedBrowser;
     }
 
-    if (options.selectors && options.selectors.length > 0) {
+    if (effectiveSelectors && effectiveSelectors.length > 0) {
       const validationContext = await browser.newContext();
       try {
         const validationPage = await validationContext.newPage();
-        await validateSelectorsInBrowser(validationPage, options.selectors);
+        await validateSelectorsInBrowser(validationPage, effectiveSelectors);
       } finally {
         await validationContext.close();
       }
@@ -846,7 +923,7 @@ export async function executeCheckCommand(
               options.only,
               config.ignore ?? new Array<IUirigIgnoreRule>(),
               targetEntry.isLocal,
-              options.selectors,
+              effectiveSelectors,
               Boolean(options.spatialBrief),
               shouldAutoDiscoverRootTokens,
               themeName,

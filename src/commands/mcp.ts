@@ -40,6 +40,14 @@ const AUDIT_INPUT_SHAPE = {
     .array(z.string())
     .optional()
     .describe('Optional list of theme skins (e.g. ["light", "dark", "enterprise-dark"]) evaluated via data-theme and color-scheme emulation.'),
+  changed: z
+    .boolean()
+    .optional()
+    .describe('When true, inspects git diff in cwd to scope checks to modified UI/component files and exits cleanly if none changed.'),
+  baseRef: z
+    .string()
+    .optional()
+    .describe('Optional Git base ref (e.g. "main", "origin/main") used when changed is true.'),
   fix: z
     .boolean()
     .optional()
@@ -87,7 +95,7 @@ const AUDIT_INPUT_SHAPE = {
   cwd: z
     .string()
     .optional()
-    .describe('Optional working directory for resolving relative target, config, source-map, and --fix paths.'),
+    .describe('Optional working directory for resolving relative target, config, git-diff, source-map, and --fix paths.'),
 };
 
 const A2UI_DELTA_INPUT_SHAPE = {
@@ -115,6 +123,7 @@ type A2uiDeltaToolArgs = z.infer<typeof A2uiDeltaInputSchema>;
 
 const DiscoverTokensInputSchema = z.object(DISCOVER_TOKENS_INPUT_SHAPE);
 type DiscoverTokensToolArgs = z.infer<typeof DiscoverTokensInputSchema>;
+
 interface IMcpToolSpec {
   name: string;
   description: string;
@@ -197,6 +206,8 @@ export function createUirigMcpServer(
             configPath: rawArgs.configPath,
             autoTokens: rawArgs.autoTokens,
             themes: rawArgs.themes,
+            changed: rawArgs.changed,
+            baseRef: rawArgs.baseRef,
             fix: rawArgs.fix,
             groupByRoot: rawArgs.groupByRoot,
             top: rawArgs.top,
