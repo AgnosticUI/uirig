@@ -6,14 +6,9 @@
 - **Active Issue:** `#9` — `Framework Source-Map & file:line Attribution` (Track B — Task 2 of Epic `#33`)
 - **Tracking Plan:** `.uirig/docs/IMPLEMENT_ISSUE_9.md`
 
-## Roadmap Progress (`epic:a2ui-eval` `#33`)
-- [x] **Track A — Task 1 (`#19`):** Computed Accessibility Tree Snapshot (`ax_empty_name`, `ax_hidden_focus`)
-- [x] **Track A — Task 4 (`#31`):** Universal `<a2ui-surface>` Component Attribution & Eval Mode
-- [x] **Track A — Task 5 (`#32`):** AgnosticUI Support Center Studio Eval Gate & Self-Healing Demo
-- [ ] **Track B — Task 2 (`#9`):** Framework Source-Map & `file:line` Attribution (In Progress — Chunk 0 Complete)
-- [ ] **Track B — Task 3 (`#13`):** Deterministic Auto-Fix Patch Generation (`--fix` / `unifiedDiff`) (`.uirig/docs/IMPLEMENT_ISSUE_13.md`)
+## Completed
+- **Chunk 0:** Branch `feat/issue-9-source-map-attribution` created and tracking docs initialized.
+- **Chunk 1:** Added `ISourceLocation` to `src/interfaces/locator.ts`, implemented Base64 VLQ Source Map v3 decoder and dev-attribute parser in `src/core/source-map.ts`, and verified with unit specs in `tests/unit/source-map.test.ts`.
 
-## Immediate Next Step (Chunk 1)
-1. Add `ISourceLocation` to `src/interfaces/locator.ts`.
-2. Create `src/core/source-map.ts` with a zero-dependency Base64 VLQ Source Map v3 decoder and dev-attribute parser.
-3. Add unit specs in `tests/unit/source-map.test.ts`, run verification, and commit Chunk 1.
+## Next Step (Chunk 2)
+Implement `resolveViolationSourceLocations(page, selectors, cwd)` in `src/core/source-map.ts` using live Chromium CDP (`CSS.styleSheetAdded` + `CSS.getMatchedStylesForNode`), wire `sourceFile`, `lineNumber`, and `columnNumber` into `src/commands/check.ts` and `src/utils/agent-stream.ts`, add live Chromium E2E tests in `tests/unit/source-map.test.ts`, verify, and commit Chunk 2.

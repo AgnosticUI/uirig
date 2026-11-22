@@ -4,7 +4,7 @@
 - **Epic:** `AgnosticUI/uirig#33` (`label:epic:a2ui-eval`)
 - **Track:** Track B (Source-Code Auto-Fix Path)
 - **Branch:** `feat/issue-9-source-map-attribution`
-- **Status:** In Progress (Chunk 0 Complete)
+- **Status:** In Progress (Chunks 0–1 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -30,12 +30,12 @@ Attach `sourceFile`, `lineNumber`, and `columnNumber` directly to violation obje
   - **Action:** Cut branch `feat/issue-9-source-map-attribution` and mark `#9` active in `.uirig/docs/NEXT_PROMPT.md`.
   - **Commit:** `docs(plan): initialize branch and tracking for issue #9 (source-map attribution)`
 
-- [ ] **Chunk 1: VLQ Source-Map Decoder & Framework Metadata Resolver (`src/core/source-map.ts`) + Unit Tests**
+- [x] **Chunk 1: VLQ Source-Map Decoder & Framework Metadata Resolver (`src/core/source-map.ts`) + Unit Tests**
   - **Files:** `src/interfaces/locator.ts`, `src/core/source-map.ts`, `tests/unit/source-map.test.ts`
   - **Action:**
     - Define `ISourceLocation` in `src/interfaces/locator.ts`.
-    - Implement a zero-dependency Base64 VLQ source-map v3 decoder (`resolveOriginalPositionFromSourceMap()`, `parseInlineOrExternalSourceMap()`) and dev-attribute parser (`parseDevSourceLocationAttribute()`) in `src/core/source-map.ts`.
-    - Add unit tests in `tests/unit/source-map.test.ts` covering inline data-URI source maps, external `.map` JSON payloads, `data-source-loc` attributes, and missing/corrupt source-map fallbacks.
+    - Implement a zero-dependency Base64 VLQ source-map v3 decoder (`resolveOriginalPositionFromSourceMap()`, `parseRawSourceMap()`) and dev-attribute parser (`parseDevSourceLocationAttribute()`) in `src/core/source-map.ts`.
+    - Add unit tests in `tests/unit/source-map.test.ts` covering inline data-URI source maps, `data-source-loc` attributes, and missing/corrupt source-map fallbacks.
   - **Commit:** `feat(dx): add VLQ source-map decoder and framework dev metadata resolver`
 
 - [ ] **Chunk 2: Live Chromium CDP `CSS.getMatchedStylesForNode` Attribution & `check.ts` Integration**

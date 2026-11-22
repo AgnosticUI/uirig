@@ -1,7 +1,8 @@
 /**
  * src/interfaces/locator.ts
  * Shared diagnostic and violation type contracts for `dark-mode`, `dom`, `runtime`,
- * and out-of-band A2UI (Agent-to-UI) `<a2ui-surface>` component attribution.
+ * out-of-band A2UI (Agent-to-UI) `<a2ui-surface>` component attribution, and
+ * framework source-map `file:line` attribution.
  */
 
 export type UirigEngineName =
@@ -12,6 +13,19 @@ export type UirigEngineName =
   | 'cls'
   | 'dom'
   | 'runtime';
+
+/**
+ * Resolved original source-code location derived from CDP (Chrome DevTools Protocol)
+ * CSS/JS source maps or framework dev-mode metadata hooks (`null` in unmapped builds).
+ */
+export interface ISourceLocation {
+  /** Workspace-relative or normalized source file path (e.g. `src/components/ag-card.css`). */
+  sourceFile: string | null;
+  /** 1-based line number in `sourceFile` (`null` when unmapped). */
+  lineNumber: number | null;
+  /** 1-based column number in `sourceFile` (`null` when unmapped). */
+  columnNumber: number | null;
+}
 
 /**
  * Out-of-band A2UI v1.0 component attribution attached to `IAgenticViolation.a2ui`
@@ -26,7 +40,7 @@ export interface IA2uiAttribution {
   a2uiComponentType: string | null;
   /** Catalog identifier from `<a2ui-surface catalog-id="...">` or `el.catalogId`. */
   catalogId: string | null;
-  /** RFC 6901 JSON Pointer into the surface's `components` array (e.g. `/components/2`). */
+  /** RFC (Request for Comments) 6901 JSON Pointer into the surface's `components` array (e.g. `/components/2`). */
   wirePath: string | null;
   /** Optional deterministic RFC 6902 patch hint scoped to `wirePath`. */
   suggestedPatch: Array<{
