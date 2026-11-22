@@ -19,9 +19,6 @@ export interface IClassifiedToken {
   normalizedValue: string;
 }
 
-/**
- * Creates an empty `ITokenScaleConfig` container.
- */
 export function createEmptyTokenScale(): ITokenScaleConfig {
   return {
     colors: [],
@@ -31,10 +28,6 @@ export function createEmptyTokenScale(): ITokenScaleConfig {
   };
 }
 
-/**
- * Formats an sRGB `colorjs.io` `Color` instance to match Chromium's `getComputedStyle()`
- * serialization (`rgb(r, g, b)` when opaque, `rgba(r, g, b, a)` when translucent).
- */
 function formatComputedRgbString(color: Color): string {
   const srgb = color.to('srgb');
   const [rawR, rawG, rawB] = srgb.coords;
@@ -50,22 +43,16 @@ function formatComputedRgbString(color: Color): string {
   return 'rgb(' + r255 + ', ' + g255 + ', ' + b255 + ')';
 }
 
-/**
- * Attempts to parse a CSS color string into a canonical `rgb(...)` or `rgba(...)` value.
- * Returns `null` for non-color tokens (lengths, numbers, font stacks, shadows, etc.).
- */
 export function normalizeCssColorToken(rawValue: string): string | null {
   const trimmed = rawValue.trim();
   if (!trimmed) {
     return null;
   }
 
-  // Reject pure numbers, percentages, or CSS lengths before invoking `colorjs.io`
   if (/^[+-]?(?:\d+\.?\d*|\.\d+)(?:%|px|rem|em|vh|vw|vmin|vmax|ch|ex|pt|pc|cm|mm|in|deg|rad|turn|s|ms)?$/i.test(trimmed)) {
     return null;
   }
 
-  // Reject CSS custom property references, W3C alias references `{...}`, or multi-value shorthands
   if (trimmed.startsWith('var(') || trimmed.startsWith('{') || trimmed.includes(';')) {
     return null;
   }
@@ -80,10 +67,6 @@ export function normalizeCssColorToken(rawValue: string): string | null {
     return null;
   }
 }
-/**
- * Normalizes a CSS length token (`0`, `16px`, `1.5rem`, `0.75em`) into pixel string (`16px`, `24px`, `12px`).
- * Returns `null` if the value is not a supported pixel or root-relative length.
- */
 export function normalizeCssLengthToPx(rawValue: string, rootFontSizePx: number = 16): string | null {
   const trimmed = rawValue.trim().toLowerCase();
   if (trimmed === '0') {
@@ -95,8 +78,8 @@ export function normalizeCssLengthToPx(rawValue: string, rootFontSizePx: number 
     return null;
   }
 
-  const numeric = Number.parseFloat(match[1] ?? '');
-  const unit = match[2];
+  const numeric = Number.parseFloat(match.at(1) ?? '');
+  const unit = match.at(2);
   if (!Number.isFinite(numeric) || numeric < 0) {
     return null;
   }
@@ -106,10 +89,6 @@ export function normalizeCssLengthToPx(rawValue: string, rootFontSizePx: number 
   return String(rounded) + 'px';
 }
 
-/**
- * Infers which dimensional scale (`radii`, `fontSizes`, or `spacing`) a length token belongs to
- * based on its CSS custom property name or token path (e.g. `--radius-md`, `--font-size-lg`, `--spacing-4`).
- */
 export function inferLengthCategoryFromName(tokenName: string): Exclude<TokenScaleCategory, 'colors'> {
   const normalizedName = tokenName.toLowerCase();
 
@@ -124,11 +103,6 @@ export function inferLengthCategoryFromName(tokenName: string): Exclude<TokenSca
   return 'spacing';
 }
 
-/**
- * Classifies and normalizes a single `(tokenName, rawValue)` pair into an `ITokenScaleConfig`
- * bucket (`colors`, `spacing`, `fontSizes`, or `radii`). Returns `null` for non-style tokens
- * (font families, z-index, durations, shadows, un-evaluated `var(...)` expressions).
- */
 export function classifyAndNormalizeTokenValue(
   tokenName: string,
   rawValue: string,
@@ -153,10 +127,6 @@ export function classifyAndNormalizeTokenValue(
   return null;
 }
 
-/**
- * Merges one or more `ITokenScaleConfig` objects into a single deduplicated scale.
- * Always ensures `'0px'` is present in `spacing` and `radii` when any spacing/radii tokens exist.
- */
 export function mergeTokenScales(...scales: Array<Partial<ITokenScaleConfig>>): ITokenScaleConfig {
   const colorSet = new Set<string>();
   const spacingSet = new Set<string>();
@@ -205,10 +175,6 @@ export function mergeTokenScales(...scales: Array<Partial<ITokenScaleConfig>>): 
   };
 }
 
-/**
- * Parses a W3C Design Tokens (`$value`) or Style Dictionary (`value`) JSON string
- * into a normalized `ITokenScaleConfig`.
- */
 export function parseW3cOrStyleDictionaryTokens(rawJson: string): ITokenScaleConfig {
   const scale = createEmptyTokenScale();
   let parsed: unknown;
@@ -251,17 +217,12 @@ export function parseW3cOrStyleDictionaryTokens(rawJson: string): ITokenScaleCon
   return mergeTokenScales(scale);
 }
 
-/**
- * Extracts CSS custom property declarations (`--name: value;`) from Tailwind v4 `@theme { ... }`
- * blocks in a CSS stylesheet and classifies them into an `ITokenScaleConfig`.
- */
 export function parseTailwindThemeCss(rawCss: string): ITokenScaleConfig {
   const scale = createEmptyTokenScale();
   if (!rawCss || !rawCss.includes('@theme')) {
     return scale;
   }
 
-  // Strip CSS block comments before scanning `@theme` blocks
   const withoutComments = rawCss.replace(/\/\*[\s\S]*?\*\//g, '');
   const themeHeaderRegex = /@theme(?:\s+[^{]+)?\{/gi;
   let match: RegExpExecArray | null;
@@ -303,13 +264,6 @@ export function parseTailwindThemeCss(rawCss: string): ITokenScaleConfig {
   return mergeTokenScales(scale);
 }
 
-
-/**
- * Scans `cwd` (up to `maxDepth` subdirectories, respecting `BLOCKLIST_DIRECTORIES`) for:
- * - W3C Design Tokens (`*.tokens.json`) and Style Dictionary token JSON (`*tokens*.json`)
- * - Tailwind v4 `@theme` CSS files (`*.css`)
- * Returns a merged `ITokenScaleConfig` containing all discovered tokens.
- */
 export function discoverWorkspaceTokens(cwd: string, maxDepth: number = 4): ITokenScaleConfig {
   const discoveredScales: ITokenScaleConfig[] = [];
 
