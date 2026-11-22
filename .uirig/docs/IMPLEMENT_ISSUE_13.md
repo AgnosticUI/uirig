@@ -5,7 +5,7 @@
 - **Track:** Track B (Source-Code Auto-Fix Path)
 - **Depends on:** `AgnosticUI/uirig#9` (`sourceFile` and `lineNumber` attribution)
 - **Branch:** `feat/issue-13-autofix-patches`
-- **Status:** In Progress (Chunks 0–1 Complete)
+- **Status:** Complete (Chunks 0–3 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -40,7 +40,7 @@ Generate deterministic unified diffs (`unifiedDiff`) in `--json` output and supp
     - Add unit tests in `tests/unit/autofix.test.ts` covering valid unified diff generation, safe disk patching, and refusal on ambiguous/structural/out-of-workspace violations.
   - **Commit:** `feat(autofix): add deterministic unifiedDiff generator for unambiguous token and DOM fixes`
 
-- [ ] **Chunk 2: `--fix` Disk Applier, Re-Verification Loop & CLI/Agent-Stream Wiring**
+- [x] **Chunk 2: `--fix` Disk Applier, Re-Verification Loop & CLI/Agent-Stream Wiring**
   - **Files:** `src/utils/agent-stream.ts`, `src/commands/check.ts`, `src/index.ts`, `tests/unit/autofix.test.ts`
   - **Action:**
     - Attach `unifiedDiff: string | null` to `IAgenticViolation` in `src/utils/agent-stream.ts` when resolvable.
@@ -48,7 +48,7 @@ Generate deterministic unified diffs (`unifiedDiff`) in `--json` output and supp
     - Add E2E tests in `tests/unit/autofix.test.ts` verifying `--json` emits `unifiedDiff` without modifying files, while `--fix` patches the file and passes re-verification.
   - **Commit:** `feat(cli): wire --fix patch application and re-verification loop into check`
 
-- [ ] **Chunk 3: Docs Sync (`README.md`, `AGENTS.md`) & Final Verification**
+- [x] **Chunk 3: Docs Sync (`README.md`, `AGENTS.md`) & Final Verification**
   - **Files:** `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_13.md`, `.uirig/docs/NEXT_PROMPT.md`
   - **Action:** Document `unifiedDiff` and `--fix` in `README.md` and `AGENTS.md`, run `npm run typecheck && npm test && npm run build`, mark all chunks `[x]` complete, and merge PR `#13`.
   - **Commit:** `docs(autofix): document unifiedDiff output and --fix CLI flag (#13)`
@@ -56,7 +56,7 @@ Generate deterministic unified diffs (`unifiedDiff`) in `--json` output and supp
 ---
 
 ## 3. Acceptance Checklist (from `AgnosticUI/uirig#13`)
-- [ ] `--json` emits a valid `unifiedDiff` for unambiguous token and DOM hygiene violations when `sourceFile` and `lineNumber` are resolved.
-- [ ] `--fix` cleanly patches target files on disk and re-verifies zero regressions.
-- [ ] Ambiguous structural/layout violations (`stress`, `cls`) and out-of-workspace files never generate or apply unsafe auto-fixes.
-- [ ] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.
+- [x] `--json` emits a valid `unifiedDiff` for unambiguous token and DOM hygiene violations when `sourceFile` and `lineNumber` are resolved.
+- [x] `--fix` cleanly patches target files on disk and re-verifies zero regressions.
+- [x] Ambiguous structural/layout violations (`stress`, `cls`) and out-of-workspace files never generate or apply unsafe auto-fixes.
+- [x] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.

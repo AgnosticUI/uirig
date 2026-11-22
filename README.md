@@ -34,6 +34,9 @@ npx @rlevin/uirig ./dist/index.html
 # Auto-discover :root CSS variables, Tailwind v4 @theme, and W3C .tokens.json with zero config
 npx @rlevin/uirig ./dist/index.html --auto-tokens --verbose
 
+# Apply deterministic 1-to-1 fixes on disk and re-verify automatically
+npx @rlevin/uirig ./dist/index.html --auto-tokens --fix
+
 # Evaluate across multiple theme skins (Light, Dark, compound brand skins) in one pass
 npx @rlevin/uirig http://localhost:5173 --themes="light, dark, enterprise-dark" --json
 
@@ -163,6 +166,7 @@ npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--co
 ### Shared Options
 * `--auto-tokens`: Auto-discover design tokens from workspace files (`*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS) and live `:root` CSS custom properties when `tokensPath` is not set.
 * `--themes=<csv>`: Evaluate the target across multiple theme skins (e.g. `--themes="light, dark, enterprise-dark"`) via `data-theme` and color-scheme emulation in a single session.
+* `--fix`: Apply deterministic, unambiguous 1-to-1 fixes on disk (when `sourceFile` and `lineNumber` are resolved inside the workspace) and automatically run a re-verification pass.
 * `-s, --selectors=<csv>`: Filter element-level checks to matching CSS selectors (comma-separated and repeatable; pierces Web Component `ShadowRoot` boundaries).
 * `--group-by-root`: Collapse cascading child failures under their shared parent container or Web Component host (`childCount` + up to 3 `sampleChildren`).
 * `--top=<n>`: Keep only the top `N` highest-priority violations (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`) and include `totalViolations` + `truncatedCount` metadata when trimmed.
@@ -171,7 +175,7 @@ npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--co
 * `--verbose`: Print every individual failing selector path, Shadow DOM host, measured delta, and suggested token beneath each engine summary.
 * `--config=<path>`: Use a custom configuration file path.
 * `--only=<tool>`: Filter `check` to a single engine (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, or `dom`).
-* `--json`: Route colored diagnostic logs to `stderr` and write a single deduplicated JSON report to `stdout`.
+* `--json`: Route colored diagnostic logs to `stderr` and write a single deduplicated JSON report (including `sourceFile`, `lineNumber`, `columnNumber`, and `unifiedDiff`) to `stdout`.
 * `--headed`: Run Chromium with a visible browser window for local inspection.
 * `<command> --help` / `help <command>`: Print detailed mechanics, flags, exit codes, and examples for any subcommand.
 
