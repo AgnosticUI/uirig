@@ -181,7 +181,7 @@ function inspectResolvedDomElementInBrowser(
   if (!(this instanceof Element)) {
     return null;
   }
-  const targetEl = this;
+  const targetEl: Element = this;
 
   const isIgnoredFn = new Function(
     'return (' + ignoreHelperSrc + ');'
@@ -245,10 +245,11 @@ function inspectResolvedDomElementInBrowser(
       hasHiddenOrInertDomAncestor = true;
       break;
     }
-    if (ancestorCursor.parentElement) {
-      ancestorCursor = ancestorCursor.parentElement;
+    const nextParent: HTMLElement | null = ancestorCursor.parentElement;
+    if (nextParent) {
+      ancestorCursor = nextParent;
     } else {
-      const r = ancestorCursor.getRootNode();
+      const r: Node = ancestorCursor.getRootNode();
       ancestorCursor = r instanceof ShadowRoot ? r.host : null;
     }
   }
@@ -256,7 +257,7 @@ function inspectResolvedDomElementInBrowser(
   const chainParts = new Array<string>();
   while (current) {
     const segment = buildLocalSegment(current);
-    const parentEl = current.parentElement;
+    const parentEl: HTMLElement | null = current.parentElement;
     if (parentEl) {
       rootSegments.unshift(segment);
       current = parentEl;
@@ -265,7 +266,7 @@ function inspectResolvedDomElementInBrowser(
       chainParts.unshift(rootSegments.join(' > '));
       rootSegments.length = 0;
 
-      const rootNode = current.getRootNode();
+      const rootNode: Node = current.getRootNode();
       if (rootNode instanceof ShadowRoot && rootNode.host) {
         inShadowDom = true;
         if (!hostComponent) {
