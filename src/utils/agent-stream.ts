@@ -17,6 +17,7 @@ import {
 } from './violation-budget.js';
 import { groupViolationsByRootCause } from './root-cause-grouper.js';
 import { enrichA2uiAttributionWithAdvice } from './a2ui-attribution.js';
+import { computeDeterministicAutoFix } from '../core/autofix.js';
 
 /**
  * Unified, flat violation contract consumed by AI coding agents (Claude Code, Cursor, Codex).
@@ -32,14 +33,16 @@ export interface IAgenticViolation {
   viewport: string;
   /** Enclosing Web Component custom element tag when inside an open ShadowRoot (e.g., 'ag-button'). */
   hostComponent: string | null;
-  /** Out-of-band A2UI v1.0 component attribution when inside `<a2ui-surface>` (`null` otherwise). */
+  /** Out-of-band A2UI (Agent-to-UI) v1.0 component attribution when inside `<a2ui-surface>` (`null` otherwise). */
   a2ui?: IA2uiAttribution | null;
-  /** Resolved original source file path from CSS/JS source maps or dev attributes (`null` when unmapped). */
+  /** Resolved original source file path from CSS (Cascading Style Sheets) / JS (JavaScript) source maps or dev attributes (`null` when unmapped). */
   sourceFile?: string | null;
   /** 1-based original line number in `sourceFile` (`null` when unmapped). */
   lineNumber?: number | null;
   /** 1-based original column number in `sourceFile` (`null` when unmapped). */
   columnNumber?: number | null;
+  /** Deterministic single-line unified diff when `sourceFile` and `lineNumber` resolve to an unambiguous 1-to-1 fix (`null` otherwise). */
+  unifiedDiff?: string | null;
   /** CSS or Shadow-DOM-piercing selector path (`host >> shadow-root >> inner`). */
   selector: string;
   /** True when the offending node lives inside an open ShadowRoot. */
@@ -564,21 +567,25 @@ export interface IAgenticJsonStreamOptions
   extends Pick<IViolationBudgetOptions, 'top' | 'maxTokens'> {
   /** When true, collapses child failures under their shared parent container or Web Component host. */
   groupByRoot?: boolean;
+  /** Workspace root directory used to compute safe `unifiedDiff` patches (`process.cwd()` by default). */
+  cwd?: string;
 }
 
-/**
- * Builds the complete machine-readable JSON string emitted to `stdout` when
- * `uirig check --json` is executed. Always ranks violations from highest priority
- * to lowest and applies `--group-by-root`, `--top`, and `--max-tokens` when provided.
- */
 export function formatAgenticJsonStream(
   report: ICheckExecutionReport,
   streamOptions: IAgenticJsonStreamOptions = {}
 ): string {
+  const cwd = streamOptions.cwd ?? process.cwd();
   const rawViolations = new Array<IAgenticViolation>();
 
   for (const viewportResult of report.results) {
-    const viewportViolations = normalizeViewportViolations(viewportResult);
+    const viewportViolations = normalizeViewportViolations(viewportResult).map((item) => {
+      const fix = computeDeterministicAutoFix(item, cwd);
+      return {
+        ...item,
+        unifiedDiff: fix ? fix.unifiedDiff : null,
+      };
+    });
     rawViolations.push(...viewportViolations);
   }
 
