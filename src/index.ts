@@ -50,8 +50,10 @@ interface ISubcommandHelpSpec {
 
 const SHARED_AUDIT_OPTIONS = [
   '--auto-tokens          Auto-discover design tokens from workspace files & live :root CSS vars',
+  '--themes=<csv>         Evaluate target across multiple theme skins (e.g. --themes="light,dark,brand")',
   '-s, --selectors=<csv>  Filter element checks to matching CSS selectors (repeatable)',
   '--config=<path>        Path to uirig.config.json (also supports: --config <path>)',
+  '--fix                  Apply deterministic 1-to-1 fixes on disk and re-verify',
   '--group-by-root        Collapse child failures under their shared parent container or host',
   '--top=<n>              Keep only the top N highest-priority violations (e.g. --top=5)',
   '--max-tokens=<budget>  Cap JSON output to approximately N LLM tokens (e.g. --max-tokens=1200)',
@@ -327,12 +329,19 @@ export type ParsedCliCommand =
   | { command: 'version' }
   | { command: 'init' }
   | { command: 'manifest' }
-  | ({ command: 'mcp' } & IMcpCommandOptions)
+  | {
+      command: 'mcp';
+      transport: McpTransportMode;
+      port: number;
+      idleTimeoutMs?: number;
+    }
   | {
       command: 'check';
       target?: string;
       only?: AuditToolName;
       autoTokens?: boolean;
+      themes?: Array<string>;
+      fix?: boolean;
       selectors?: Array<string>;
       configPath?: string;
       groupByRoot: boolean;
@@ -343,7 +352,11 @@ export type ParsedCliCommand =
       json: boolean;
       headless: boolean;
     }
-  | { command: 'unknown'; rawCommand: string; reason: string };
+  | {
+      command: 'unknown';
+      rawCommand: string;
+      reason: string;
+    };
 
 export function isDirectTargetArg(arg: string): boolean {
   const trimmed = arg.trim();
@@ -474,6 +487,8 @@ function parseAuditCommandArgs(
   let configPath: string | undefined;
   let only: AuditToolName | undefined = presetOnly;
   let autoTokens = false;
+  let fix = false;
+  const collectedThemes = new Array<string>();
   const collectedSelectors = new Array<string>();
   let groupByRoot = false;
   let top: number | undefined;
@@ -490,6 +505,37 @@ function parseAuditCommandArgs(
       json = true;
     } else if (token === '--auto-tokens') {
       autoTokens = true;
+    } else if (token === '--fix') {
+      fix = true;
+    } else if (token.startsWith('--themes=')) {
+      const parsedThemes = parseSelectorList(token.slice('--themes='.length));
+      if (parsedThemes.length === 0) {
+        return {
+          command: 'unknown',
+          rawCommand: rawSubcommand,
+          reason: 'Missing theme name after --themes=',
+        };
+      }
+      collectedThemes.push(...parsedThemes);
+    } else if (token === '--themes') {
+      const nextToken = restArgs.at(i + 1);
+      if (!nextToken || nextToken.startsWith('-')) {
+        return {
+          command: 'unknown',
+          rawCommand: rawSubcommand,
+          reason: 'Missing theme name after --themes',
+        };
+      }
+      const parsedThemes = parseSelectorList(nextToken);
+      if (parsedThemes.length === 0) {
+        return {
+          command: 'unknown',
+          rawCommand: rawSubcommand,
+          reason: 'Empty theme name after --themes',
+        };
+      }
+      collectedThemes.push(...parsedThemes);
+      i++;
     } else if (token === '--group-by-root') {
       groupByRoot = true;
     } else if (token === '--spatial-brief') {
@@ -635,12 +681,16 @@ function parseAuditCommandArgs(
 
   const uniqueSelectors =
     collectedSelectors.length > 0 ? Array.from(new Set(collectedSelectors)) : undefined;
+  const uniqueThemes =
+    collectedThemes.length > 0 ? Array.from(new Set(collectedThemes)) : undefined;
 
   return {
     command: 'check',
     target,
     only,
     ...(autoTokens ? { autoTokens: true } : {}),
+    ...(uniqueThemes ? { themes: uniqueThemes } : {}),
+    ...(fix ? { fix: true } : {}),
     selectors: uniqueSelectors,
     configPath,
     groupByRoot,
@@ -757,7 +807,7 @@ export async function runCli(
       await runMcp({
         transport: parsed.transport,
         port: parsed.port,
-        idleTimeoutMs: parsed.idleTimeoutMs,
+        idleTimeoutMs: parsed.idleTimeoutMs ?? 300_000,
       });
       return 0;
     }
@@ -768,6 +818,8 @@ export async function runCli(
       configPath: parsed.configPath,
       only: parsed.only,
       ...(parsed.autoTokens ? { autoTokens: true } : {}),
+      ...(parsed.themes ? { themes: parsed.themes } : {}),
+      ...(parsed.fix ? { fix: true } : {}),
       selectors: parsed.selectors,
       groupByRoot: parsed.groupByRoot,
       top: parsed.top,
@@ -783,18 +835,4 @@ export async function runCli(
     console.error(paint('[uirig:fatal] ' + message, 'bold', 'red'));
     return 1;
   }
-}
-
-const currentScriptPath = fileURLToPath(import.meta.url);
-const invokedScriptPath = process.argv.at(1) ? resolve(process.argv.at(1) as string) : '';
-
-if (currentScriptPath === invokedScriptPath) {
-  const rawArgs = process.argv.slice(2);
-  if (rawArgs.at(0) === 'mcp' || rawArgs.includes('--json')) {
-    process.env.UIRIG_JSON_MODE = '1';
-  }
-  logTelemetry('cli:boot', `Starting uirig v${UIRIG_VERSION}...`);
-  runCli(rawArgs).then((exitCode) => {
-    process.exit(exitCode);
-  });
 }

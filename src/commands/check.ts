@@ -7,7 +7,6 @@
  * mutated DOM fuzzing (`stress`), and pre-navigation `PerformanceObserver` monitoring (`cls`)
  * execute without cross-tool pollution or multiple browser startup overhead.
  */
-
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { chromium, type Browser } from 'playwright';
@@ -17,15 +16,21 @@ import {
   extractRootCssVariables,
   mergeTokenScales,
 } from '../core/auto-tokens.js';
-import { resolveViolationSourceLocations } from '../core/source-map.js';
-import { type ISourceLocation } from '../interfaces/locator.js';
 import { auditPageContrast, type IContrastViolation, MIN_WCAG_AA_CONTRAST } from '../core/matrix.js';
 import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
 import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '../core/cls.js';
 import { type WarmBrowserPool } from '../core/browser-pool.js';
+import {
+  applyDeterministicAutoFixes,
+  computeDeterministicAutoFix,
+  type IDeterministicAutoFix,
+} from '../core/autofix.js';
 import { logTelemetry, paint } from '../utils/formatter.js';
 import { formatConsoleAuditReport } from '../utils/console-report.js';
-import { formatAgenticJsonStream } from '../utils/agent-stream.js';
+import {
+  formatAgenticJsonStream,
+  normalizeViewportViolations,
+} from '../utils/agent-stream.js';
 import { writeGithubPrCommentReport, DEFAULT_PR_COMMENT_PATH } from '../utils/fs.js';
 import { collectSpatialNodes, formatSpatialBrief } from '../utils/spatial-brief.js';
 import { runDomIntegrityAudit } from '../core/dom.js';
@@ -44,11 +49,13 @@ import {
 } from '../utils/scope.js';
 import type { IUirigIgnoreRule } from '../utils/ignore.js';
 import { resolveA2uiAttributionsForSelectors } from '../utils/a2ui-attribution.js';
+import { resolveViolationSourceLocations } from '../core/source-map.js';
 import type {
   IA2uiAttribution,
   IDarkModeViolation,
   IDomIntegrityViolation,
   IRuntimeErrorViolation,
+  ISourceLocation,
 } from '../interfaces/locator.js';
 
 export type PosixExitCode = 0 | 1 | 2;
@@ -101,8 +108,10 @@ export interface ICheckCommandOptions {
   only?: AuditToolName;
   /** When true, auto-discovers design tokens from workspace files and live `:root` CSS variables when `tokensPath` is not set. */
   autoTokens?: boolean;
-  /** Optional theme skins (e.g. `['light', 'dark', 'enterprise']`) evaluated via `data-theme` and color-scheme emulation (`--themes`). */
+  /** Optional theme skins (e.g. `['light', 'dark', 'enterprise-dark']`) evaluated via `data-theme` and color-scheme emulation (`--themes`). */
   themes?: Array<string>;
+  /** When true, applies deterministic 1-to-1 fixes on disk and runs a re-verification pass (`--fix`). */
+  fix?: boolean;
   /** Optional inline token scale override (useful for programmatic calls & tests). */
   tokenScaleOverride?: ITokenScaleConfig;
   /** Optional viewport list override (e.g., single-viewport fast path for MCP [Model Context Protocol] tool calls). */
@@ -823,29 +832,60 @@ export async function executeCheckCommand(
     const activeThemes: Array<string | undefined> =
       rawThemes && rawThemes.length > 0 ? rawThemes : [undefined];
 
-    const results = new Array<IViewportAuditReport>();
+    const runMatrixSweep = async (): Promise<Array<IViewportAuditReport>> => {
+      const sweepResults = new Array<IViewportAuditReport>();
+      for (const targetEntry of resolvedTargets) {
+        for (const viewport of activeViewports) {
+          for (const themeName of activeThemes) {
+            const viewportReport = await auditViewportInParallel(
+              browser,
+              targetEntry.liveUrl,
+              viewport,
+              tokenScale,
+              config.thresholdBudgets,
+              options.only,
+              config.ignore ?? new Array<IUirigIgnoreRule>(),
+              targetEntry.isLocal,
+              options.selectors,
+              Boolean(options.spatialBrief),
+              shouldAutoDiscoverRootTokens,
+              themeName,
+              cwd
+            );
+            sweepResults.push({
+              ...viewportReport,
+              url: targetEntry.displayUrl,
+            });
+          }
+        }
+      }
+      return sweepResults;
+    };
 
-    for (const targetEntry of resolvedTargets) {
-      for (const viewport of activeViewports) {
-        for (const themeName of activeThemes) {
-          const viewportReport = await auditViewportInParallel(
-            browser,
-            targetEntry.liveUrl,
-            viewport,
-            tokenScale,
-            config.thresholdBudgets,
-            options.only,
-            config.ignore ?? new Array<IUirigIgnoreRule>(),
-            targetEntry.isLocal,
-            options.selectors,
-            Boolean(options.spatialBrief),
-            shouldAutoDiscoverRootTokens,
-            themeName
+    let results = await runMatrixSweep();
+    let appliedFixes = new Array<IDeterministicAutoFix>();
+
+    if (options.fix && evaluatePosixExitCode(results) !== 0) {
+      const candidateFixes = new Array<IDeterministicAutoFix>();
+      for (const vpReport of results) {
+        for (const item of normalizeViewportViolations(vpReport)) {
+          const fix = computeDeterministicAutoFix(item, cwd);
+          if (fix) {
+            candidateFixes.push(fix);
+          }
+        }
+      }
+
+      if (candidateFixes.length > 0) {
+        appliedFixes = applyDeterministicAutoFixes(candidateFixes, cwd);
+        if (appliedFixes.length > 0) {
+          logTelemetry(
+            'check:autofix',
+            'Applied ' +
+              paint(String(appliedFixes.length), 'bold', 'green') +
+              ' deterministic fix(es) on disk; running re-verification pass...'
           );
-          results.push({
-            ...viewportReport,
-            url: targetEntry.displayUrl,
-          });
+          results = await runMatrixSweep();
         }
       }
     }
@@ -885,9 +925,22 @@ export async function executeCheckCommand(
           groupByRoot: options.groupByRoot,
           top: options.top,
           maxTokens: options.maxTokens,
+          cwd,
         });
         process.stdout.write(jsonOutput + '\n');
       } else {
+        if (appliedFixes.length > 0) {
+          process.stdout.write(
+            paint(
+              'Auto-Fix Applied: Patched ' +
+                appliedFixes.length +
+                ' line(s) across ' +
+                new Set(appliedFixes.map((f) => f.sourceFile)).size +
+                ' file(s) and re-verified.',
+              'green'
+            ) + '\n'
+          );
+        }
         process.stdout.write(
           formatConsoleAuditReport(executionReport, { verbose: options.verbose })
         );
@@ -901,6 +954,7 @@ export async function executeCheckCommand(
               groupByRoot: options.groupByRoot,
               top: options.top,
               maxTokens: options.maxTokens,
+              cwd,
             })
           ) as {
             totalViolations?: number;
