@@ -3,7 +3,7 @@
 - **Issue:** `AgnosticUI/uirig#19` — `Computed Accessibility Tree Snapshot (dom / contrast)`
 - **Epic:** `AgnosticUI/uirig#33` (`label:epic:a2ui-eval`)
 - **Branch:** `feat/issue-19-ax-tree`
-- **Status:** In Progress (Chunks 0–1 Complete)
+- **Status:** Complete (Chunks 0–3 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -36,7 +36,7 @@ Extend the `dom` verification engine (`src/core/dom.ts`) with native Chromium De
     - Write 1-to-1 unit tests in `tests/unit/ax-tree.test.ts` covering empty/whitespace names, valid labels, and `aria-hidden="true"` / `inert` focus traps.
   - **Commit:** `feat(dom): add pure AX-tree rule evaluators for ax_empty_name and ax_hidden_focus`
 
-- [ ] **Chunk 2: Live Chromium CDP `Accessibility.getFullAXTree` Collector & Shadow DOM Host Attribution**
+- [x] **Chunk 2: Live Chromium CDP `Accessibility.getFullAXTree` Collector & Shadow DOM Host Attribution**
   - **Files:** `src/core/ax-tree.ts`, `src/core/dom.ts`, `tests/unit/ax-tree.test.ts`
   - **Action:**
     - Add `auditComputedAccessibilityTree(page, options)` in `src/core/ax-tree.ts` using `page.context().newCDPSession(page)` -> `Accessibility.getFullAXTree` + `DOM.resolveNode` to map offending AX nodes back to DOM elements, piercing Shadow DOM selectors (`host >> shadow-root >> inner`), `hostComponent`, `--selectors` scope, and `data-uirig-ignore="dom"` rules.
@@ -44,7 +44,7 @@ Extend the `dom` verification engine (`src/core/dom.ts`) with native Chromium De
     - Add live Chromium E2E tests in `tests/unit/ax-tree.test.ts` covering `<div role="button"></div>`, Shadow DOM `<ag-icon-button>` with severed accessible name, and `<button>` trapped inside `<div aria-hidden="true">`.
   - **Commit:** `feat(dom): integrate native CDP Accessibility.getFullAXTree inspection into dom engine`
 
-- [ ] **Chunk 3: Agentic Stream Remediation Advice, Docs Sync & Final Verification**
+- [x] **Chunk 3: Agentic Stream Remediation Advice, Docs Sync & Final Verification**
   - **Files:** `src/utils/agent-stream.ts`, `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_19.md`, `.uirig/docs/NEXT_PROMPT.md`
   - **Action:**
     - Add tailored `remediationAdvice` formatting for `ax_empty_name` and `ax_hidden_focus` in `src/utils/agent-stream.ts`.
@@ -55,8 +55,8 @@ Extend the `dom` verification engine (`src/core/dom.ts`) with native Chromium De
 ---
 
 ## 3. Acceptance Checklist (from `AgnosticUI/uirig#19`)
-- [ ] Flags interactive elements (including Shadow DOM hosts) with an empty computed accessible name in Chromium's AX tree (`ax_empty_name`).
-- [ ] Flags keyboard-focusable controls (`tabIndex >= 0`) trapped inside `aria-hidden="true"` or `inert` ancestors (`ax_hidden_focus`).
-- [ ] Adds zero external dependencies by relying strictly on native Chromium CDP primitives.
-- [ ] Respects `--selectors` scoping and `data-uirig-ignore="dom"` / `uirig.config.json` ignore rules.
-- [ ] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.
+- [x] Flags interactive elements (including Shadow DOM hosts) with an empty computed accessible name in Chromium's AX tree (`ax_empty_name`).
+- [x] Flags keyboard-focusable controls (`tabIndex >= 0`) trapped inside `aria-hidden="true"` or `inert` ancestors (`ax_hidden_focus`).
+- [x] Adds zero external dependencies by relying strictly on native Chromium CDP primitives.
+- [x] Respects `--selectors` scoping and `data-uirig-ignore="dom"` / `uirig.config.json` ignore rules.
+- [x] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.

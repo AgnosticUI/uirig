@@ -15,6 +15,7 @@ import {
   type ICdpAxNode,
 } from '../../src/core/ax-tree.js';
 import { runDomIntegrityAudit } from '../../src/core/dom.js';
+import { normalizeViewportViolations } from '../../src/utils/agent-stream.js';
 
 describe('::: ISSUE #19 (CHUNKS 1–2): COMPUTED ACCESSIBILITY TREE SNAPSHOT :::', () => {
   let browser: Browser | null = null;
@@ -151,4 +152,37 @@ describe('::: ISSUE #19 (CHUNKS 1–2): COMPUTED ACCESSIBILITY TREE SNAPSHOT :::
     expect(hiddenFocusViolations).toHaveLength(1);
     expect(hiddenFocusViolations.at(0)?.selector).toContain('button#trapped-close-btn');
   });
+
+  it('==> Should emit tailored remediationAdvice for ax_empty_name and ax_hidden_focus in agentic JSON stream', () => {
+    const normalized = normalizeViewportViolations({
+      url: 'http://localhost:5173',
+      viewport: { name: 'desktop', width: 1440, height: 900 },
+      tokenViolations: [],
+      contrastViolations: [],
+      stressViolations: [],
+      clsEvaluation: { maxSessionCls: 0, violation: null },
+      domViolations: [
+        {
+          rule: 'ax_empty_name',
+          selector: 'ag-icon-button >> shadow-root >> span.inner-btn',
+          hostComponent: 'ag-icon-button',
+          detail: "Interactive element with computed AX role 'button' has an empty accessible name in Chromium's accessibility tree.",
+          inShadowDom: true,
+        },
+        {
+          rule: 'ax_hidden_focus',
+          selector: 'html > body > div#hidden-drawer > button#trapped-close-btn',
+          hostComponent: null,
+          detail: 'Keyboard-focusable element (AX role \'button\') is nested inside an aria-hidden="true" or inert container, creating a hidden focus trap.',
+          inShadowDom: false,
+        },
+      ],
+    });
+
+    expect(normalized).toHaveLength(2);
+    expect(normalized.at(0)?.remediationAdvice).toContain('computed accessible name');
+    expect(normalized.at(0)?.hostComponent).toBe('ag-icon-button');
+    expect(normalized.at(1)?.remediationAdvice).toContain('tabindex="-1"');
+  });
+
 });
