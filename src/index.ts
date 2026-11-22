@@ -332,7 +332,7 @@ export type ParsedCliCommand =
       command: 'check';
       target?: string;
       only?: AuditToolName;
-      autoTokens: boolean;
+      autoTokens?: boolean;
       selectors?: Array<string>;
       configPath?: string;
       groupByRoot: boolean;
@@ -640,7 +640,7 @@ function parseAuditCommandArgs(
     command: 'check',
     target,
     only,
-    autoTokens,
+    ...(autoTokens ? { autoTokens: true } : {}),
     selectors: uniqueSelectors,
     configPath,
     groupByRoot,
@@ -767,7 +767,7 @@ export async function runCli(
       target: parsed.target,
       configPath: parsed.configPath,
       only: parsed.only,
-      autoTokens: parsed.autoTokens,
+      ...(parsed.autoTokens ? { autoTokens: true } : {}),
       selectors: parsed.selectors,
       groupByRoot: parsed.groupByRoot,
       top: parsed.top,
