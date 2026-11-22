@@ -311,7 +311,6 @@ export async function auditComputedAccessibilityTree(
     const treeResponse = (await cdp.send('Accessibility.getFullAXTree')) as {
       nodes?: Array<ICdpAxNode>;
     };
-
     const axNodes = treeResponse.nodes ?? new Array<ICdpAxNode>();
     const nodeById = new Map<string, ICdpAxNode>();
     for (const axNode of axNodes) {
@@ -339,6 +338,10 @@ export async function auditComputedAccessibilityTree(
     const ignoreHelperSrc = isElementIgnoredInBrowser.toString();
     const scopeHelperSrc = isElementInSelectorScope.toString();
     const inspectFnSrc = inspectResolvedDomElementInBrowser.toString();
+    const wrappedFunctionDeclaration =
+      'function(pageUrl, rules, ignoreHelperSrc, activeSelectors, scopeHelperSrc) { return (' +
+      inspectFnSrc +
+      ').call(this, pageUrl, rules, ignoreHelperSrc, activeSelectors, scopeHelperSrc); }';
     const emittedKeys = new Set<string>();
 
     for (const axNode of axNodes) {
@@ -373,7 +376,7 @@ export async function auditComputedAccessibilityTree(
       try {
         const evalRes = (await cdp.send('Runtime.callFunctionOn', {
           objectId: resolvedObjectId,
-          functionDeclaration: inspectFnSrc,
+          functionDeclaration: wrappedFunctionDeclaration,
           arguments: [
             { value: pageUrl },
             { value: ignoreRules },
@@ -440,3 +443,4 @@ export async function auditComputedAccessibilityTree(
 
   return violations;
 }
+

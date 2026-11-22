@@ -13,6 +13,7 @@ import { logTelemetry, paint } from '../utils/formatter.js';
 import { isElementIgnoredInBrowser, type IUirigIgnoreRule } from '../utils/ignore.js';
 import { isElementInSelectorScope } from '../utils/scope.js';
 import { createBrowserDomWalker } from '../utils/dom-walker.js';
+import { auditComputedAccessibilityTree } from './ax-tree.js';
 
 export interface IDomAuditOptions {
   /** Optional HTTP navigation response used to verify frame-ancestors / X-Frame-Options headers. */
@@ -489,6 +490,27 @@ export async function runDomIntegrityAudit(
   );
 
   violations.push(...domViolations);
+
+  const axViolations = await auditComputedAccessibilityTree(page, {
+    ignoreRules,
+    selectors,
+  });
+
+  const existingUnlabeledSelectors = new Set(
+    violations
+      .filter((v) => v.rule === 'unlabeled_control')
+      .map((v) => v.selector)
+  );
+
+  for (const axViolation of axViolations) {
+    if (
+      axViolation.rule === 'ax_empty_name' &&
+      existingUnlabeledSelectors.has(axViolation.selector)
+    ) {
+      continue;
+    }
+    violations.push(axViolation);
+  }
 
   const countBadge =
     violations.length > 0
