@@ -67,7 +67,11 @@ export function resolveA2uiAttributionFromComposedChain(
       }
     }
 
-    if (tag === 'a2ui-surface') {
+    const dataSurfaceAttr = current.getAttribute('data-a2ui-surface');
+    const hasSurfaceProp =
+      typeof current.surfaceId === 'string' && current.surfaceId.trim().length > 0;
+
+    if (tag === 'a2ui-surface' || dataSurfaceAttr !== null || hasSurfaceProp) {
       surfaceNode = current;
       break;
     }
@@ -86,10 +90,12 @@ export function resolveA2uiAttributionFromComposedChain(
     return null;
   }
 
+  const dataSurfaceVal = (surfaceNode.getAttribute('data-a2ui-surface') ?? '').trim();
   const attrSurfaceId = (
-    surfaceNode.getAttribute('surface-id') ??
-    surfaceNode.getAttribute('id') ??
-    surfaceNode.id ??
+    dataSurfaceVal ||
+    surfaceNode.getAttribute('surface-id') ||
+    surfaceNode.getAttribute('id') ||
+    surfaceNode.id ||
     ''
   ).trim();
   const propSurfaceId =
@@ -203,4 +209,93 @@ export async function resolveA2uiAttributionsForSelectors(
   }
 
   return resultMap;
+}
+
+/**
+ * Formats a catalog-neutral A2UI v1.0 `updateComponents` remediation instruction
+ * and optional RFC (Request for Comments) 6902 JSON (JavaScript Object Notation) patch
+ * when a violation occurs inside an `<a2ui-surface>` boundary.
+ */
+export function enrichA2uiAttributionWithAdvice(params: {
+  attribution: IA2uiAttribution;
+  engine: string;
+  violationType: string;
+  measuredDelta: string;
+  suggestedToken?: string;
+  fallbackAdvice: string;
+}): { attribution: IA2uiAttribution; remediationAdvice: string } {
+  const { attribution, engine, violationType, measuredDelta, suggestedToken, fallbackAdvice } =
+    params;
+
+  if (!attribution.a2uiComponentId) {
+    return {
+      attribution,
+      remediationAdvice: fallbackAdvice,
+    };
+  }
+
+  const surfaceLabel = attribution.surfaceId ? "'" + attribution.surfaceId + "'" : 'active';
+  const typeLabel = attribution.a2uiComponentType
+    ? ' (' + attribution.a2uiComponentType + ')'
+    : '';
+  const compId = attribution.a2uiComponentId;
+
+  let actionHint = '';
+  let patchValue: Record<string, unknown> | null = null;
+
+  if (
+    violationType === 'ax_empty_name' ||
+    violationType === 'unlabeled_control'
+  ) {
+    actionHint =
+      "add a non-empty 'ariaLabel' or 'label' property so the rendered control exposes an accessible name";
+    patchValue = { ariaLabel: 'Action' };
+  } else if (
+    engine === 'contrast' ||
+    engine === 'dark-mode' ||
+    violationType === 'token_drift'
+  ) {
+    const tokenHint = suggestedToken ? " (such as '" + suggestedToken + "')" : '';
+    actionHint =
+      'update its color/theme style tokens' +
+      tokenHint +
+      ' to satisfy WCAG (Web Content Accessibility Guidelines) contrast and token scale budgets (' +
+      measuredDelta +
+      ')';
+  } else if (engine === 'stress') {
+    actionHint =
+      'adjust layout constraints or text wrapping so the component does not overflow or violate touch-target bounds (' +
+      measuredDelta +
+      ')';
+  } else {
+    actionHint = 'resolve ' + violationType + ' (' + measuredDelta + ')';
+  }
+
+  const suggestedPatch =
+    attribution.wirePath && patchValue
+      ? Object.entries(patchValue).map(([propKey, propVal]) => ({
+          op: 'add' as const,
+          path: attribution.wirePath + '/' + propKey,
+          value: propVal,
+        }))
+      : attribution.suggestedPatch;
+
+  const remediationAdvice =
+    'In A2UI updateComponents for surface ' +
+    surfaceLabel +
+    ", update component '" +
+    compId +
+    "'" +
+    typeLabel +
+    ': ' +
+    actionHint +
+    '.';
+
+  return {
+    attribution: {
+      ...attribution,
+      suggestedPatch,
+    },
+    remediationAdvice,
+  };
 }

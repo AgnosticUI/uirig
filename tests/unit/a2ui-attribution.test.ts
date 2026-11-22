@@ -10,6 +10,10 @@ import {
   resolveA2uiAttributionsForSelectors,
   type IA2uiElementNodeLike,
 } from '../../src/utils/a2ui-attribution.js';
+import { executeCheckCommand } from '../../src/commands/check.js';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 describe('::: ISSUE #31 (CHUNK 1): UNIVERSAL <a2ui-surface> ATTRIBUTION :::', () => {
   let browser: Browser | null = null;
@@ -138,4 +142,81 @@ describe('::: ISSUE #31 (CHUNK 1): UNIVERSAL <a2ui-surface> ATTRIBUTION :::', ()
 
     expect(resolved.get('button#plain-btn')).toBeNull();
   });
+
+  it('==> Should populate out-of-band a2ui diagnostic block and updateComponents advice in check --json output', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'uirig-a2ui-json-'));
+    try {
+      const htmlPath = join(tempDir, 'a2ui-surface.html');
+      writeFileSync(
+        htmlPath,
+        `<!DOCTYPE html>
+        <html>
+          <body>
+            <a2ui-surface id="support-ticket" catalog-id="agnosticui-v1">
+              <ag-icon-button id="close-btn" data-a2ui-id="close_drawer_btn" data-a2ui-component="IconButton"></ag-icon-button>
+            </a2ui-surface>
+            <script>
+              class AgIconButton extends HTMLElement {
+                constructor() {
+                  super();
+                  const root = this.attachShadow({ mode: 'open' });
+                  root.innerHTML = '<button class="icon-only" type="button"></button>';
+                }
+              }
+              customElements.define('ag-icon-button', AgIconButton);
+            </script>
+          </body>
+        </html>`,
+        'utf8'
+      );
+
+      const report = await executeCheckCommand({
+        target: './a2ui-surface.html',
+        cwd: tempDir,
+        only: 'dom',
+        headless: true,
+        silentStdout: true,
+        reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+      });
+
+      expect(report.exitCode).toBe(1);
+      const { formatAgenticJsonStream } = await import('../../src/utils/agent-stream.js');
+      const parsed = JSON.parse(formatAgenticJsonStream(report)) as {
+        violations: Array<{
+          violationType: string;
+          a2ui: {
+            surfaceId: string | null;
+            a2uiComponentId: string | null;
+            a2uiComponentType: string | null;
+            catalogId: string | null;
+            wirePath: string | null;
+            suggestedPatch: Array<{ op: string; path: string; value?: unknown }> | null;
+          } | null;
+          remediationAdvice: string;
+        }>;
+      };
+
+      const v = parsed.violations.at(0);
+      expect(v).toBeDefined();
+      expect(v?.a2ui).toEqual({
+        surfaceId: 'support-ticket',
+        a2uiComponentId: 'close_drawer_btn',
+        a2uiComponentType: 'IconButton',
+        catalogId: 'agnosticui-v1',
+        wirePath: '/components/0',
+        suggestedPatch: [
+          {
+            op: 'add',
+            path: '/components/0/ariaLabel',
+            value: 'Action',
+          },
+        ],
+      });
+      expect(v?.remediationAdvice).toContain("In A2UI updateComponents for surface 'support-ticket'");
+      expect(v?.remediationAdvice).toContain("close_drawer_btn");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
 });
