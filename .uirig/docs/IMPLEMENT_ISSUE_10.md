@@ -2,7 +2,7 @@
 
 - **Issue:** `AgnosticUI/uirig#10` — `Zero-Config Design Token Auto-Discovery (--auto-tokens)`
 - **Branch:** `feat/issue-10-auto-tokens`
-- **Status:** In Progress (Chunks 0–1 Complete)
+- **Status:** In Progress (Chunks 0–2 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -35,11 +35,11 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
 - [x] **Chunk 1: Value Classifier & Normalizer (`classifyAndNormalizeTokenValue`) in `src/core/auto-tokens.ts` + Unit Tests**
   - **Files:** `src/core/auto-tokens.ts`, `tests/unit/auto-tokens.test.ts`
   - **Action:**
-    - Create `src/core/auto-tokens.ts` with `classifyAndNormalizeTokenValue()` and `mergeTokenScales()` to normalize CSS colors (`hex`, `rgb`, `hsl`, `oklch` -> `rgb(...)`) and lengths (`px`, `rem` -> `px`) into `{ colors, spacing, fontSizes, radii }` buckets using token name hints (`radius`/`rounded`, `font`/`text`, `space`/`gap`/`padding`/`margin`, `color`/`bg`/`fg`/`surface`/`border`).
+    - Create `src/core/auto-tokens.ts` with `classifyAndNormalizeTokenValue()` and `mergeTokenScales()` to normalize CSS colors (`hex`, `rgb`, `hsl`, `oklch` -> `rgb(...)`) and lengths (`px`, `rem` -> `px`) into `{ colors, spacing, fontSizes, radii }` buckets using token name hints.
     - Write 1-to-1 unit tests in `tests/unit/auto-tokens.test.ts`.
   - **Commit:** `feat(tokens): add CSS token value classifier and scale merger in src/core/auto-tokens.ts`
 
-- [ ] **Chunk 2: Workspace Token File Discovery (`discoverWorkspaceTokens`) in `src/core/auto-tokens.ts` + Unit Tests**
+- [x] **Chunk 2: Workspace Token File Discovery (`discoverWorkspaceTokens`) in `src/core/auto-tokens.ts` + Unit Tests**
   - **Files:** `src/core/auto-tokens.ts`, `tests/unit/auto-tokens.test.ts`
   - **Action:**
     - Add `parseW3cOrStyleDictionaryTokens()`, `parseTailwindThemeCss()`, and `discoverWorkspaceTokens(cwd)` to scan safe workspace directories (skipping `BLOCKLIST_DIRECTORIES`) for `*.tokens.json`, Style Dictionary JSON files, and CSS `@theme { ... }` blocks.
@@ -58,14 +58,11 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
   - **Action:**
     - Wire `--auto-tokens` in `src/index.ts`, `autoTokens?: boolean` in `IUirigConfig` / `ICheckCommandOptions` (`src/commands/check.ts`), and `autoTokens` in `src/commands/mcp.ts`.
     - Ensure explicit `tokensPath` takes precedence over `--auto-tokens`, while `--auto-tokens` with no `tokensPath` populates `suggestedToken` in `contrast`/`dark-mode` and runs `tokens` drift checks.
-    - Add unit & integration tests verifying precedence and zero-config `suggestedToken` output.
   - **Commit:** `feat(cli): wire --auto-tokens flag across check, standalone engines, and MCP`
 
 - [ ] **Chunk 5: Docs Sync (`README.md`, `AGENTS.md`) & Final Verification**
   - **Files:** `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_10.md`, `.uirig/docs/NEXT_PROMPT.md`
-  - **Action:**
-    - Document `--auto-tokens` in `README.md` and `AGENTS.md`.
-    - Mark all chunks `[x]` complete in `.uirig/docs/IMPLEMENT_ISSUE_10.md` and update `.uirig/docs/NEXT_PROMPT.md`.
+  - **Action:** Document `--auto-tokens` in `README.md` and `AGENTS.md`, mark all chunks `[x]` complete, and update `.uirig/docs/NEXT_PROMPT.md`.
   - **Commit:** `docs: document --auto-tokens zero-config design token discovery (#10)`
 
 ---
