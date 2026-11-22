@@ -69,6 +69,7 @@ export interface IUirigConfig {
   targetUrls: Array<string>;
   tokensPath?: string;
   autoTokens?: boolean;
+  themes?: Array<string>;
   thresholdBudgets: IThresholdBudgets;
   viewports: Array<IViewportConfig>;
   ignore?: Array<IUirigIgnoreRule>;
@@ -92,21 +93,23 @@ export interface ICheckCommandOptions {
   top?: number;
   /** Optional approximate token budget for serialized JSON output (`--max-tokens <budget>`). */
   maxTokens?: number;
-  /** Optional CSS selectors limiting element-level audits to matching subtrees (`--selectors` / `-s`). */
+  /** Optional CSS (Cascading Style Sheets) selectors limiting element-level audits to matching subtrees (`--selectors` / `-s`). */
   selectors?: Array<string>;
   /** Optional single-engine filter. Runs all enabled engines when omitted. */
   only?: AuditToolName;
   /** When true, auto-discovers design tokens from workspace files and live `:root` CSS variables when `tokensPath` is not set. */
   autoTokens?: boolean;
+  /** Optional theme skins (e.g. `['light', 'dark', 'enterprise']`) evaluated via `data-theme` and color-scheme emulation (`--themes`). */
+  themes?: Array<string>;
   /** Optional inline token scale override (useful for programmatic calls & tests). */
   tokenScaleOverride?: ITokenScaleConfig;
-  /** Optional viewport list override (e.g., single-viewport fast path for MCP tool calls). */
+  /** Optional viewport list override (e.g., single-viewport fast path for MCP [Model Context Protocol] tool calls). */
   viewportsOverride?: Array<IViewportConfig>;
   /** Optional persistent warm browser pool (used by `uirig mcp` to eliminate Chromium cold starts). */
   browserPool?: WarmBrowserPool;
-  /** When true, suppresses writing CLI output to `process.stdout` (used by `uirig mcp` over stdio). */
+  /** When true, suppresses writing CLI (Command-Line Interface) output to `process.stdout` (used by `uirig mcp` over stdio). */
   silentStdout?: boolean;
-  /** Optional custom output path for the Markdown PR comment report (defaults to `.uirig/github_pr_comment.md`). */
+  /** Optional custom output path for the Markdown PR (Pull Request) comment report (defaults to `.uirig/github_pr_comment.md`). */
   reportOutputPath?: string;
   /** Optional working directory override for resolving relative paths in tests. */
   cwd?: string;
@@ -115,9 +118,11 @@ export interface ICheckCommandOptions {
 export interface IViewportAuditReport {
   url: string;
   viewport: IViewportConfig;
+  /** Active theme skin name when multi-theme evaluation (`--themes`) is enabled. */
+  theme?: string;
   /** Active `--selectors` / `-s` filters when the audit was component-scoped. */
   scopedSelectors?: Array<string>;
-  /** Number of unique elements matched across Light + Shadow DOM for `scopedSelectors`. */
+  /** Number of unique elements matched across Light + Shadow DOM (Document Object Model) for `scopedSelectors`. */
   matchedSelectorCount?: number;
   /** Compact plain-text bounding-box summary emitted when `--spatial-brief` is enabled. */
   spatialBrief?: string;
@@ -196,7 +201,7 @@ export function loadUirigConfig(
   }
 
   if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error('ERR_CONFIG_SCHEMA: Configuration at ' + configPath + ' must be a JSON object.');
+    throw new Error('ERR_CONFIG_SCHEMA: Configuration at ' + configPath + ' must be a JSON (JavaScript Object Notation) object.');
   }
 
   const candidate = parsed as Partial<IUirigConfig>;
@@ -206,6 +211,7 @@ export function loadUirigConfig(
       "ERR_CONFIG_SCHEMA: 'targetUrls' must be a non-empty array of URLs in " + configPath + '.'
     );
   }
+
   if (
     candidate.tokensPath !== undefined &&
     (typeof candidate.tokensPath !== 'string' || candidate.tokensPath.trim().length === 0)
@@ -255,11 +261,16 @@ export function loadUirigConfig(
     }
   }
 
+  const configThemes = Array.isArray(candidate.themes)
+    ? candidate.themes.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+    : undefined;
+
   return {
     $schema: candidate.$schema,
     targetUrls: candidate.targetUrls,
     tokensPath: candidate.tokensPath,
     autoTokens: candidate.autoTokens === true,
+    ...(configThemes && configThemes.length > 0 ? { themes: configThemes } : {}),
     thresholdBudgets: {
       clsMaxLimit: budgets.clsMaxLimit,
       overflowPixelTolerance: budgets.overflowPixelTolerance,
@@ -395,9 +406,16 @@ export async function auditViewportInParallel(
   isLocalStaticTarget: boolean = false,
   selectors?: Array<string>,
   includeSpatialBrief: boolean = false,
-  autoDiscoverRootTokens: boolean = false
+  autoDiscoverRootTokens: boolean = false,
+  themeName?: string
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
+  const contextOptions = {
+    viewport: viewportSize,
+    ...(themeName
+      ? { colorScheme: (themeName.toLowerCase() === 'dark' ? 'dark' : 'light') as 'dark' | 'light' }
+      : {}),
+  };
   const runContrast = !only || only === 'contrast';
   const runDarkMode = !only || only === 'dark-mode';
   const runStress = !only || only === 'stress';
@@ -408,7 +426,8 @@ export async function auditViewportInParallel(
 
   const activeScope = only ? 'single engine (' + only + ')' : '4 isolated contexts';
   const selectorTag = hasSelectors && selectors ? ' [scope: ' + selectors.join(', ') + ']' : '';
-  const vpLabel = viewport.name + ' (' + viewport.width + 'x' + viewport.height + ')';
+  const themeTag = themeName ? ' [theme: ' + themeName + ']' : '';
+  const vpLabel = viewport.name + ' (' + viewport.width + 'x' + viewport.height + ')' + themeTag;
   logTelemetry(
     'check:dispatch',
     'Running ' +
@@ -423,10 +442,15 @@ export async function auditViewportInParallel(
 
   let effectiveTokenScale: ITokenScaleConfig | null = tokenScale;
   if (autoDiscoverRootTokens) {
-    const probeContext = await browser.newContext({ viewport: viewportSize });
+    const probeContext = await browser.newContext(contextOptions);
     try {
       const probePage = await probeContext.newPage();
       await probePage.goto(url, { waitUntil: 'networkidle' });
+      if (themeName) {
+        await probePage.evaluate((t: string) => {
+          document.documentElement.setAttribute('data-theme', t);
+        }, themeName);
+      }
       const liveRootTokens = await extractRootCssVariables(probePage);
       effectiveTokenScale = mergeTokenScales(
         tokenScale ?? { colors: [], spacing: [], fontSizes: [], radii: [] },
@@ -463,7 +487,7 @@ export async function auditViewportInParallel(
         runtimeErrors: new Array<IRuntimeErrorViolation>(),
       };
     }
-    const context = await browser.newContext({ viewport: viewportSize });
+    const context = await browser.newContext(contextOptions);
     try {
       const page = await context.newPage();
       const runtimeErrors = new Array<IRuntimeErrorViolation>();
@@ -489,6 +513,11 @@ export async function auditViewportInParallel(
       }
 
       const response = await page.goto(url, { waitUntil: 'networkidle' });
+      if (themeName) {
+        await page.evaluate((t: string) => {
+          document.documentElement.setAttribute('data-theme', t);
+        }, themeName);
+      }
 
       let matchedSelectorCount: number | undefined;
       if (hasSelectors && selectors) {
@@ -567,10 +596,15 @@ export async function auditViewportInParallel(
     if (!runDarkMode) {
       return new Array<IDarkModeViolation>();
     }
-    const context = await browser.newContext({ viewport: viewportSize });
+    const context = await browser.newContext(contextOptions);
     try {
       const page = await context.newPage();
       await page.goto(url, { waitUntil: 'networkidle' });
+      if (themeName) {
+        await page.evaluate((t: string) => {
+          document.documentElement.setAttribute('data-theme', t);
+        }, themeName);
+      }
       return await runDarkModeAudit(page, {
         maxSurfaceLuminance:
           budgets.darkModeMaxSurfaceLuminance ?? DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
@@ -587,10 +621,15 @@ export async function auditViewportInParallel(
     if (!runStress) {
       return new Array<IGeometricViolation>();
     }
-    const context = await browser.newContext({ viewport: viewportSize });
+    const context = await browser.newContext(contextOptions);
     try {
       const page = await context.newPage();
       await page.goto(url, { waitUntil: 'networkidle' });
+      if (themeName) {
+        await page.evaluate((t: string) => {
+          document.documentElement.setAttribute('data-theme', t);
+        }, themeName);
+      }
       return await runGeometricStressAudit(page, {
         overflowPixelTolerance: budgets.overflowPixelTolerance,
         touchTargetMinSpacingPx: budgets.touchTargetMinSpacingPx,
@@ -606,11 +645,16 @@ export async function auditViewportInParallel(
     if (!runCls) {
       return { maxSessionCls: 0, violation: null };
     }
-    const context = await browser.newContext({ viewport: viewportSize });
+    const context = await browser.newContext(contextOptions);
     try {
       const page = await context.newPage();
       await prepareClsObserver(page);
       await page.goto(url, { waitUntil: 'networkidle' });
+      if (themeName) {
+        await page.evaluate((t: string) => {
+          document.documentElement.setAttribute('data-theme', t);
+        }, themeName);
+      }
       return await collectPageCls(page, budgets.clsMaxLimit);
     } finally {
       await context.close();
@@ -627,6 +671,7 @@ export async function auditViewportInParallel(
   return {
     url,
     viewport,
+    ...(themeName ? { theme: themeName } : {}),
     ...(hasSelectors && selectors
       ? {
           scopedSelectors: selectors,
@@ -648,6 +693,7 @@ export async function auditViewportInParallel(
     runtimeErrors: readOnlyResult.runtimeErrors,
   };
 }
+
 
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
@@ -710,7 +756,7 @@ export async function executeCheckCommand(
     } else if (autoTokensEnabled) {
       logTelemetry(
         'tokens:auto-discover',
-        'Auto-discovering design tokens from workspace files and live :root CSS variables...'
+        'Auto-discovering design tokens from workspace files and live :root CSS (Cascading Style Sheets) variables...'
       );
       tokenScale = discoverWorkspaceTokens(cwd);
       shouldAutoDiscoverRootTokens = true;
@@ -756,30 +802,37 @@ export async function executeCheckCommand(
       }
     }
 
+    const rawThemes =
+      options.themes && options.themes.length > 0 ? options.themes : config.themes;
+    const activeThemes: Array<string | undefined> =
+      rawThemes && rawThemes.length > 0 ? rawThemes : [undefined];
+
     const results = new Array<IViewportAuditReport>();
 
     for (const targetEntry of resolvedTargets) {
       for (const viewport of activeViewports) {
-        const viewportReport = await auditViewportInParallel(
-          browser,
-          targetEntry.liveUrl,
-          viewport,
-          tokenScale,
-          config.thresholdBudgets,
-          options.only,
-          config.ignore ?? new Array<IUirigIgnoreRule>(),
-          targetEntry.isLocal,
-          options.selectors,
-          Boolean(options.spatialBrief),
-          shouldAutoDiscoverRootTokens
-        );
-        results.push({
-          ...viewportReport,
-          url: targetEntry.displayUrl,
-        });
+        for (const themeName of activeThemes) {
+          const viewportReport = await auditViewportInParallel(
+            browser,
+            targetEntry.liveUrl,
+            viewport,
+            tokenScale,
+            config.thresholdBudgets,
+            options.only,
+            config.ignore ?? new Array<IUirigIgnoreRule>(),
+            targetEntry.isLocal,
+            options.selectors,
+            Boolean(options.spatialBrief),
+            shouldAutoDiscoverRootTokens,
+            themeName
+          );
+          results.push({
+            ...viewportReport,
+            url: targetEntry.displayUrl,
+          });
+        }
       }
     }
-
     const exitCode = evaluatePosixExitCode(results);
 
     const summary = {
@@ -847,7 +900,7 @@ export async function executeCheckCommand(
                 (sum, v) => sum + (v.childCount ?? 0),
                 0
               );
-                            process.stdout.write(
+              process.stdout.write(
                 paint(
                   'Root-Cause Grouping: Collapsed ' +
                     collapsedChildren +
