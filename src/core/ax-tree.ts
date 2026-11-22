@@ -47,6 +47,8 @@ interface IResolvedDomTargetMetadata {
   hostComponent: string | null;
   inShadowDom: boolean;
   hasHiddenOrInertDomAncestor: boolean;
+  isDomFocusable: boolean;
+  hasShadowHostAriaLabel: boolean;
 }
 
 /**
@@ -78,7 +80,6 @@ export function getAxBooleanProperty(node: ICdpAxNode, propertyName: string): bo
   }
   return false;
 }
-
 /**
  * Checks whether a CDP `AXNode` is keyboard-focusable (`focusable: true` or `focused: true`).
  */
@@ -164,11 +165,11 @@ export function evaluateAxNodeForHiddenFocus(
     "') is nested inside an aria-hidden=\"true\" or inert container, creating a hidden focus trap."
   );
 }
-
 /**
  * Browser-injected helper invoked via CDP `Runtime.callFunctionOn` with `this` bound to a resolved
  * DOM (Document Object Model) `Element`. Computes its Shadow-DOM-piercing selector, enclosing
- * custom element `hostComponent`, ignore status, `--selectors` scope, and `aria-hidden`/`inert` state.
+ * custom element `hostComponent`, ignore status, `--selectors` scope, focusability, and
+ * `aria-hidden`/`inert` ancestor state.
  */
 function inspectResolvedDomElementInBrowser(
   this: unknown,
@@ -198,6 +199,8 @@ function inspectResolvedDomElementInBrowser(
       hostComponent: null,
       inShadowDom: false,
       hasHiddenOrInertDomAncestor: false,
+      isDomFocusable: false,
+      hasShadowHostAriaLabel: false,
     };
   }
 
@@ -211,6 +214,8 @@ function inspectResolvedDomElementInBrowser(
       hostComponent: null,
       inShadowDom: false,
       hasHiddenOrInertDomAncestor: false,
+      isDomFocusable: false,
+      hasShadowHostAriaLabel: false,
     };
   }
 
@@ -226,16 +231,27 @@ function inspectResolvedDomElementInBrowser(
     return tag;
   }
 
-  const rootSegments = new Array<string>();
-  let current: Element | null = targetEl;
-  let hostComponent: string | null = null;
-  let inShadowDom = false;
-  let hasHiddenOrInertDomAncestor = false;
+  const htmlEl = targetEl as HTMLElement;
+  const isDisabled =
+    targetEl.hasAttribute('disabled') || targetEl.getAttribute('aria-disabled') === 'true';
+  const isDomFocusable =
+    !isDisabled && typeof htmlEl.tabIndex === 'number' && htmlEl.tabIndex >= 0;
 
+  let hasShadowHostAriaLabel = false;
+  const immediateRoot: Node = targetEl.getRootNode();
+  if (immediateRoot instanceof ShadowRoot && immediateRoot.host) {
+    const hostEl = immediateRoot.host;
+    const hostAriaLabel = (hostEl.getAttribute('aria-label') ?? '').trim();
+    const hostAriaLabelledBy = (hostEl.getAttribute('aria-labelledby') ?? '').trim();
+    if (hostAriaLabel.length > 0 || hostAriaLabelledBy.length > 0) {
+      hasShadowHostAriaLabel = true;
+    }
+  }
+
+    let hasHiddenOrInertDomAncestor = false;
   let ancestorCursor: Element | null = targetEl.parentElement;
   if (!ancestorCursor) {
-    const firstRoot = targetEl.getRootNode();
-    ancestorCursor = firstRoot instanceof ShadowRoot ? firstRoot.host : null;
+    ancestorCursor = immediateRoot instanceof ShadowRoot ? immediateRoot.host : null;
   }
   while (ancestorCursor) {
     if (
@@ -254,7 +270,12 @@ function inspectResolvedDomElementInBrowser(
     }
   }
 
+  const rootSegments = new Array<string>();
   const chainParts = new Array<string>();
+  let current: Element | null = targetEl;
+  let hostComponent: string | null = null;
+  let inShadowDom = false;
+
   while (current) {
     const segment = buildLocalSegment(current);
     const parentEl: HTMLElement | null = current.parentElement;
@@ -287,6 +308,8 @@ function inspectResolvedDomElementInBrowser(
     hostComponent,
     inShadowDom,
     hasHiddenOrInertDomAncestor,
+    isDomFocusable,
+    hasShadowHostAriaLabel,
   };
 }
 
@@ -352,7 +375,9 @@ export async function auditComputedAccessibilityTree(
 
       const emptyNameDetail = evaluateAxNodeForEmptyName(axNode);
       const axHiddenAncestor = hasHiddenOrInertAxAncestor(axNode);
-      const candidateHiddenFocus = isAxNodeFocusable(axNode);
+      const axSelfHidden = isAxNodeHiddenByAriaOrInert(axNode);
+      const candidateHiddenFocus =
+        isAxNodeFocusable(axNode) || axHiddenAncestor || axSelfHidden;
 
       if (!emptyNameDetail && !candidateHiddenFocus) {
         continue;
@@ -401,7 +426,7 @@ export async function auditComputedAccessibilityTree(
         continue;
       }
 
-      if (emptyNameDetail) {
+      if (emptyNameDetail && !meta.hasShadowHostAriaLabel) {
         const key = 'ax_empty_name::' + meta.selector;
         if (!emittedKeys.has(key)) {
           emittedKeys.add(key);
@@ -415,11 +440,17 @@ export async function auditComputedAccessibilityTree(
         }
       }
 
-      const hiddenFocusDetail = evaluateAxNodeForHiddenFocus(
-        axNode,
-        axHiddenAncestor || meta.hasHiddenOrInertDomAncestor
-      );
-      if (hiddenFocusDetail) {
+      const isHiddenFocusTrap =
+        (axHiddenAncestor || meta.hasHiddenOrInertDomAncestor) &&
+        (isAxNodeFocusable(axNode) || meta.isDomFocusable);
+
+      if (isHiddenFocusTrap) {
+        const rawRole =
+          typeof axNode.role?.value === 'string' ? axNode.role.value.trim().toLowerCase() : 'control';
+        const hiddenFocusDetail =
+          "Keyboard-focusable element (AX role '" +
+          rawRole +
+          "') is nested inside an aria-hidden=\"true\" or inert container, creating a hidden focus trap.";
         const key = 'ax_hidden_focus::' + meta.selector;
         if (!emittedKeys.has(key)) {
           emittedKeys.add(key);
@@ -443,4 +474,3 @@ export async function auditComputedAccessibilityTree(
 
   return violations;
 }
-
