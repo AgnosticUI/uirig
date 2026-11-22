@@ -2,7 +2,7 @@
 
 - **Issue:** `AgnosticUI/uirig#10` — `Zero-Config Design Token Auto-Discovery (--auto-tokens)`
 - **Branch:** `feat/issue-10-auto-tokens`
-- **Status:** In Progress (Chunk 0 Complete)
+- **Status:** In Progress (Chunks 0–1 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -32,7 +32,7 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
   - **Action:** Cut branch `feat/issue-10-auto-tokens`, save this implementation plan, and initialize the continuity capsule.
   - **Commit:** `docs(plan): add implementation plan and continuity capsule for issue #10 (--auto-tokens)`
 
-- [ ] **Chunk 1: Value Classifier & Normalizer (`classifyAndNormalizeTokenValue`) in `src/core/auto-tokens.ts` + Unit Tests**
+- [x] **Chunk 1: Value Classifier & Normalizer (`classifyAndNormalizeTokenValue`) in `src/core/auto-tokens.ts` + Unit Tests**
   - **Files:** `src/core/auto-tokens.ts`, `tests/unit/auto-tokens.test.ts`
   - **Action:**
     - Create `src/core/auto-tokens.ts` with `classifyAndNormalizeTokenValue()` and `mergeTokenScales()` to normalize CSS colors (`hex`, `rgb`, `hsl`, `oklch` -> `rgb(...)`) and lengths (`px`, `rem` -> `px`) into `{ colors, spacing, fontSizes, radii }` buckets using token name hints (`radius`/`rounded`, `font`/`text`, `space`/`gap`/`padding`/`margin`, `color`/`bg`/`fg`/`surface`/`border`).
