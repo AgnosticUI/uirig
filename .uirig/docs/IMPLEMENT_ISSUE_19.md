@@ -3,7 +3,7 @@
 - **Issue:** `AgnosticUI/uirig#19` — `Computed Accessibility Tree Snapshot (dom / contrast)`
 - **Epic:** `AgnosticUI/uirig#33` (`label:epic:a2ui-eval`)
 - **Branch:** `feat/issue-19-ax-tree`
-- **Status:** In Progress (Chunk 0 Complete)
+- **Status:** In Progress (Chunks 0–1 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -28,7 +28,7 @@ Extend the `dom` verification engine (`src/core/dom.ts`) with native Chromium De
   - **Action:** Cut branch `feat/issue-19-ax-tree` from `main` and mark `#19` as active in `.uirig/docs/NEXT_PROMPT.md`.
   - **Commit:** `docs(plan): initialize branch and tracking for issue #19 (computed AX tree)`
 
-- [ ] **Chunk 1: Pure AX Tree Rule Evaluators (`ax_empty_name`, `ax_hidden_focus`) & Type Contracts**
+- [x] **Chunk 1: Pure AX Tree Rule Evaluators (`ax_empty_name`, `ax_hidden_focus`) & Type Contracts**
   - **Files:** `src/interfaces/locator.ts`, `src/core/ax-tree.ts`, `tests/unit/ax-tree.test.ts`
   - **Action:**
     - Extend `IDomIntegrityViolation['rule']` in `src/interfaces/locator.ts` with `'ax_empty_name' | 'ax_hidden_focus'`.
