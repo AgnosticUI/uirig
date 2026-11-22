@@ -1,18 +1,18 @@
-# Session Continuity: `epic:a2ui-eval` (`#33`) -> Next Issue `#19`
+# Session Continuity: Issue #19 Complete -> Next Issue `#31` (`epic:a2ui-eval`)
 
 ## Current Context
 - **Repository:** `AgnosticUI/uirig`
-- **Active Branch:** `main` (clean; ready to cut `feat/issue-19-ax-tree`)
-- **Active Epic:** `#33` — `Epic: Deterministic Eval & Self-Healing Architecture (uirig x A2UI)` (`label:epic:a2ui-eval`)
-- **Completed:** Issue `#10` (`--auto-tokens`) merged into `main`; all 6 `epic:a2ui-eval` issues (`#33`, `#19`, `#31`, `#32`, `#9`, `#13`) tagged and planned in `.uirig/docs/IMPLEMENT_ISSUE_*.md`.
+- **Completed Branch:** `feat/issue-19-ax-tree` (ready to merge into `main`)
+- **Completed Issue:** `#19` — `Computed Accessibility Tree Snapshot (dom / contrast)` (Track A — Task 1 of Epic `#33`)
+- **Tracking Plan:** `.uirig/docs/IMPLEMENT_ISSUE_19.md` (all Chunks 0–3 marked `[x]` complete)
 
-## Roadmap Order (`epic:a2ui-eval`)
-1. **Track A — Task 1 (`#19`):** Computed Accessibility Tree Snapshot (`ax_empty_name`, `ax_hidden_focus`) — `.uirig/docs/IMPLEMENT_ISSUE_19.md`
-2. **Track A — Task 4 (`#31`):** Universal `<a2ui-surface>` Component Attribution & Eval Mode — `.uirig/docs/IMPLEMENT_ISSUE_31.md`
-3. **Track A — Task 5 (`#32`):** AgnosticUI Support Center Studio Eval Gate & Self-Healing Demo — `.uirig/docs/IMPLEMENT_ISSUE_32.md`
-4. **Track B — Task 2 (`#9`):** Framework Source-Map & `file:line` Attribution — `.uirig/docs/IMPLEMENT_ISSUE_9.md`
-5. **Track B — Task 3 (`#13`):** Deterministic Auto-Fix Patch Generation (`--fix` / `unifiedDiff`) — `.uirig/docs/IMPLEMENT_ISSUE_13.md`
+## Roadmap Progress (`epic:a2ui-eval` `#33`)
+- [x] **Track A — Task 1 (`#19`):** Computed Accessibility Tree Snapshot (`ax_empty_name`, `ax_hidden_focus`)
+- [ ] **Track A — Task 4 (`#31`):** Universal `<a2ui-surface>` Component Attribution & Eval Mode (`.uirig/docs/IMPLEMENT_ISSUE_31.md`)
+- [ ] **Track A — Task 5 (`#32`):** AgnosticUI Support Center Studio Eval Gate & Self-Healing Demo (`.uirig/docs/IMPLEMENT_ISSUE_32.md`)
+- [ ] **Track B — Task 2 (`#9`):** Framework Source-Map & `file:line` Attribution (`.uirig/docs/IMPLEMENT_ISSUE_9.md`)
+- [ ] **Track B — Task 3 (`#13`):** Deterministic Auto-Fix Patch Generation (`--fix` / `unifiedDiff`) (`.uirig/docs/IMPLEMENT_ISSUE_13.md`)
 
 ## Immediate Next Step
-1. Commit the planning docs (`IMPLEMENT_ISSUE_{33,19,31,32,9,13}.md` and `NEXT_PROMPT.md`).
-2. Cut branch `feat/issue-19-ax-tree` from `main` and begin **Issue `#19` — Chunk 1** (AX-tree rule evaluators and `IDomIntegrityViolation` rules `ax_empty_name` and `ax_hidden_focus`).
+1. Verify `git checkout main && git pull origin main` after merging PR `#19`.
+2. Cut branch `feat/issue-31-a2ui-surface-attribution` from `main` and begin **Issue `#31` — Chunk 1** (`IA2uiAttribution` contract and composed `<a2ui-surface>` discovery across Light and Shadow DOM).

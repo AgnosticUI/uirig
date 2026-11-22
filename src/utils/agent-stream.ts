@@ -243,10 +243,32 @@ export function normalizeViewportViolations(
         ? domViolation.hostComponent
         : extractHostComponentFromSelector(domViolation.selector);
 
-    const remediationAdvice =
-      domViolation.rule === 'orphaned_slot_content'
-        ? `Update or remove the 'slot' attribute on '${domViolation.selector}' to match one of the custom element's valid slots, or remove the orphaned light-DOM child if no <slot> exists. (${domViolation.detail})`
-        : `Fix '${domViolation.rule}' on '${domViolation.selector}': ${domViolation.detail}`;
+    let remediationAdvice: string;
+    if (domViolation.rule === 'orphaned_slot_content') {
+      remediationAdvice =
+        "Update or remove the 'slot' attribute on '" +
+        domViolation.selector +
+        "' to match one of the custom element's valid slots, or remove the orphaned light-DOM child if no <slot> exists. (" +
+        domViolation.detail +
+        ')';
+    } else if (domViolation.rule === 'ax_empty_name') {
+      remediationAdvice =
+        "Provide a non-empty computed accessible name on '" +
+        domViolation.selector +
+        "' via visible text content, aria-label, or a valid same-root aria-labelledby reference so screen readers announce the interactive control. (" +
+        domViolation.detail +
+        ')';
+    } else if (domViolation.rule === 'ax_hidden_focus') {
+      remediationAdvice =
+        "Remove the focusable control '" +
+        domViolation.selector +
+        "' from the tab order (tabindex=\"-1\" or inert) or remove aria-hidden=\"true\" from its ancestor so keyboard focus cannot enter an invisible subtree. (" +
+        domViolation.detail +
+        ')';
+    } else {
+      remediationAdvice =
+        "Fix '" + domViolation.rule + "' on '" + domViolation.selector + "': " + domViolation.detail;
+    }
 
     normalized.push({
       engine: 'dom',

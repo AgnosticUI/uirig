@@ -32,7 +32,8 @@ export interface IDarkModeViolation {
 
 /**
  * Represents a single structural DOM, ARIA reference, broken media, passive security,
- * Web Component `<slot>` content-model mismatch, or AI prompt-injection trap violation (`uirig dom`).
+ * Web Component `<slot>` content-model mismatch, hidden AI prompt-injection trap,
+ * or computed accessibility tree violation (`uirig dom`).
  */
 export interface IDomIntegrityViolation {
   rule:
@@ -44,7 +45,9 @@ export interface IDomIntegrityViolation {
     | 'unsafe_target_blank'
     | 'missing_frame_header'
     | 'prompt_injection_trap'
-    | 'orphaned_slot_content';
+    | 'orphaned_slot_content'
+    | 'ax_empty_name'
+    | 'ax_hidden_focus';
   selector: string;
   hostComponent?: string | null;
   detail: string;
