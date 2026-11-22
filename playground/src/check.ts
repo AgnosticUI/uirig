@@ -1,8 +1,9 @@
 /**
  * playground/src/check.ts
- * End-to-end live check runner executing all 4 core `uirig` validation engines
- * (`crawlPageTokens`, `auditPageContrast`, `runGeometricStressAudit`, `collectPageCls`)
- * against the live Vite + AgnosticUI Lit sandbox in both Light Mode and Dark Mode.
+ * End-to-end live check runner executing all 6 core `uirig` validation engines
+ * (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom` AX-tree) plus v0.3.0
+ * `<a2ui-surface>` attribution, source-map `file:line` resolution, and `unifiedDiff`
+ * synthesis against the live Vite + AgnosticUI Lit sandbox.
  */
 import { chromium, type Browser } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
@@ -18,6 +19,10 @@ import {
   type IContrastViolation,
 } from '../../src/core/matrix.js';
 import {
+  runDarkModeAudit,
+  DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
+} from '../../src/core/dark-mode.js';
+import {
   runGeometricStressAudit,
   type IGeometricViolation,
 } from '../../src/core/adversary.js';
@@ -26,6 +31,16 @@ import {
   collectPageCls,
   type IClsEvaluationResult,
 } from '../../src/core/cls.js';
+import { runDomIntegrityAudit } from '../../src/core/dom.js';
+import { resolveA2uiAttributionsForSelectors } from '../../src/utils/a2ui-attribution.js';
+import { resolveViolationSourceLocations } from '../../src/core/source-map.js';
+import { computeDeterministicAutoFix } from '../../src/core/autofix.js';
+import type {
+  IA2uiAttribution,
+  IDarkModeViolation,
+  IDomIntegrityViolation,
+  ISourceLocation,
+} from '../../src/interfaces/locator.js';
 import { formatTelemetryLog, paint } from '../../src/utils/formatter.js';
 
 export const AGNOSTIC_SPOTCHECK_SCALE: ITokenScaleConfig = {
@@ -58,10 +73,17 @@ export interface ISpotCheckReport {
     contrastViolations: IContrastViolation[];
     stressViolations: IGeometricViolation[];
     clsEvaluation: IClsEvaluationResult;
+    domViolations?: IDomIntegrityViolation[];
   };
   darkMode: {
     activeThemeAttr: string | null;
     contrastViolations: IContrastViolation[];
+    darkModeViolations?: IDarkModeViolation[];
+  };
+  v030Diagnostics?: {
+    a2uiAttributions: Record<string, IA2uiAttribution | null>;
+    sourceLocations: Record<string, ISourceLocation | null>;
+    generatedUnifiedDiffs: Array<string>;
   };
 }
 
@@ -80,17 +102,27 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
     'cyan'
   );
   const title = paint(
-    '  uirig Live 4-Tool Check Report (AgnosticUI Lit Sandbox)',
+    '  uirig Live 6-Tool + v0.3.0 Check Report (AgnosticUI Lit Sandbox)',
     'bold',
     'cyan'
   );
+
+  const domViolations = report.lightMode.domViolations ?? [];
+  const darkModeViolations = report.darkMode.darkModeViolations ?? [];
+  const a2uiMatchedCount = Object.values(
+    report.v030Diagnostics?.a2uiAttributions ?? {}
+  ).filter(Boolean).length;
+  const sourceMappedCount = Object.values(
+    report.v030Diagnostics?.sourceLocations ?? {}
+  ).filter(Boolean).length;
+  const diffCount = report.v030Diagnostics?.generatedUnifiedDiffs.length ?? 0;
 
   const lines: string[] = [
     '',
     divider,
     title,
     divider,
-    `${paint('1. [tokens]', 'bold', 'magenta')}   Design Token Violations : ${formatCountBadge(
+    `${paint('1. [tokens]', 'bold', 'magenta')}    Design Token Violations : ${formatCountBadge(
       report.lightMode.tokenViolations.length
     )}`,
     ...report.lightMode.tokenViolations.map(
@@ -102,7 +134,7 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
           v.inShadowDom ? paint(' [ShadowDOM]', 'magenta') : ''
         }`
     ),
-    `${paint('2. [contrast]', 'bold', 'cyan')} Light Mode Violations   : ${formatCountBadge(
+    `${paint('2. [contrast]', 'bold', 'cyan')}  Light Mode Violations   : ${formatCountBadge(
       report.lightMode.contrastViolations.length
     )}`,
     ...report.lightMode.contrastViolations.map(
@@ -113,19 +145,13 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
           'red'
         )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'white')})`
     ),
-    `   ${paint('[contrast]', 'bold', 'cyan')} Dark Mode (${paint(
+    `${paint('3. [dark-mode]', 'bold', 'cyan')} Dark Mode (${paint(
       report.darkMode.activeThemeAttr ?? 'none',
       'magenta'
-    )}) Violations : ${formatCountBadge(report.darkMode.contrastViolations.length)}`,
-    ...report.darkMode.contrastViolations.map(
-      (v) =>
-        `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
-          `${v.contrastRatio}:1 < 4.5:1`,
-          'bold',
-          'red'
-        )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'white')})`
-    ),
-    `${paint('3. [stress]', 'bold', 'yellow')}   Geometric Overflow Hits : ${formatCountBadge(
+    )}) Parity  : ${formatCountBadge(
+      report.darkMode.contrastViolations.length + darkModeViolations.length
+    )}`,
+    `${paint('4. [stress]', 'bold', 'yellow')}    Geometric Overflow Hits : ${formatCountBadge(
       report.lightMode.stressViolations.length
     )}`,
     ...report.lightMode.stressViolations.map(
@@ -139,7 +165,7 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
           'red'
         )})`
     ),
-    `${paint('4. [cls]', 'bold', 'blue')}      Max Session CLS Score   : ${paint(
+    `${paint('5. [cls]', 'bold', 'blue')}       Max Session CLS Score   : ${paint(
       String(report.lightMode.clsEvaluation.maxSessionCls),
       'bold',
       report.lightMode.clsEvaluation.violation ? 'red' : 'green'
@@ -148,6 +174,22 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
         ? paint('FAIL (Shift Detected)', 'bold', 'red')
         : paint('PASS', 'bold', 'green')
     }`,
+    `${paint('6. [dom+ax]', 'bold', 'magenta')}    DOM & Computed AX Hits  : ${formatCountBadge(
+      domViolations.length
+    )}`,
+    ...domViolations.map(
+      (v) =>
+        `   ${paint('•', 'red')} [${paint(v.rule, 'cyan')}] ${paint(v.selector, 'yellow')}: ${
+          v.detail
+        }`
+    ),
+    `${paint('7. [v0.3.0]', 'bold', 'green')}    A2UI / Source-Map / Diff: ${paint(
+      `${a2uiMatchedCount} A2UI`,
+      'cyan'
+    )} | ${paint(`${sourceMappedCount} file:line`, 'cyan')} | ${paint(
+      `${diffCount} unifiedDiff`,
+      'cyan'
+    )}`,
     divider,
     '',
   ];
@@ -161,6 +203,7 @@ export async function runLivePlaygroundSpotCheck(
 ): Promise<ISpotCheckReport> {
   const headless = options.headless ?? true;
   const slowMo = options.slowMoMs ?? 0;
+  const workspaceCwd = process.cwd();
 
   let server: ViteDevServer | null = null;
   let browser: Browser | null = null;
@@ -169,7 +212,7 @@ export async function runLivePlaygroundSpotCheck(
     let targetUrl = options.existingUrl;
 
     if (!targetUrl) {
-      const playgroundRoot = resolve(process.cwd(), 'playground');
+      const playgroundRoot = resolve(workspaceCwd, 'playground');
       server = await createServer({
         root: playgroundRoot,
         server: { port, strictPort: false },
@@ -194,7 +237,7 @@ export async function runLivePlaygroundSpotCheck(
 
     browser = await chromium.launch({ headless, slowMo });
 
-    // 1. Context A: Read-only Tokens + Contrast + Dark Mode Toggle Check
+    // 1. Context A: Read-only Tokens + Contrast + DOM/AX + A2UI + Source-Map + Dark Mode Check
     const readOnlyContext = await browser.newContext({
       viewport: { width: 1280, height: 800 },
     });
@@ -203,13 +246,50 @@ export async function runLivePlaygroundSpotCheck(
 
     const tokenViolations = await crawlPageTokens(readOnlyPage, AGNOSTIC_SPOTCHECK_SCALE);
     const lightContrastViolations = await auditPageContrast(readOnlyPage);
+    const domViolations = await runDomIntegrityAudit(readOnlyPage, {
+      navigationResponse: null,
+    });
 
-    // Toggle to Dark Mode (`data-theme="dark"`) via #theme-toggle and re-audit contrast
+    const candidateSelectors = [
+      ...tokenViolations.map((v) => v.selector),
+      ...lightContrastViolations.map((v) => v.selector),
+      ...domViolations.map((v) => v.selector),
+    ];
+    const [a2uiMap, sourceMap] = await Promise.all([
+      resolveA2uiAttributionsForSelectors(readOnlyPage, candidateSelectors),
+      resolveViolationSourceLocations(readOnlyPage, candidateSelectors, workspaceCwd),
+    ]);
+    const a2uiAttributions = Object.fromEntries(a2uiMap.entries());
+    const sourceLocations = Object.fromEntries(sourceMap.entries());
+
+    const generatedUnifiedDiffs = new Array<string>();
+    for (const domV of domViolations) {
+      const loc = sourceLocations[domV.selector] ?? null;
+      const fix = computeDeterministicAutoFix(
+        {
+          engine: 'dom',
+          violationType: domV.rule,
+          sourceFile: loc?.sourceFile ?? null,
+          lineNumber: loc?.lineNumber ?? null,
+          measuredDelta: domV.detail,
+        },
+        workspaceCwd
+      );
+      if (fix) {
+        generatedUnifiedDiffs.push(fix.unifiedDiff);
+      }
+    }
+
+    // Toggle to Dark Mode (`data-theme="dark"`) via #theme-toggle and re-audit contrast & dark-mode parity
     await readOnlyPage.click('#theme-toggle');
     const activeThemeAttr = await readOnlyPage.evaluate(() =>
       document.documentElement.getAttribute('data-theme')
     );
     const darkContrastViolations = await auditPageContrast(readOnlyPage);
+    const darkModeViolations = await runDarkModeAudit(readOnlyPage, {
+      maxSurfaceLuminance: DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
+      allowedColors: AGNOSTIC_SPOTCHECK_SCALE.colors,
+    });
     await readOnlyContext.close();
 
     // 2. Context B: Mutated Geometric Stress Rig (+30% Pseudo-Localization)
@@ -242,10 +322,17 @@ export async function runLivePlaygroundSpotCheck(
         contrastViolations: lightContrastViolations,
         stressViolations,
         clsEvaluation,
+        domViolations,
       },
       darkMode: {
         activeThemeAttr,
         contrastViolations: darkContrastViolations,
+        darkModeViolations,
+      },
+      v030Diagnostics: {
+        a2uiAttributions,
+        sourceLocations,
+        generatedUnifiedDiffs,
       },
     };
   } finally {

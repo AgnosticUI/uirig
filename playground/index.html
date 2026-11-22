@@ -98,6 +98,13 @@
         white-space: nowrap;
         font-size: var(--ag-font-size-base);
       }
+
+      a2ui-surface {
+        display: block;
+        padding: var(--ag-space-4);
+        border: var(--ag-border-width-1) solid var(--ag-border);
+        border-radius: var(--ag-radius-md);
+      }
     </style>
   </head>
   <body>
@@ -166,6 +173,37 @@
           <span id="overflow-trap-label">Long Unbreakable Navigation Label</span>
         </div>
       </section>
+
+      <!-- Section 3: v0.3.0 A2UI Surface, Computed AX Tree & Source-Map Traps -->
+      <section id="a2ui-ax-traps" aria-labelledby="a2ui-heading">
+        <h2 id="a2ui-heading" class="section-heading">
+          3. A2UI Surface, Computed AX &amp; Source-Map Traps
+        </h2>
+        <a2ui-surface id="playground-support-ticket" catalog-id="agnosticui-v1">
+          <p class="card-body" style="margin-bottom: var(--ag-space-2);">
+            A2UI Generative Ticket Drawer (unlabeled close icon + source-located unsafe link):
+          </p>
+          <button
+            id="a2ui-unlabeled-close-btn"
+            type="button"
+            data-a2ui-id="close-ticket-btn"
+            data-a2ui-component="IconButton"
+            style="min-width: 32px; min-height: 32px; margin-right: var(--ag-space-2);"
+          >
+            <svg width="16" height="16" aria-hidden="true"></svg>
+          </button>
+          <a
+            id="a2ui-source-mapped-link"
+            data-a2ui-id="reset-ticket-link"
+            data-a2ui-component="Link"
+            data-source-loc="playground/index.html:200:13"
+            href="javascript:void(0)"
+          >
+            Reset Ticket
+          </a>
+        </a2ui-surface>
+      </section>
+
     </main>
 
     <script type="module" src="./src/main.ts"></script>

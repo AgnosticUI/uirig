@@ -1,6 +1,7 @@
 /**
  * tests/integration/playground.test.ts
- * End-to-end integration test executing all 4 core `uirig` validation engines
+ * End-to-end integration test executing all 6 core `uirig` validation engines
+ * plus v0.3.0 A2UI attribution, source-map `file:line`, and `unifiedDiff` spot checks
  * against the live Vite + AgnosticUI Lit sandbox in Chromium.
  *
  * Supports `UIRIG_HEADED=1` (via `npm run playground:test:headed`) for visual
@@ -13,13 +14,13 @@ import {
   formatSpotCheckSummary,
 } from '../../playground/src/check.js';
 
-describe('::: PHASE 4 TASK 4.4: LIVE 4-TOOL AGNOSTICUI PLAYGROUND VERIFICATION :::', () => {
+describe('::: PHASE 4 + v0.3.0: LIVE 6-TOOL AGNOSTICUI PLAYGROUND VERIFICATION :::', () => {
   it(
-    '==> Should verify Shadow DOM piercing, token drift, contrast traps, overflow stress, CLS shifts, and dark mode toggle',
+    '==> Should verify Shadow DOM piercing, token drift, contrast traps, overflow stress, CLS shifts, dark mode, A2UI attribution, source-map file:line, and unifiedDiff',
     async () => {
       const isHeaded = process.env.UIRIG_HEADED === '1';
       console.log(
-        `\n::: RUNNING LIVE 4-TOOL END-TO-END PLAYWRIGHT VERIFICATION (headed=${isHeaded}) :::`
+        `\n::: RUNNING LIVE 6-TOOL END-TO-END PLAYWRIGHT VERIFICATION (headed=${isHeaded}) :::`
       );
 
       const report = await runLivePlaygroundSpotCheck(isHeaded ? 5173 : 0, {
@@ -71,7 +72,32 @@ describe('::: PHASE 4 TASK 4.4: LIVE 4-TOOL AGNOSTICUI PLAYGROUND VERIFICATION :
       expect(report.lightMode.clsEvaluation.maxSessionCls).toBeGreaterThan(0.1);
       expect(report.lightMode.clsEvaluation.violation).not.toBeNull();
 
-      console.log('[+] Verified all 4 tools end-to-end against live AgnosticUI Web Components!');
+      // 5. v0.3.0 `<a2ui-surface>` attribution, DOM/AX defects, source-map `file:line`, and `unifiedDiff`
+      // 5. v0.3.0 `<a2ui-surface>` attribution, DOM/AX defects, source-map `file:line`, and `unifiedDiff`
+      const domViolations = report.lightMode.domViolations ?? [];
+      const closeBtnDom = domViolations.find((v) =>
+        v.selector.includes('a2ui-unlabeled-close-btn')
+      );
+      expect(closeBtnDom).toBeDefined();
+      expect(report.v030Diagnostics?.a2uiAttributions[closeBtnDom!.selector]).toMatchObject({
+        surfaceId: 'playground-support-ticket',
+        a2uiComponentId: 'close-ticket-btn',
+        a2uiComponentType: 'IconButton',
+        catalogId: 'agnosticui-v1',
+      });
+
+      const unsafeLinkDom = domViolations.find((v) =>
+        v.selector.includes('a2ui-source-mapped-link')
+      );
+      expect(unsafeLinkDom).toBeDefined();
+      expect(report.v030Diagnostics?.sourceLocations[unsafeLinkDom!.selector]).toMatchObject({
+        sourceFile: 'playground/index.html',
+        lineNumber: 200,
+      });
+      expect((report.v030Diagnostics?.generatedUnifiedDiffs.length ?? 0)).toBeGreaterThanOrEqual(1);
+      expect(report.v030Diagnostics?.generatedUnifiedDiffs.at(0)).toContain('href="#"');
+
+      console.log('[+] Verified all 6 engines + v0.3.0 A2UI/source-map/unifiedDiff end-to-end against live AgnosticUI Web Components!');
     },
     60000
   );
