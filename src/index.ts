@@ -49,6 +49,7 @@ interface ISubcommandHelpSpec {
 }
 
 const SHARED_AUDIT_OPTIONS = [
+  '--auto-tokens          Auto-discover design tokens from workspace files & live :root CSS vars',
   '-s, --selectors=<csv>  Filter element checks to matching CSS selectors (repeatable)',
   '--config=<path>        Path to uirig.config.json (also supports: --config <path>)',
   '--group-by-root        Collapse child failures under their shared parent container or host',
@@ -331,6 +332,7 @@ export type ParsedCliCommand =
       command: 'check';
       target?: string;
       only?: AuditToolName;
+      autoTokens: boolean;
       selectors?: Array<string>;
       configPath?: string;
       groupByRoot: boolean;
@@ -471,6 +473,7 @@ function parseAuditCommandArgs(
   let target: string | undefined = initialTarget;
   let configPath: string | undefined;
   let only: AuditToolName | undefined = presetOnly;
+  let autoTokens = false;
   const collectedSelectors = new Array<string>();
   let groupByRoot = false;
   let top: number | undefined;
@@ -485,6 +488,8 @@ function parseAuditCommandArgs(
 
     if (token === '--json') {
       json = true;
+    } else if (token === '--auto-tokens') {
+      autoTokens = true;
     } else if (token === '--group-by-root') {
       groupByRoot = true;
     } else if (token === '--spatial-brief') {
@@ -499,7 +504,7 @@ function parseAuditCommandArgs(
         return {
           command: 'unknown',
           rawCommand: rawSubcommand,
-          reason: `Invalid --top value '${token.slice('--top='.length)}'. Expected a positive integer (e.g. --top=5).`,
+          reason: "Invalid --top value '" + token.slice('--top='.length) + "'. Expected a positive integer (e.g. --top=5).",
         };
       }
       top = parsedTop;
@@ -517,7 +522,7 @@ function parseAuditCommandArgs(
         return {
           command: 'unknown',
           rawCommand: rawSubcommand,
-          reason: `Invalid --top value '${nextToken}'. Expected a positive integer (e.g. --top 5).`,
+          reason: "Invalid --top value '" + nextToken + "'. Expected a positive integer (e.g. --top 5).",
         };
       }
       top = parsedTop;
@@ -528,7 +533,7 @@ function parseAuditCommandArgs(
         return {
           command: 'unknown',
           rawCommand: rawSubcommand,
-          reason: `Invalid --max-tokens value '${token.slice('--max-tokens='.length)}'. Expected a positive integer (e.g. --max-tokens=1200).`,
+          reason: "Invalid --max-tokens value '" + token.slice('--max-tokens='.length) + "'. Expected a positive integer (e.g. --max-tokens=1200).",
         };
       }
       maxTokens = parsedTokens;
@@ -546,7 +551,7 @@ function parseAuditCommandArgs(
         return {
           command: 'unknown',
           rawCommand: rawSubcommand,
-          reason: `Invalid --max-tokens value '${nextToken}'. Expected a positive integer (e.g. --max-tokens 1200).`,
+          reason: "Invalid --max-tokens value '" + nextToken + "'. Expected a positive integer (e.g. --max-tokens 1200).",
         };
       }
       maxTokens = parsedTokens;
@@ -570,7 +575,7 @@ function parseAuditCommandArgs(
         return {
           command: 'unknown',
           rawCommand: rawSubcommand,
-          reason: `Missing CSS selector value after ${token}`,
+          reason: 'Missing CSS selector value after ' + token,
         };
       }
       const parsed = parseSelectorList(nextToken);
@@ -578,7 +583,7 @@ function parseAuditCommandArgs(
         return {
           command: 'unknown',
           rawCommand: rawSubcommand,
-          reason: `Empty CSS selector value after ${token}`,
+          reason: 'Empty CSS selector value after ' + token,
         };
       }
       collectedSelectors.push(...parsed);
@@ -589,7 +594,7 @@ function parseAuditCommandArgs(
         return {
           command: 'unknown',
           rawCommand: rawSubcommand,
-          reason: `Invalid --only value '${toolValue}'. Expected one of: tokens, contrast, dark-mode, stress, cls, dom.`,
+          reason: "Invalid --only value '" + toolValue + "'. Expected one of: tokens, contrast, dark-mode, stress, cls, dom.",
         };
       }
       only = toolValue;
@@ -623,7 +628,7 @@ function parseAuditCommandArgs(
       return {
         command: 'unknown',
         rawCommand: rawSubcommand,
-        reason: `Unrecognized option for '${rawSubcommand}': ${token}`,
+        reason: "Unrecognized option for '" + rawSubcommand + "': " + token,
       };
     }
   }
@@ -635,6 +640,7 @@ function parseAuditCommandArgs(
     command: 'check',
     target,
     only,
+    autoTokens,
     selectors: uniqueSelectors,
     configPath,
     groupByRoot,
@@ -718,17 +724,17 @@ export async function runCli(
   const parsed = parseCliArgs(argv);
 
   if (parsed.command === 'help') {
-    process.stdout.write(`${renderHelpText(parsed.topic)}\n`);
+    process.stdout.write(renderHelpText(parsed.topic) + '\n');
     return 0;
   }
 
   if (parsed.command === 'version') {
-    process.stdout.write(`${UIRIG_VERSION}\n`);
+    process.stdout.write(UIRIG_VERSION + '\n');
     return 0;
   }
 
   if (parsed.command === 'unknown') {
-    console.error(paint(`[uirig:cli] Error: ${parsed.reason}`, 'bold', 'red'));
+    console.error(paint('[uirig:cli] Error: ' + parsed.reason, 'bold', 'red'));
     return 1;
   }
 
@@ -761,6 +767,7 @@ export async function runCli(
       target: parsed.target,
       configPath: parsed.configPath,
       only: parsed.only,
+      autoTokens: parsed.autoTokens,
       selectors: parsed.selectors,
       groupByRoot: parsed.groupByRoot,
       top: parsed.top,
@@ -773,7 +780,7 @@ export async function runCli(
     return report.exitCode;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(paint(`[uirig:fatal] ${message}`, 'bold', 'red'));
+    console.error(paint('[uirig:fatal] ' + message, 'bold', 'red'));
     return 1;
   }
 }

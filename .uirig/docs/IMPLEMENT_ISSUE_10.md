@@ -2,7 +2,7 @@
 
 - **Issue:** `AgnosticUI/uirig#10` — `Zero-Config Design Token Auto-Discovery (--auto-tokens)`
 - **Branch:** `feat/issue-10-auto-tokens`
-- **Status:** In Progress (Chunks 0–3 Complete)
+- **Status:** Complete (Chunks 0–5 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -53,14 +53,14 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
     - Add live Chromium tests in `tests/unit/auto-tokens.test.ts`.
   - **Commit:** `feat(tokens): scrape live :root CSS custom properties in Chromium for --auto-tokens`
 
-- [ ] **Chunk 4: CLI (`--auto-tokens`), Config (`autoTokens`), Check Dispatcher & MCP Integration**
-  - **Files:** `src/commands/check.ts`, `src/index.ts`, `src/commands/mcp.ts`, `tests/unit/check.test.ts`, `tests/unit/cli.test.ts`
+- [x] **Chunk 4: CLI (`--auto-tokens`), Config (`autoTokens`), Check Dispatcher & MCP Integration**
+  - **Files:** `src/commands/check.ts`, `src/index.ts`, `src/commands/mcp.ts`, `tests/unit/check.test.ts`, `tests/unit/cli-auto-tokens.test.ts`
   - **Action:**
     - Wire `--auto-tokens` in `src/index.ts`, `autoTokens?: boolean` in `IUirigConfig` / `ICheckCommandOptions` (`src/commands/check.ts`), and `autoTokens` in `src/commands/mcp.ts`.
     - Ensure explicit `tokensPath` takes precedence over `--auto-tokens`, while `--auto-tokens` with no `tokensPath` populates `suggestedToken` in `contrast`/`dark-mode` and runs `tokens` drift checks.
   - **Commit:** `feat(cli): wire --auto-tokens flag across check, standalone engines, and MCP`
 
-- [ ] **Chunk 5: Docs Sync (`README.md`, `AGENTS.md`) & Final Verification**
+- [x] **Chunk 5: Docs Sync (`README.md`, `AGENTS.md`) & Final Verification**
   - **Files:** `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_10.md`, `.uirig/docs/NEXT_PROMPT.md`
   - **Action:** Document `--auto-tokens` in `README.md` and `AGENTS.md`, mark all chunks `[x]` complete, and update `.uirig/docs/NEXT_PROMPT.md`.
   - **Commit:** `docs: document --auto-tokens zero-config design token discovery (#10)`
@@ -68,7 +68,7 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
 ---
 
 ## 3. Acceptance Checklist (from `AgnosticUI/uirig#10`)
-- [ ] Running `uirig check --auto-tokens` on a page with `:root` CSS variables populates `suggestedToken` recommendations with zero config files.
+- [x] Running `uirig check --auto-tokens` on a page with `:root` CSS variables populates `suggestedToken` recommendations with zero config files.
 - [x] Auto-detects Tailwind v4 `@theme` variables and standard W3C `.tokens.json` / Style Dictionary files if present in the repo.
-- [ ] Explicit `tokensPath` configuration continues to take precedence over auto-discovered tokens.
-- [ ] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.
+- [x] Explicit `tokensPath` configuration continues to take precedence over auto-discovered tokens.
+- [x] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.
