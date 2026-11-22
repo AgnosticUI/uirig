@@ -2,10 +2,10 @@
  * src/index.ts
  * Main system entry point and zero-dependency CLI argument parser/router for `uirig`.
  * Supports:
- * - `uirig <url-or-file> [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
+ * - `uirig <url-or-file> [--only=<tool>] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
  * - `uirig init`
- * - `uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
- * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
+ * - `uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
+ * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
  * - `uirig manifest`
  * - `uirig mcp [--transport=<mode>] [--port=<n>] [--idle-timeout=<ms>]`
  * - `uirig --help` / `uirig <command> --help` / `uirig --version`
@@ -51,6 +51,8 @@ interface ISubcommandHelpSpec {
 const SHARED_AUDIT_OPTIONS = [
   '--auto-tokens          Auto-discover design tokens from workspace files & live :root CSS vars',
   '--themes=<csv>         Evaluate target across multiple theme skins (e.g. --themes="light,dark,brand")',
+  '--changed              Scope audit to components modified in git diff (optional: --base <ref>)',
+  '--base=<ref>           Git base ref for --changed diff comparison (e.g. --base=main)',
   '-s, --selectors=<csv>  Filter element checks to matching CSS selectors (repeatable)',
   '--config=<path>        Path to uirig.config.json (also supports: --config <path>)',
   '--fix                  Apply deterministic 1-to-1 fixes on disk and re-verify',
@@ -63,7 +65,6 @@ const SHARED_AUDIT_OPTIONS = [
   '--headed               Launch Chromium with a visible browser window for local inspection',
   '-h, --help             Show this command help page',
 ];
-
 const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   init: {
     summary: 'Scaffold uirig.config.json, .uirig/session.json, and .uirig/SKILL.md in the current workspace.',
@@ -81,11 +82,11 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   check: {
     summary: 'Run all 6 verification engines concurrently across configured or direct targets in isolated contexts.',
-    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Launches a single headless Chromium instance and isolates each (url, viewport) pair in a fresh BrowserContext.',
       'Automatically serves local .html files on an ephemeral 127.0.0.1 HTTP server when given a file path.',
-      'Ranks violations from highest impact to lowest and supports --group-by-root, --top, and --max-tokens.',
+      'Ranks violations from highest impact to lowest and supports --changed, --group-by-root, --top, and --max-tokens.',
     ],
     options: [
       '--only=<tool>          Filter execution to one engine: tokens | contrast | dark-mode | stress | cls | dom',
@@ -98,6 +99,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     ],
     examples: [
       'npx @rlevin/uirig check',
+      'npx @rlevin/uirig check --changed --base=main --json',
       'npx @rlevin/uirig check ./dist/index.html --selectors="#hero, .card" --verbose',
       'npx @rlevin/uirig check ./dist/index.html --group-by-root --top=5 --json',
       'npx @rlevin/uirig check --only=dark-mode --json',
@@ -240,7 +242,6 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     ],
   },
 };
-
 export const CLI_HELP_TEXT = `
 ${paint('uirig', 'bold', 'cyan')} v${UIRIG_VERSION}: The first line of defense for AI-generated UIs and Web Components
 
@@ -261,6 +262,8 @@ ${paint('COMMANDS:', 'bold')}
   mcp                             Start persistent MCP server with warm Chromium (stdio or SSE)
 
 ${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / cls / dom):', 'bold')}
+  --changed                       Scope audit to components modified in git diff (optional: --base <ref>)
+  --base=<ref>                    Git base ref for --changed diff comparison (e.g. --base=main)
   -s, --selectors=<csv>           Filter element checks to matching CSS selectors (repeatable)
   --config=<path>                 Path to uirig.config.json (also supports: --config <path>)
   --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls | dom
@@ -341,6 +344,8 @@ export type ParsedCliCommand =
       only?: AuditToolName;
       autoTokens?: boolean;
       themes?: Array<string>;
+      changed?: boolean;
+      baseRef?: string;
       fix?: boolean;
       selectors?: Array<string>;
       configPath?: string;
@@ -357,7 +362,6 @@ export type ParsedCliCommand =
       rawCommand: string;
       reason: string;
     };
-
 export function isDirectTargetArg(arg: string): boolean {
   const trimmed = arg.trim();
   if (!trimmed || trimmed.startsWith('-')) {
@@ -487,6 +491,8 @@ function parseAuditCommandArgs(
   let configPath: string | undefined;
   let only: AuditToolName | undefined = presetOnly;
   let autoTokens = false;
+  let changed = false;
+  let baseRef: string | undefined;
   let fix = false;
   const collectedThemes = new Array<string>();
   const collectedSelectors = new Array<string>();
@@ -505,6 +511,29 @@ function parseAuditCommandArgs(
       json = true;
     } else if (token === '--auto-tokens') {
       autoTokens = true;
+    } else if (token === '--changed') {
+      changed = true;
+    } else if (token.startsWith('--base=')) {
+      const val = token.slice('--base='.length).trim();
+      if (val.length === 0) {
+        return {
+          command: 'unknown',
+          rawCommand: rawSubcommand,
+          reason: 'Missing Git ref after --base=',
+        };
+      }
+      baseRef = val;
+    } else if (token === '--base') {
+      const nextToken = restArgs.at(i + 1);
+      if (!nextToken || nextToken.startsWith('-')) {
+        return {
+          command: 'unknown',
+          rawCommand: rawSubcommand,
+          reason: 'Missing Git ref after --base',
+        };
+      }
+      baseRef = nextToken.trim();
+      i++;
     } else if (token === '--fix') {
       fix = true;
     } else if (token.startsWith('--themes=')) {
@@ -690,6 +719,8 @@ function parseAuditCommandArgs(
     only,
     ...(autoTokens ? { autoTokens: true } : {}),
     ...(uniqueThemes ? { themes: uniqueThemes } : {}),
+    ...(changed ? { changed: true } : {}),
+    ...(baseRef ? { baseRef } : {}),
     ...(fix ? { fix: true } : {}),
     selectors: uniqueSelectors,
     configPath,
@@ -702,7 +733,6 @@ function parseAuditCommandArgs(
     headless,
   };
 }
-
 export function parseCliArgs(argv: Array<string>): ParsedCliCommand {
   if (argv.length === 0) {
     return { command: 'help' };
@@ -819,6 +849,8 @@ export async function runCli(
       only: parsed.only,
       ...(parsed.autoTokens ? { autoTokens: true } : {}),
       ...(parsed.themes ? { themes: parsed.themes } : {}),
+      ...(parsed.changed ? { changed: true } : {}),
+      ...(parsed.baseRef ? { baseRef: parsed.baseRef } : {}),
       ...(parsed.fix ? { fix: true } : {}),
       selectors: parsed.selectors,
       groupByRoot: parsed.groupByRoot,

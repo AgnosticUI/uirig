@@ -177,6 +177,8 @@ npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--co
 ### Shared Options
 * `--auto-tokens`: Auto-discover design tokens from workspace files (`*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS) and live `:root` CSS custom properties when `tokensPath` is not set.
 * `--themes=<csv>`: Evaluate the target across multiple theme skins (e.g. `--themes="light, dark, enterprise-dark"`) via `data-theme` and color-scheme emulation in a single session.
+* `--changed`: Inspect `git diff` to infer modified custom element tags/selectors and skip browser execution cleanly (`exitCode: 0`) when no UI/component files changed.
+* `--base=<ref>`: Git base ref for `--changed` diff comparison (e.g. `--base=main` or `--base=origin/main` in CI/CD pull requests).
 * `--fix`: Apply deterministic, unambiguous 1-to-1 fixes on disk (when `sourceFile` and `lineNumber` are resolved inside the workspace) and automatically run a re-verification pass.
 * `-s, --selectors=<csv>`: Filter element-level checks to matching CSS selectors (comma-separated and repeatable; pierces Web Component `ShadowRoot` boundaries).
 * `--group-by-root`: Collapse cascading child failures under their shared parent container or Web Component host (`childCount` + up to 3 `sampleChildren`).
