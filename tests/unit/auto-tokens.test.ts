@@ -5,13 +5,15 @@
  * and scale merging.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { chromium, type Browser } from 'playwright';
 import {
   classifyAndNormalizeTokenValue,
   discoverWorkspaceTokens,
+  extractRootCssVariables,
   mergeTokenScales,
   normalizeCssColorToken,
   normalizeCssLengthToPx,
@@ -19,7 +21,52 @@ import {
   parseW3cOrStyleDictionaryTokens,
 } from '../../src/core/auto-tokens.js';
 
+
 describe('::: ISSUE #10 (CHUNKS 1–2): TOKEN CLASSIFIER & WORKSPACE FILE DISCOVERY :::', () => {
+
+  let browser: Browser | null = null;
+
+  afterAll(async () => {
+    if (browser) {
+      await browser.close();
+    }
+  });
+
+  it('==> Should scrape and resolve live :root CSS custom properties (including var() aliases) in Chromium', async () => {
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root {
+              --brand-blue: #2563eb;
+              --color-primary: var(--brand-blue);
+              --color-surface: #ffffff;
+              --spacing-md: 1rem;
+              --text-body: 16px;
+              --radius-pill: 9999px;
+              --font-family-sans: system-ui, sans-serif;
+            }
+          </style>
+        </head>
+        <body><h1>Hello Auto Tokens</h1></body>
+      </html>
+    `);
+
+    const scraped = await extractRootCssVariables(page);
+    await context.close();
+
+    expect(scraped.colors).toContain('rgb(37, 99, 235)');
+    expect(scraped.colors).toContain('rgb(255, 255, 255)');
+    expect(scraped.spacing).toEqual(['16px', '0px']);
+    expect(scraped.fontSizes).toEqual(['16px']);
+    expect(scraped.radii).toEqual(['9999px', '0px']);
+  });
+
   it('==> Should normalize hex, rgb/rgba, hsl, and oklch colors to computed rgb/rgba strings', () => {
     expect(normalizeCssColorToken('#2563eb')).toBe('rgb(37, 99, 235)');
     expect(normalizeCssColorToken('hsl(222, 47%, 11%)')).toBe('rgb(15, 23, 41)');

@@ -2,7 +2,7 @@
 
 - **Issue:** `AgnosticUI/uirig#10` — `Zero-Config Design Token Auto-Discovery (--auto-tokens)`
 - **Branch:** `feat/issue-10-auto-tokens`
-- **Status:** In Progress (Chunks 0–2 Complete)
+- **Status:** In Progress (Chunks 0–3 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -46,7 +46,7 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
     - Add 1-to-1 unit tests in `tests/unit/auto-tokens.test.ts` with temporary fixture files.
   - **Commit:** `feat(tokens): auto-discover W3C .tokens.json, Style Dictionary, and Tailwind v4 @theme files`
 
-- [ ] **Chunk 3: Live Browser `:root` Custom Property Scraper (`extractRootCssVariables`) + Chromium Tests**
+- [x] **Chunk 3: Live Browser `:root` Custom Property Scraper (`extractRootCssVariables`) + Chromium Tests**
   - **Files:** `src/core/auto-tokens.ts`, `tests/unit/auto-tokens.test.ts`
   - **Action:**
     - Add `extractRootCssVariables(page)` to scrape `--*` custom properties from `:root` stylesheets and `getComputedStyle(document.documentElement)` in Playwright Chromium and normalize them into an `ITokenScaleConfig`.
@@ -69,6 +69,6 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
 
 ## 3. Acceptance Checklist (from `AgnosticUI/uirig#10`)
 - [ ] Running `uirig check --auto-tokens` on a page with `:root` CSS variables populates `suggestedToken` recommendations with zero config files.
-- [ ] Auto-detects Tailwind v4 `@theme` variables and standard W3C `.tokens.json` / Style Dictionary files if present in the repo.
+- [x] Auto-detects Tailwind v4 `@theme` variables and standard W3C `.tokens.json` / Style Dictionary files if present in the repo.
 - [ ] Explicit `tokensPath` configuration continues to take precedence over auto-discovered tokens.
 - [ ] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.

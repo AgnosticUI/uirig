@@ -3,14 +3,17 @@
  * Zero-Config Design Token Auto-Discovery (`--auto-tokens`).
  * Classifies and normalizes CSS colors and dimensional lengths into `ITokenScaleConfig`
  * buckets (`colors`, `spacing`, `fontSizes`, `radii`), discovers tokens from W3C `.tokens.json`,
- * Style Dictionary JSON, and Tailwind v4 `@theme` CSS files, and merges token sources.
+ * Style Dictionary JSON, and Tailwind v4 `@theme` CSS files, scrapes live `:root` CSS
+ * custom properties in Chromium, and merges token sources.
  */
 
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, basename } from 'path';
+import type { Page } from 'playwright';
 import Color from 'colorjs.io';
 import type { ITokenScaleConfig } from './tokens.js';
 import { BLOCKLIST_DIRECTORIES } from './crawler.js';
+import { logTelemetry, paint } from '../utils/formatter.js';
 
 export type TokenScaleCategory = keyof ITokenScaleConfig;
 
@@ -348,4 +351,110 @@ export function discoverWorkspaceTokens(cwd: string, maxDepth: number = 4): ITok
 
   scanDir(cwd, 0);
   return mergeTokenScales(...discoveredScales);
+}
+
+/**
+ * Scrapes live `:root` / `html` CSS custom properties (`--*`) from a rendered Playwright `Page`,
+ * resolves their final computed values (including nested `var(...)` references) via
+ * `getComputedStyle(document.documentElement)`, and classifies them into an `ITokenScaleConfig`.
+ */
+export async function extractRootCssVariables(page: Page): Promise<ITokenScaleConfig> {
+  const { rootFontSizePx, declarations } = await page.evaluate(
+    (): { rootFontSizePx: number; declarations: Array<{ name: string; value: string }> } => {
+      const rootEl = document.documentElement;
+      const computedRoot = window.getComputedStyle(rootEl);
+      const parsedRootFont = Number.parseFloat(computedRoot.fontSize);
+      const effectiveRootFontPx =
+        Number.isFinite(parsedRootFont) && parsedRootFont > 0 ? parsedRootFont : 16;
+
+      const customPropNames = new Set<string>();
+
+      // 1. Collect inline custom properties set directly on <html style="--...">
+      for (let i = 0; i < rootEl.style.length; i++) {
+        const prop = rootEl.style.item(i);
+        if (prop && prop.startsWith('--')) {
+          customPropNames.add(prop);
+        }
+      }
+
+      // 2. Collect custom properties declared in `:root` or `html` stylesheet rules
+      function collectFromRuleList(rules: CSSRuleList | undefined): void {
+        if (!rules) {
+          return;
+        }
+        for (let i = 0; i < rules.length; i++) {
+          const rule = rules.item(i);
+          if (!rule) {
+            continue;
+          }
+          if (rule instanceof CSSStyleRule) {
+            const selector = rule.selectorText || '';
+            if (/(?:^|[\s,])(?::root|html)(?:$|[\s,:.[])/i.test(selector)) {
+              for (let j = 0; j < rule.style.length; j++) {
+                const prop = rule.style.item(j);
+                if (prop && prop.startsWith('--')) {
+                  customPropNames.add(prop);
+                }
+              }
+            }
+          } else if ('cssRules' in rule) {
+            try {
+              collectFromRuleList((rule as CSSGroupingRule).cssRules);
+            } catch {
+              // Ignore cross-origin grouping rules
+            }
+          }
+        }
+      }
+
+      for (let s = 0; s < document.styleSheets.length; s++) {
+        const sheet = document.styleSheets.item(s);
+        if (!sheet) {
+          continue;
+        }
+        try {
+          collectFromRuleList(sheet.cssRules);
+        } catch {
+          // Ignore cross-origin stylesheets that disallow cssRules inspection
+        }
+      }
+
+      const resolved: Array<{ name: string; value: string }> = [];
+      for (const name of customPropNames) {
+        const val = computedRoot.getPropertyValue(name).trim();
+        if (val) {
+          resolved.push({ name, value: val });
+        }
+      }
+
+      return {
+        rootFontSizePx: effectiveRootFontPx,
+        declarations: resolved,
+      };
+    }
+  );
+
+  const scale = createEmptyTokenScale();
+  for (const decl of declarations) {
+    const classified = classifyAndNormalizeTokenValue(decl.name, decl.value, rootFontSizePx);
+    if (classified) {
+      scale[classified.category].push(classified.normalizedValue);
+    }
+  }
+
+  const merged = mergeTokenScales(scale);
+  const totalDiscovered =
+    merged.colors.length +
+    merged.spacing.length +
+    merged.fontSizes.length +
+    merged.radii.length;
+
+  logTelemetry(
+    'tokens:auto-discover',
+    'Scraped ' +
+      paint(String(totalDiscovered), 'bold', 'cyan') +
+      ' normalized tokens from live :root CSS variables.'
+  );
+
+  return merged;
 }
