@@ -4,7 +4,7 @@
 - **Epic:** `AgnosticUI/uirig#33` (`label:epic:a2ui-eval`)
 - **Depends on:** `AgnosticUI/uirig#19`
 - **Branch:** `feat/issue-31-a2ui-surface-attribution`
-- **Status:** Planned
+- **Status:** In Progress (Chunks 0–1 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -29,12 +29,12 @@ Populated on `IAgenticViolation.a2ui` when a violation occurs inside an `<a2ui-s
 
 ## 2. Micro-Chunk Execution Breakdown
 
-- [ ] **Chunk 0: Planning & Continuity Capsule Scaffold**
+- [x] **Chunk 0: Planning & Continuity Capsule Scaffold**
   - **Files:** `.uirig/docs/IMPLEMENT_ISSUE_31.md`, `.uirig/docs/NEXT_PROMPT.md`
   - **Action:** Cut branch `feat/issue-31-a2ui-surface-attribution` after `#19` merges and update continuity docs.
   - **Commit:** `docs(plan): initialize branch and tracking for issue #31`
 
-- [ ] **Chunk 1: Composed-Tree `<a2ui-surface>` Discovery & `IA2uiAttribution` Contract**
+- [x] **Chunk 1: Composed-Tree `<a2ui-surface>` Discovery & `IA2uiAttribution` Contract**
   - **Files:** `src/interfaces/locator.ts`, `src/utils/a2ui-attribution.ts`, `tests/unit/a2ui-attribution.test.ts`
   - **Action:**
     - Define `IA2uiAttribution` in `src/interfaces/locator.ts`.
@@ -46,7 +46,7 @@ Populated on `IAgenticViolation.a2ui` when a violation occurs inside an `<a2ui-s
   - **Files:** `src/utils/agent-stream.ts`, `src/commands/check.ts`, `tests/unit/a2ui-attribution.test.ts`
   - **Action:**
     - Attach `a2ui: IA2uiAttribution | null` to every `IAgenticViolation` emitted in `--json` mode (`null` on non-A2UI pages).
-    - Translate generic DOM/AX/contrast/stress failures inside `<a2ui-surface>` into catalog-neutral A2UI v1.0 `updateComponents` `remediationAdvice` scoped to `a2uiComponentId` (e.g., _"In updateComponents for surface 'support-ticket', add a non-empty 'ariaLabel' or 'label' property to component 'close_drawer_btn' (IconButton)."_).
+    - Translate generic DOM/AX/contrast/stress failures inside `<a2ui-surface>` into catalog-neutral A2UI v1.0 `updateComponents` `remediationAdvice` scoped to `a2uiComponentId`.
     - Add unit tests verifying JSON stream payloads for both `<a2ui-surface>` and standard HTML pages.
   - **Commit:** `feat(a2ui): emit out-of-band a2ui diagnostic block and updateComponents remediation advice`
 
@@ -65,7 +65,7 @@ Populated on `IAgenticViolation.a2ui` when a violation occurs inside an `<a2ui-s
 ---
 
 ## 3. Acceptance Checklist (from `AgnosticUI/uirig#31`)
-- [ ] **Component-ID Discovery:** Resolves `data-a2ui-id`, `data-a2ui-component`, `surface-id`, and `catalog-id` (with `el.component?.id` / `el.component?.component` fallback) across Light and Shadow DOM.
+- [x] **Component-ID Discovery:** Resolves `data-a2ui-id`, `data-a2ui-component`, `surface-id`, and `catalog-id` (with `el.component?.id` / `el.component?.component` fallback) across Light and Shadow DOM.
 - [ ] **Out-of-Band `a2ui` Diagnostic Block:** Populates `a2ui` on `--json` violations inside `<a2ui-surface>` (`null` otherwise) with zero changes to A2UI v1.0 wire schemas.
 - [ ] **Wire-Protocol `remediationAdvice`:** Emits catalog-neutral `updateComponents` instructions scoped to `a2uiComponentId`.
 - [ ] **Multi-Theme Eval Matrix & Renderer Portability:** Evaluates across Light, Dark, and custom themes and passes against at least two distinct A2UI renderer patterns.
