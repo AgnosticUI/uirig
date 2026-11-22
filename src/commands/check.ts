@@ -47,7 +47,10 @@ import {
   countMatchedSelectorsInBrowser,
   validateSelectorsInBrowser,
 } from '../utils/scope.js';
-import { resolveChangedComponentSelectors } from '../core/git-diff.js';
+import {
+  resolveChangedComponentSelectors,
+  type IChangedPathsConfig,
+} from '../core/git-diff.js';
 import type { IUirigIgnoreRule } from '../utils/ignore.js';
 import { resolveA2uiAttributionsForSelectors } from '../utils/a2ui-attribution.js';
 import { resolveViolationSourceLocations } from '../core/source-map.js';
@@ -80,13 +83,13 @@ export interface IUirigConfig {
   tokensPath?: string;
   autoTokens?: boolean;
   themes?: Array<string>;
+  changedPaths?: IChangedPathsConfig;
   thresholdBudgets: IThresholdBudgets;
   viewports: Array<IViewportConfig>;
   ignore?: Array<IUirigIgnoreRule>;
 }
 
 export type AuditToolName = 'tokens' | 'contrast' | 'dark-mode' | 'stress' | 'cls' | 'dom';
-
 export interface ICheckCommandOptions {
   /** Optional positional `<url-or-file>` target for zero-config or single-target overrides. */
   target?: string;
@@ -109,6 +112,8 @@ export interface ICheckCommandOptions {
   changed?: boolean;
   /** Optional Git base ref (e.g. `main`, `origin/main`) used with `--changed` (`--base <ref>`). */
   baseRef?: string;
+  /** Optional include/exclude glob overrides for `--changed` file classification. */
+  changedPaths?: IChangedPathsConfig;
   /** Optional single-engine filter. Runs all enabled engines when omitted. */
   only?: AuditToolName;
   /** When true, auto-discovers design tokens from workspace files and live `:root` CSS variables when `tokensPath` is not set. */
@@ -283,12 +288,33 @@ export function loadUirigConfig(
     ? candidate.themes.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
     : undefined;
 
+  const rawChangedPaths = candidate.changedPaths;
+  let parsedChangedPaths: IChangedPathsConfig | undefined;
+  if (rawChangedPaths !== undefined) {
+    if (typeof rawChangedPaths !== 'object' || rawChangedPaths === null) {
+      throw new Error("ERR_CONFIG_SCHEMA: 'changedPaths' must be an object with optional 'include' and 'exclude' string arrays.");
+    }
+    const include = Array.isArray(rawChangedPaths.include)
+      ? rawChangedPaths.include.filter((g): g is string => typeof g === 'string' && g.trim().length > 0)
+      : undefined;
+    const exclude = Array.isArray(rawChangedPaths.exclude)
+      ? rawChangedPaths.exclude.filter((g): g is string => typeof g === 'string' && g.trim().length > 0)
+      : undefined;
+    if ((include && include.length > 0) || (exclude && exclude.length > 0)) {
+      parsedChangedPaths = {
+        ...(include && include.length > 0 ? { include } : {}),
+        ...(exclude && exclude.length > 0 ? { exclude } : {}),
+      };
+    }
+  }
+
   return {
     $schema: candidate.$schema,
     targetUrls: candidate.targetUrls,
     tokensPath: candidate.tokensPath,
     autoTokens: candidate.autoTokens === true,
     ...(configThemes && configThemes.length > 0 ? { themes: configThemes } : {}),
+    ...(parsedChangedPaths ? { changedPaths: parsedChangedPaths } : {}),
     thresholdBudgets: {
       clsMaxLimit: budgets.clsMaxLimit,
       overflowPixelTolerance: budgets.overflowPixelTolerance,
@@ -539,7 +565,6 @@ export async function auditViewportInParallel(
           document.documentElement.setAttribute('data-theme', t);
         }, themeName);
       }
-
       let matchedSelectorCount: number | undefined;
       if (hasSelectors && selectors) {
         matchedSelectorCount = await countMatchedSelectorsInBrowser(page, selectors);
@@ -619,6 +644,7 @@ export async function auditViewportInParallel(
       await context.close();
     }
   };
+
   const runDarkModeTrack = async (): Promise<Array<IDarkModeViolation>> => {
     if (!runDarkMode) {
       return new Array<IDarkModeViolation>();
@@ -723,8 +749,6 @@ export async function auditViewportInParallel(
     runtimeErrors: readOnlyResult.runtimeErrors,
   };
 }
-
-
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
 ): Promise<ICheckExecutionReport> {
@@ -740,12 +764,18 @@ export async function executeCheckCommand(
   const ephemeralServers = new Array<IEphemeralStaticServer>();
 
   try {
+    const { config, configLabel } = resolveExecutionConfig(options, cwd);
     let effectiveSelectors: Array<string> | undefined = options.selectors
       ? [...options.selectors]
       : undefined;
 
     if (options.changed) {
-      const diffResolution = resolveChangedComponentSelectors(cwd, options.baseRef);
+      const effectiveChangedPaths = options.changedPaths ?? config.changedPaths;
+      const diffResolution = resolveChangedComponentSelectors(
+        cwd,
+        options.baseRef,
+        effectiveChangedPaths
+      );
       if (!diffResolution.isGitRepo) {
         logTelemetry(
           'check:changed',
@@ -759,7 +789,7 @@ export async function executeCheckCommand(
 
         const emptyReport: ICheckExecutionReport = {
           timestamp: new Date().toISOString(),
-          configPath: options.configPath ?? '(changed-diff-skip)',
+          configPath: configLabel,
           reportPath: resolvedReportPath,
           exitCode: 0,
           results: new Array<IViewportAuditReport>(),
@@ -813,7 +843,6 @@ export async function executeCheckCommand(
       }
     }
 
-    const { config, configLabel } = resolveExecutionConfig(options, cwd);
     const activeViewports =
       options.viewportsOverride && options.viewportsOverride.length > 0
         ? options.viewportsOverride

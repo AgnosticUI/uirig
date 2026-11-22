@@ -15,7 +15,7 @@
 * **Renderer-Agnostic A2UI Surface Attribution (`<a2ui-surface>` / `[data-a2ui-surface]`):** Automatically resolves composed ancestors across Lit, React, Vue, Angular, and Flutter Web A2UI v1.0 surfaces into an out-of-band `a2ui` diagnostic block (`surfaceId`, `a2uiComponentId`, `a2uiComponentType`, `catalogId`, `wirePath`, `suggestedPatch`) and catalog-neutral `updateComponents` `remediationAdvice` with zero changes to A2UI wire schemas.
 * **Zero Screenshot Diff Flakiness & Zero Vision-Token Bloat:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast (including CSS `background-clip: text` gradient color stops), and W3C session-window CLS scores—plus `--spatial-brief` delivers macro-layout coordinates in ~40 plain-text tokens instead of 1,500–3,000+ vision tokens.
 * **Root-Cause Grouped, Priority-Ranked & Token-Budgeted for AI Agents:** Collapse cascading child failures under their shared parent container with `--group-by-root`, automatically sort violations from highest page impact (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`), and cap output with `--top=<n>` and `--max-tokens=<budget>`.
-* **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, pass `--auto-tokens` to auto-discover `:root` CSS variables, Tailwind v4 `@theme`, and W3C `.tokens.json` scales, evaluate multiple theme skins with `--themes`, or scope audits to specific components with `--selectors`.
+* **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, pass `--auto-tokens` to auto-discover `:root` CSS variables, Tailwind v4 `@theme`, and W3C `.tokens.json` scales, evaluate multiple theme skins with `--themes`, or scope audits to specific components with `--selectors` or `--changed`.
 * **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout` while keeping colored telemetry on `stderr`.
 
 ### Works Alongside Google Modern Web Guidance
@@ -51,6 +51,9 @@ npx @rlevin/uirig ./dist/index.html --auto-tokens --fix
 # Evaluate across multiple theme skins (Light, Dark, compound brand skins) in one pass
 npx @rlevin/uirig http://localhost:5173 --themes="light, dark, enterprise-dark" --json
 
+# Scope checks incrementally to components modified in git diff (or against --base=main)
+npx @rlevin/uirig http://localhost:5173 --changed --base=main --json
+
 # Scope checks to specific components or CSS selectors (Light DOM + Shadow DOM)
 npx @rlevin/uirig http://localhost:5173 --selectors="#hero, ag-button, .pricing-card"
 
@@ -77,6 +80,7 @@ npx @rlevin/uirig http://localhost:5173 --group-by-root --spatial-brief --top=5 
 | **6. DOM & AX Integrity** | `dom` | Inspects Chromium's computed accessibility tree (`ax_empty_name`, `ax_hidden_focus`) plus dangling `aria-labelledby`/`for` IDs, unlabeled controls, broken `<img>` loads, `javascript:` URIs, orphaned Web Component `<slot>` children, and hidden AI prompt-injection traps. | `1` |
 
 *(Full suite runs also automatically fail with exit code `1` if the page throws uncaught runtime JavaScript errors during load.)*
+
 ---
 
 ## Installation & Workspace Setup
@@ -101,11 +105,15 @@ npx @rlevin/uirig init
 
 ```json
 {
-  "\$schema": "https://json-schema.org/draft/2020-12/schema",
+  "\$schema": "https://json-schema.org",
   "targetUrls": ["http://localhost:5173"],
   "tokensPath": "./config/default_tokens.json",
   "autoTokens": false,
   "themes": ["light", "dark"],
+  "changedPaths": {
+    "include": ["src/components/**", "src/app/**/_components/**", "app/views/**"],
+    "exclude": ["src/toys/**", "src/experimental/**"]
+  },
   "thresholdBudgets": {
     "clsMaxLimit": 0.1,
     "overflowPixelTolerance": 2,
@@ -122,7 +130,7 @@ npx @rlevin/uirig init
 }
 ```
 
-*(When `tokensPath` is omitted and `--auto-tokens` or `"autoTokens": true` is active, `uirig` automatically discovers design tokens from W3C `*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS blocks, and live `:root` CSS custom properties. Explicit `tokensPath` always takes precedence.)*
+*(When `tokensPath` is omitted and `--auto-tokens` or `"autoTokens": true` is active, `uirig` automatically discovers design tokens from W3C `*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS blocks, and live `:root` CSS custom properties. Explicit `tokensPath` always takes precedence. When `changedPaths` is omitted, `--changed` automatically detects standard frontend component extensions as well as server-rendered templates like `.erb`, `.jinja2`, `.heex`, `.twig`, and `.cshtml` across any folder layout.)*
 
 ### Bundler-Proof Rule Escape Hatches
 Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comments, you can exempt intentional one-off overrides in two ways:
@@ -166,18 +174,18 @@ Launches a single Chromium instance and executes all 6 verification engines acro
 Run any individual verification engine in isolation for rapid inner-loop debugging or targeted AI agent re-checks:
 
 ```bash
-npx @rlevin/uirig tokens [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig contrast [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig dark-mode [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig stress [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig cls [<url-or-file>] [--themes=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig tokens [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig contrast [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig dark-mode [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig stress [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig cls [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
 ```
 
 ### Shared Options
 * `--auto-tokens`: Auto-discover design tokens from workspace files (`*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS) and live `:root` CSS custom properties when `tokensPath` is not set.
 * `--themes=<csv>`: Evaluate the target across multiple theme skins (e.g. `--themes="light, dark, enterprise-dark"`) via `data-theme` and color-scheme emulation in a single session.
-* `--changed`: Inspect `git diff` to infer modified custom element tags/selectors and skip browser execution cleanly (`exitCode: 0`) when no UI/component files changed.
+* `--changed`: Inspect `git diff` (filtered by optional `changedPaths` globs) to infer modified custom element tags/selectors and skip browser execution cleanly (`exitCode: 0`) when no UI/component/template files changed.
 * `--base=<ref>`: Git base ref for `--changed` diff comparison (e.g. `--base=main` or `--base=origin/main` in CI/CD pull requests).
 * `--fix`: Apply deterministic, unambiguous 1-to-1 fixes on disk (when `sourceFile` and `lineNumber` are resolved inside the workspace) and automatically run a re-verification pass.
 * `-s, --selectors=<csv>`: Filter element-level checks to matching CSS selectors (comma-separated and repeatable; pierces Web Component `ShadowRoot` boundaries).
@@ -196,6 +204,7 @@ npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--co
 * `0`: All token, contrast, dark-mode parity, geometric stress, CLS, DOM integrity, and runtime checks passed.
 * `1`: Design token drift, WCAG/dark-mode contrast failure, DOM/ARIA/hygiene violation, uncaught runtime JS error, or config error.
 * `2`: Structural layout break (overflow, horizontal scrollbar, tap-target collision) or CLS budget breach.
+
 ---
 
 ## How Self-Healing Actually Works: Sensor vs. Actor Ownership
@@ -290,7 +299,7 @@ Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Curso
 - name: Run uirig UI verification gate
   run: |
     npm run build
-    npx @rlevin/uirig ./dist/index.html --verbose
+    npx @rlevin/uirig ./dist/index.html --changed --base=origin/\${{ github.base_ref }} --verbose
 ```
 
 On every `uirig check` run, `.uirig/github_pr_comment.md` is generated and ready to post onto Pull Requests.
@@ -300,7 +309,7 @@ On every `uirig check` run, `.uirig/github_pr_comment.md` is generated and ready
 ```bash
 #!/usr/bin/env bash
 set -e
-npx @rlevin/uirig check --config=uirig.config.json
+npx @rlevin/uirig check --changed --config=uirig.config.json
 ```
 
 ### 5. Local Development & Playground

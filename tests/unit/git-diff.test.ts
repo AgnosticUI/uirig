@@ -1,6 +1,7 @@
 /**
  * tests/unit/git-diff.test.ts
- * Unit & E2E specs for Incremental Git-Diff Component Scoping (`--changed` / `--base <ref>`) (Issue #14).
+ * Unit & E2E specs for Incremental Git-Diff Component Scoping (`--changed` / `--base <ref>`)
+ * and `changedPaths` (`include` / `exclude` globs) (Issue #14).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -10,12 +11,13 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   inferSelectorsFromFile,
+  isUiComponentFile,
   resolveChangedComponentSelectors,
 } from '../../src/core/git-diff.js';
 import { executeCheckCommand } from '../../src/commands/check.js';
 import { parseCliArgs } from '../../src/index.js';
 
-describe('::: ISSUE #14 (CHUNKS 1–2): INCREMENTAL GIT-DIFF COMPONENT SCOPING :::', () => {
+describe('::: ISSUE #14: INCREMENTAL GIT-DIFF COMPONENT SCOPING & CHANGED PATHS :::', () => {
   it('==> Should infer custom element tags from customElements.define, @customElement, stylesheets, and filenames', () => {
     expect(
       inferSelectorsFromFile(
@@ -38,6 +40,21 @@ export class AgTicketCard extends LitElement {}`
     ).toEqual(['ag-pricing-card']);
 
     expect(inferSelectorsFromFile('src/utils/format.ts', 'export const x = 1;')).toEqual([]);
+  });
+
+  it('==> Should support server-rendered templates (.erb, .jinja2) and custom changedPaths include/exclude globs', () => {
+    expect(isUiComponentFile('app/views/tickets/show.html.erb')).toBe(true);
+    expect(isUiComponentFile('templates/partials/drawer.jinja2')).toBe(true);
+
+    const pathsConfig = {
+      include: ['src/components/**', 'src/app/**/_components/**', 'server/views/*.py'],
+      exclude: ['src/toys/**', 'src/experimental/**'],
+    };
+    expect(isUiComponentFile('src/toys/components/Demo.tsx', pathsConfig)).toBe(false);
+    expect(isUiComponentFile('src/experimental/codez/Scratch.ts', pathsConfig)).toBe(false);
+    expect(isUiComponentFile('src/app/dashboard/_components/MetricCard.tsx', pathsConfig)).toBe(true);
+    expect(isUiComponentFile('server/views/render_ticket.py', pathsConfig)).toBe(true);
+    expect(isUiComponentFile('server/api/billing.py', pathsConfig)).toBe(false);
   });
 
   it('==> Should skip browser execution (exitCode 0) when only non-UI files changed, and scope audits to changed components when UI files changed', async () => {

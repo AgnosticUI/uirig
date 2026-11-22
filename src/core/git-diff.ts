@@ -1,14 +1,22 @@
 /**
  * src/core/git-diff.ts
  * Incremental Git-Diff Component Scoping (`--changed` / `--base <ref>`) (Issue #14).
- * Inspects modified files in Git, infers custom element tags and component selectors
- * (`customElements.define(...)`, `@customElement(...)`, hyphenated filenames/tags),
- * and enables zero-overhead early exit when no UI/component files changed.
+ * Inspects modified files in Git, applies optional `changedPaths` (`include` / `exclude` globs),
+ * infers custom element tags and component selectors (`customElements.define(...)`,
+ * `@customElement(...)`, hyphenated filenames/tags), and enables zero-overhead early exit
+ * when no UI/component/template files changed.
  */
 
 import { execFileSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { basename, extname, resolve } from 'path';
+
+export interface IChangedPathsConfig {
+  /** Optional glob patterns (e.g. `["src/components/**", "app/views/**", "server/html_*.py"]`) that classify changed files as UI files. */
+  include?: Array<string>;
+  /** Optional glob patterns (e.g. `["src/toys/**", "src/experimental/**"]`) excluded from `--changed` triggers. */
+  exclude?: Array<string>;
+}
 
 export interface IChangedComponentsResolution {
   /** Whether the working directory is inside a valid Git repository. */
@@ -37,6 +45,27 @@ const UI_FILE_EXTENSIONS = new Set<string>([
   '.vue',
   '.svelte',
   '.astro',
+  '.erb',
+  '.haml',
+  '.slim',
+  '.jinja',
+  '.jinja2',
+  '.j2',
+  '.njk',
+  '.hbs',
+  '.handlebars',
+  '.mustache',
+  '.twig',
+  '.heex',
+  '.eex',
+  '.cshtml',
+  '.razor',
+  '.tmpl',
+  '.gohtml',
+  '.liquid',
+  '.pug',
+  '.ejs',
+  '.php',
 ]);
 
 const IGNORED_TEST_OR_CONFIG_PATTERNS = [
@@ -47,6 +76,54 @@ const IGNORED_TEST_OR_CONFIG_PATTERNS = [
   /\.config\.[cm]?[jt]s$/i,
   /\.d\.ts$/i,
 ];
+
+function globPatternToRegExp(glob: string): RegExp {
+  const normalized = glob.trim().replace(/\\/g, '/').replace(/^\.\//, '');
+  let regexStr = '^';
+  let i = 0;
+
+  while (i < normalized.length) {
+    const ch = normalized.charAt(i);
+    if (ch === '*') {
+      if (normalized.charAt(i + 1) === '*') {
+        if (normalized.charAt(i + 2) === '/') {
+          regexStr += '(?:.+/)?';
+          i += 3;
+          continue;
+        }
+        regexStr += '.*';
+        i += 2;
+        continue;
+      }
+      regexStr += '[^/]*';
+      i++;
+      continue;
+    }
+    if (ch === '?') {
+      regexStr += '[^/]';
+      i++;
+      continue;
+    }
+    regexStr += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    i++;
+  }
+
+  regexStr += '$';
+  return new RegExp(regexStr);
+}
+
+export function matchesAnyGlob(relPath: string, globs: ReadonlyArray<string>): boolean {
+  const normalized = relPath.replace(/\\/g, '/').replace(/^\.\//, '');
+  for (const glob of globs) {
+    if (glob.trim().length === 0) {
+      continue;
+    }
+    if (globPatternToRegExp(glob).test(normalized)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function runGitCommand(cwd: string, args: Array<string>): string | null {
   try {
@@ -60,9 +137,6 @@ function runGitCommand(cwd: string, args: Array<string>): string | null {
   }
 }
 
-/**
- * Collects modified (staged, unstaged, untracked, or against `baseRef`) workspace-relative file paths.
- */
 export function getGitChangedFiles(
   cwd: string,
   baseRef?: string
@@ -73,7 +147,6 @@ export function getGitChangedFiles(
   }
 
   const collected = new Set<string>();
-
   const addLines = (output: string | null): void => {
     if (!output) {
       return;
@@ -88,11 +161,9 @@ export function getGitChangedFiles(
 
   if (baseRef && baseRef.trim().length > 0) {
     const cleanRef = baseRef.trim();
-    // Compare baseRef...HEAD plus any uncommitted working tree changes
     addLines(runGitCommand(cwd, ['diff', '--name-only', cleanRef + '...HEAD']));
     addLines(runGitCommand(cwd, ['diff', '--name-only', cleanRef]));
   } else {
-    // Working tree + staged changes against HEAD (falling back to index diff if initial commit)
     const headDiff = runGitCommand(cwd, ['diff', '--name-only', 'HEAD']);
     if (headDiff !== null) {
       addLines(headDiff);
@@ -110,8 +181,22 @@ export function getGitChangedFiles(
   };
 }
 
-function isUiComponentFile(relPath: string): boolean {
-  const normalized = relPath.replace(/\\/g, '/');
+export function isUiComponentFile(
+  relPath: string,
+  changedPaths?: IChangedPathsConfig
+): boolean {
+  const normalized = relPath.replace(/\\/g, '/').replace(/^\.\//, '');
+
+  if (changedPaths?.exclude && changedPaths.exclude.length > 0) {
+    if (matchesAnyGlob(normalized, changedPaths.exclude)) {
+      return false;
+    }
+  }
+
+  if (changedPaths?.include && changedPaths.include.length > 0) {
+    return matchesAnyGlob(normalized, changedPaths.include);
+  }
+
   for (const pattern of IGNORED_TEST_OR_CONFIG_PATTERNS) {
     if (pattern.test(normalized)) {
       return false;
@@ -121,11 +206,6 @@ function isUiComponentFile(relPath: string): boolean {
   return UI_FILE_EXTENSIONS.has(ext);
 }
 
-/**
- * Infers custom element tag names or CSS selectors from a single UI/component file's
- * source content and filename (e.g. `customElements.define('ag-card', ...)`,
- * `@customElement('ag-button')`, or `ag-pricing-card.ts` -> `ag-pricing-card`).
- */
 export function inferSelectorsFromFile(
   relPath: string,
   fileContent: string | null
@@ -133,7 +213,6 @@ export function inferSelectorsFromFile(
   const selectors = new Set<string>();
 
   if (fileContent && fileContent.length > 0) {
-    // 1. Standard Web Component `customElements.define('tag-name', ...)`
     const defineRegex = /customElements\.define\(\s*['"`]([a-z][a-z0-9-]*-[a-z0-9-]+)['"`]/g;
     let defineMatch: RegExpExecArray | null = defineRegex.exec(fileContent);
     while (defineMatch !== null) {
@@ -143,7 +222,6 @@ export function inferSelectorsFromFile(
       defineMatch = defineRegex.exec(fileContent);
     }
 
-    // 2. Lit / Fast / Stencil `@customElement('tag-name')` or `@Component({ tag: 'tag-name' })`
     const decoratorRegex =
       /(?:@customElement\(\s*['"`]([a-z][a-z0-9-]*-[a-z0-9-]+)['"`]\s*\)|@Component\(\s*\{[^}]*\btag\s*:\s*['"`]([a-z][a-z0-9-]*-[a-z0-9-]+)['"`])/g;
     let decMatch: RegExpExecArray | null = decoratorRegex.exec(fileContent);
@@ -155,7 +233,6 @@ export function inferSelectorsFromFile(
       decMatch = decoratorRegex.exec(fileContent);
     }
 
-    // 3. CSS host/custom-element rules in stylesheets (`.css`, `.scss`)
     const ext = extname(relPath).toLowerCase();
     if (ext === '.css' || ext === '.scss' || ext === '.sass' || ext === '.less') {
       const cssTagRegex = /(?:^|[\s,{])([a-z][a-z0-9]*-[a-z0-9-]+)(?=[\s.{:#[,>+~])/gm;
@@ -169,7 +246,6 @@ export function inferSelectorsFromFile(
     }
   }
 
-  // 4. Fallback: hyphenated custom element filename (`ag-pricing-card.ts` -> `ag-pricing-card`)
   if (selectors.size === 0) {
     const stem = basename(relPath, extname(relPath))
       .replace(/\.stories$/i, '')
@@ -183,13 +259,10 @@ export function inferSelectorsFromFile(
   return Array.from(selectors);
 }
 
-/**
- * Resolves changed Git files and maps modified UI/component files to their
- * corresponding custom element tags / CSS selectors.
- */
 export function resolveChangedComponentSelectors(
   cwd: string,
-  baseRef?: string
+  baseRef?: string,
+  changedPaths?: IChangedPathsConfig
 ): IChangedComponentsResolution {
   const { isGitRepo, files } = getGitChangedFiles(cwd, baseRef);
   if (!isGitRepo) {
@@ -201,7 +274,7 @@ export function resolveChangedComponentSelectors(
     };
   }
 
-  const changedUiFiles = files.filter((f) => isUiComponentFile(f));
+  const changedUiFiles = files.filter((f) => isUiComponentFile(f, changedPaths));
   const selectorSet = new Set<string>();
 
   for (const relFile of changedUiFiles) {
