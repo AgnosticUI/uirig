@@ -81,13 +81,16 @@ export function normalizeViewportViolations(
   viewportReport: IViewportAuditReport
 ): Array<IAgenticViolation> {
   const normalized = new Array<IAgenticViolation>();
-  const viewportLabel =
+  const baseViewportLabel =
     viewportReport.viewport.name +
     ' (' +
     viewportReport.viewport.width +
     'x' +
     viewportReport.viewport.height +
     ')';
+  const viewportLabel = viewportReport.theme
+    ? baseViewportLabel + ' [theme: ' + viewportReport.theme + ']'
+    : baseViewportLabel;
 
   function resolveA2uiForViolation(params: {
     selector: string;
@@ -174,7 +177,7 @@ export function normalizeViewportViolations(
       contrastViolation.backgroundRgb +
       ") on '" +
       contrastViolation.selector +
-      "' so computed WCAG contrast reaches at least 4.50:1." +
+      "' so computed WCAG (Web Content Accessibility Guidelines) contrast reaches at least 4.50:1." +
       tokenSuffix;
     const { a2ui, remediationAdvice } = resolveA2uiForViolation({
       selector: contrastViolation.selector,
@@ -202,8 +205,7 @@ export function normalizeViewportViolations(
       remediationAdvice,
     });
   }
-
-    // 3. Normalize Dark-Mode Theme Parity Violations (`dark-mode`)
+  // 3. Normalize Dark-Mode Theme Parity Violations (`dark-mode`)
   for (const darkViolation of viewportReport.darkModeViolations ?? new Array()) {
     const hostComponent =
       darkViolation.hostComponent !== undefined
@@ -465,8 +467,7 @@ export function normalizeViewportViolations(
       remediationAdvice,
     });
   }
-  
-  // 7. Normalize Uncaught Runtime JS & Console Errors (runtime)
+  // 7. Normalize Uncaught Runtime JS (JavaScript) & Console Errors (runtime)
   for (const runtimeErr of viewportReport.runtimeErrors ?? new Array()) {
     normalized.push({
       engine: 'runtime',

@@ -1,14 +1,18 @@
-# Session Continuity: Issue #31 (`feat/issue-31-a2ui-surface-attribution`)
+# Session Continuity: Issue #31 Complete -> Next Issue `#32` (`epic:a2ui-eval`)
 
 ## Current Context
 - **Repository:** `AgnosticUI/uirig`
-- **Active Branch:** `feat/issue-31-a2ui-surface-attribution`
-- **Active Issue:** `#31` — `feat(a2ui): universal <a2ui-surface> component attribution and eval mode` (Track A — Task 4 of Epic `#33`)
-- **Tracking Plan:** `.uirig/docs/IMPLEMENT_ISSUE_31.md`
+- **Completed Branch:** `feat/issue-31-a2ui-surface-attribution` (ready to merge into `main`)
+- **Completed Issue:** `#31` — `feat(a2ui): universal <a2ui-surface> component attribution and eval mode` (Track A — Task 4 of Epic `#33`)
+- **Tracking Plan:** `.uirig/docs/IMPLEMENT_ISSUE_31.md` (all Chunks 0–4 marked `[x]` complete)
 
-## Completed
-- **Chunk 0:** Branch `feat/issue-31-a2ui-surface-attribution` checked out.
-- **Chunk 1:** Defined `IA2uiAttribution` in `src/interfaces/locator.ts` and implemented `resolveA2uiAttributionFromComposedChain()` and `resolveA2uiAttributionsForSelectors()` in `src/utils/a2ui-attribution.ts` with unit and live Chromium specs in `tests/unit/a2ui-attribution.test.ts`.
+## Roadmap Progress (`epic:a2ui-eval` `#33`)
+- [x] **Track A — Task 1 (`#19`):** Computed Accessibility Tree Snapshot (`ax_empty_name`, `ax_hidden_focus`)
+- [x] **Track A — Task 4 (`#31`):** Universal `<a2ui-surface>` Component Attribution & Eval Mode
+- [ ] **Track A — Task 5 (`#32`):** AgnosticUI Support Center Studio Eval Gate & Self-Healing Demo (`.uirig/docs/IMPLEMENT_ISSUE_32.md`)
+- [ ] **Track B — Task 2 (`#9`):** Framework Source-Map & `file:line` Attribution (`.uirig/docs/IMPLEMENT_ISSUE_9.md`)
+- [ ] **Track B — Task 3 (`#13`):** Deterministic Auto-Fix Patch Generation (`--fix` / `unifiedDiff`) (`.uirig/docs/IMPLEMENT_ISSUE_13.md`)
 
-## Next Step (Chunk 2)
-Attach `a2ui: IA2uiAttribution | null` to `IAgenticViolation` in `src/utils/agent-stream.ts` + `src/commands/check.ts` and generate catalog-neutral A2UI v1.0 `updateComponents` `remediationAdvice` when violations occur inside `<a2ui-surface>`, verify, and commit Chunk 2.
+## Immediate Next Step
+1. Verify `git checkout main && git pull origin main` after merging PR `#31`.
+2. Cut branch `feat/issue-32-a2ui-support-center-demo` from `main` and begin **Issue `#32` — Chunk 1** (Support Center `<a2ui-surface>` scenario fixtures & multi-viewport eval gate tests).

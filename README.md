@@ -12,9 +12,10 @@
 
 * **Catches Design-System Drift `axe` Misses:** `axe` won't tell you that an AI agent hardcoded `#3b82f6` instead of `--ag-color-primary`, or that `+30%` longer German translation copy overflowed `<ag-card>`.
 * **Pierces Web Component Shadow DOMs & Audits `<slot>` + Computed AX Tree Integrity:** `Lighthouse` won't climb inside a Lit or Stencil `ShadowRoot` to tell a coding agent *which custom element* (`hostComponent`) broke dark-mode contrast, layout bounds, dropped an orphaned `slot="..."` child, or severed its computed accessibility name (`ax_empty_name` / `ax_hidden_focus`).
+* **Renderer-Agnostic A2UI Surface Attribution (`<a2ui-surface>` / `[data-a2ui-surface]`):** Automatically resolves composed ancestors across Lit, React, Vue, Angular, and Flutter Web A2UI v1.0 surfaces into an out-of-band `a2ui` diagnostic block (`surfaceId`, `a2uiComponentId`, `a2uiComponentType`, `catalogId`, `wirePath`, `suggestedPatch`) and catalog-neutral `updateComponents` `remediationAdvice` with zero changes to A2UI wire schemas.
 * **Zero Screenshot Diff Flakiness & Zero Vision-Token Bloat:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast (including CSS `background-clip: text` gradient color stops), and W3C session-window CLS scores—plus `--spatial-brief` delivers macro-layout coordinates in ~40 plain-text tokens instead of 1,500–3,000+ vision tokens.
 * **Root-Cause Grouped, Priority-Ranked & Token-Budgeted for AI Agents:** Collapse cascading child failures under their shared parent container with `--group-by-root`, automatically sort violations from highest page impact (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`), and cap output with `--top=<n>` and `--max-tokens=<budget>`.
-* **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, pass `--auto-tokens` to auto-discover `:root` CSS variables, Tailwind v4 `@theme`, and W3C `.tokens.json` scales, or scope audits to specific components with `--selectors`.
+* **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, pass `--auto-tokens` to auto-discover `:root` CSS variables, Tailwind v4 `@theme`, and W3C `.tokens.json` scales, evaluate multiple theme skins with `--themes`, or scope audits to specific components with `--selectors`.
 * **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout` while keeping colored telemetry on `stderr`.
 
 ---
@@ -33,8 +34,8 @@ npx @rlevin/uirig ./dist/index.html
 # Auto-discover :root CSS variables, Tailwind v4 @theme, and W3C .tokens.json with zero config
 npx @rlevin/uirig ./dist/index.html --auto-tokens --verbose
 
-# Print individual failing selectors and details in the terminal
-npx @rlevin/uirig ./dist/index.html --verbose
+# Evaluate across multiple theme skins (Light, Dark, custom brand skins) in one pass
+npx @rlevin/uirig http://localhost:5173 --themes="light, dark, enterprise" --json
 
 # Scope checks to specific components or CSS selectors (Light DOM + Shadow DOM)
 npx @rlevin/uirig http://localhost:5173 --selectors="#hero, ag-button, .pricing-card"
@@ -62,6 +63,7 @@ npx @rlevin/uirig http://localhost:5173 --group-by-root --spatial-brief --top=5 
 | **6. DOM & AX Integrity** | `dom` | Inspects Chromium's computed accessibility tree (`ax_empty_name`, `ax_hidden_focus`) plus dangling `aria-labelledby`/`for` IDs, unlabeled controls, broken `<img>` loads, `javascript:` URIs, orphaned Web Component `<slot>` children, and hidden AI prompt-injection traps. | `1` |
 
 *(Full suite runs also automatically fail with exit code `1` if the page throws uncaught runtime JavaScript errors during load.)*
+
 ---
 
 ## Installation & Workspace Setup
@@ -69,38 +71,42 @@ npx @rlevin/uirig http://localhost:5173 --group-by-root --spatial-brief --top=5 
 ### Prerequisites
 * **Node.js 22+**
 * **Playwright Chromium browser binary**
+
 ```bash
-  npm install -D @rlevin/uirig
-  npx playwright install chromium
+npm install -D @rlevin/uirig
+npx playwright install chromium
 ```
 
 ### Optional Workspace Initialization (`uirig init`)
 When you are ready to enforce custom design tokens, multi-viewport budgets, or AI agent skills in a repository, run `init` to scaffold `uirig.config.json`, `.uirig/session.json`, and `.uirig/SKILL.md`:
+
 ```bash
-  npx @rlevin/uirig init
+npx @rlevin/uirig init
 ```
 
 ### Configuration (`uirig.config.json`)
+
 ```json
-    {
-      "$schema": "https://json-schema.org",
-      "targetUrls": ["http://localhost:5173"],
-      "tokensPath": "./config/default_tokens.json",
-      "autoTokens": false,
-      "thresholdBudgets": {
-        "clsMaxLimit": 0.1,
-        "overflowPixelTolerance": 2,
-        "touchTargetMinSpacingPx": 24,
-        "darkModeMaxSurfaceLuminance": 0.85
-      },
-      "viewports": [
-        { "name": "mobile", "width": 375, "height": 812 },
-        { "name": "desktop", "width": 1440, "height": 900 }
-      ],
-      "ignore": [
-        { "rule": "tokens", "selector": ".legacy-embed" }
-      ]
-    }
+{
+  "\$schema": "https://json-schema.org",
+  "targetUrls": ["http://localhost:5173"],
+  "tokensPath": "./config/default_tokens.json",
+  "autoTokens": false,
+  "themes": ["light", "dark"],
+  "thresholdBudgets": {
+    "clsMaxLimit": 0.1,
+    "overflowPixelTolerance": 2,
+    "touchTargetMinSpacingPx": 24,
+    "darkModeMaxSurfaceLuminance": 0.85
+  },
+  "viewports": [
+    { "name": "mobile", "width": 375, "height": 812 },
+    { "name": "desktop", "width": 1440, "height": 900 }
+  ],
+  "ignore": [
+    { "rule": "tokens", "selector": ".legacy-embed" }
+  ]
+}
 ```
 
 *(When `tokensPath` is omitted and `--auto-tokens` or `"autoTokens": true` is active, `uirig` automatically discovers design tokens from W3C `*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS blocks, and live `:root` CSS custom properties. Explicit `tokensPath` always takes precedence.)*
@@ -111,25 +117,26 @@ Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comm
 1. **In Markup (`data-uirig-ignore`):** Add `data-uirig-ignore` to an element, ancestor container, or Web Component host. Exemptions cascade down to child elements and across open `ShadowRoot` boundaries:
 
 ```html
-       <!-- Exempt a single rule -->
-       <div data-uirig-ignore="tokens">Intentional one-off hero gradient</div>
+<!-- Exempt a single rule -->
+<div data-uirig-ignore="tokens">Intentional one-off hero gradient</div>
 
-       <!-- Exempt multiple comma-separated rules -->
-       <ag-card data-uirig-ignore="tokens, dark-mode">Custom promotional card</ag-card>
+<!-- Exempt multiple comma-separated rules -->
+<ag-card data-uirig-ignore="tokens, dark-mode">Custom promotional card</ag-card>
 
-       <!-- Exempt all engines on a third-party widget -->
-       <section data-uirig-ignore="all">Legacy third-party embed</section>
+<!-- Exempt all engines on a third-party widget -->
+<section data-uirig-ignore="all">Legacy third-party embed</section>
 ```
 
 2. **In `uirig.config.json` (`ignore`):** Exempt specific selectors or route URLs (including trailing `*` wildcards) centrally without touching markup:
 
 ```json
-       "ignore": [
-         { "rule": "tokens", "selector": ".legacy-embed" },
-         { "rule": "contrast", "url": "http://localhost:5173/admin/*" },
-         { "rule": "all", "selector": "#third-party-chat" }
-       ]
+"ignore": [
+  { "rule": "tokens", "selector": ".legacy-embed" },
+  { "rule": "contrast", "url": "http://localhost:5173/admin/*" },
+  { "rule": "all", "selector": "#third-party-chat" }
+]
 ```
+
 ---
 
 ## CLI Command Reference
@@ -140,20 +147,23 @@ Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comm
 Runs all 6 verification engines against a single URL or local `.html` path using `uirig.config.json` if present, or sensible built-in defaults if not.
 
 ### `uirig check [options]`
-Launches a single Chromium instance and executes all 6 verification engines across every configured `(url, viewport)` pair in isolated parallel `BrowserContext` sessions. Writes a standalone Markdown PR report to `.uirig/github_pr_comment.md`.
+Launches a single Chromium instance and executes all 6 verification engines across every configured `(url, viewport, theme)` tuple in isolated parallel `BrowserContext` sessions. Writes a standalone Markdown PR report to `.uirig/github_pr_comment.md`.
+
 ### Standalone Engine Commands
 Run any individual verification engine in isolation for rapid inner-loop debugging or targeted AI agent re-checks:
 
 ```bash
-    npx @rlevin/uirig tokens [<url-or-file>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig contrast [<url-or-file>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig dark-mode [<url-or-file>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig cls [<url-or-file>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig tokens [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig contrast [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig dark-mode [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig stress [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig cls [<url-or-file>] [--themes=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+```
 
 ### Shared Options
 * `--auto-tokens`: Auto-discover design tokens from workspace files (`*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS) and live `:root` CSS custom properties when `tokensPath` is not set.
+* `--themes=<csv>`: Evaluate the target across multiple theme skins (e.g. `--themes="light, dark, enterprise"`) via `data-theme` and color-scheme emulation in a single session.
 * `-s, --selectors=<csv>`: Filter element-level checks to matching CSS selectors (comma-separated and repeatable; pierces Web Component `ShadowRoot` boundaries).
 * `--group-by-root`: Collapse cascading child failures under their shared parent container or Web Component host (`childCount` + up to 3 `sampleChildren`).
 * `--top=<n>`: Keep only the top `N` highest-priority violations (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`) and include `totalViolations` + `truncatedCount` metadata when trimmed.
@@ -170,7 +180,6 @@ Run any individual verification engine in isolation for rapid inner-loop debuggi
 * `0`: All token, contrast, dark-mode parity, geometric stress, CLS, DOM integrity, and runtime checks passed.
 * `1`: Design token drift, WCAG/dark-mode contrast failure, DOM/ARIA/hygiene violation, uncaught runtime JS error, or config error.
 * `2`: Structural layout break (overflow, horizontal scrollbar, tap-target collision) or CLS budget breach.
-```
 
 ---
 
@@ -178,61 +187,65 @@ Run any individual verification engine in isolation for rapid inner-loop debuggi
 
 ### 1. AI Design System Harness Loop (`AGENTS.md` + `--auto-tokens --group-by-root --spatial-brief --top=5 --json`)
 `uirig init` generates `.uirig/SKILL.md` so coding agents (Claude Code, Cursor, Codex) can auto-discover design tokens (`--auto-tokens`), verify macro-layout (`spatialBrief`), collapse cascading child failures under their parent (`--group-by-root`), and tackle the highest-impact defects first without prompt bloat:
+
 ```bash
-    npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-brief --top=5 --json
+npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-brief --top=5 --json
 ```
 
-Each entry in `violations` includes `engine`, `hostComponent`, `selector`, `childCount` / `sampleChildren` (when grouped), `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
+Each entry in `violations` includes `engine`, `hostComponent`, `a2ui` (when inside `<a2ui-surface>` or `[data-a2ui-surface]`), `selector`, `childCount` / `sampleChildren` (when grouped), `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates or A2UI `updateComponents` payloads and re-run until `exitCode === 0`.
 
 ### 1b. Native MCP Server Mode (`uirig mcp`)
 Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Cursor, Windsurf, Codex) by registering `uirig mcp`, which keeps a warm headless Chromium pool alive across edits and exposes `uirig_check`, `uirig_tokens`, `uirig_contrast`, `uirig_dark_mode`, `uirig_stress`, `uirig_cls`, and `uirig_dom` as native MCP tools:
 
 ```json
-    {
-      "mcpServers": {
-        "uirig": {
-          "command": "npx",
-          "args": ["-y", "@rlevin/uirig", "mcp"]
-        }
-      }
+{
+  "mcpServers": {
+    "uirig": {
+      "command": "npx",
+      "args": ["-y", "@rlevin/uirig", "mcp"]
     }
+  }
+}
 ```
 
 *(You can also inspect or debug tools interactively via `npx @modelcontextprotocol/inspector npx @rlevin/uirig mcp`, or run over HTTP/SSE with `npx @rlevin/uirig mcp --transport=sse --port=3333`.)*
 
 ### 2. GitHub Actions CI/CD Gate
+
 ```yml
-    - name: Run uirig UI verification gate
-      run: |
-        npm run build
-        npx @rlevin/uirig ./dist/index.html --verbose
+- name: Run uirig UI verification gate
+  run: |
+    npm run build
+    npx @rlevin/uirig ./dist/index.html --verbose
 ```
 
 On every `uirig check` run, `.uirig/github_pr_comment.md` is generated and ready to post onto Pull Requests.
 
 ### 3. Git Pre-Commit Hook (`.git/hooks/pre-commit`)
+
 ```bash
-    #!/usr/bin/env bash
-    set -e
-    npx @rlevin/uirig check --config=uirig.config.json
+#!/usr/bin/env bash
+set -e
+npx @rlevin/uirig check --config=uirig.config.json
 ```
 
 ### 4. Local Development & Playground
+
 ```bash
-    # Build, typecheck, and run the full unit & MCP integration test suite
-    npm run typecheck:all && npm test
+# Build, typecheck, and run the full unit & MCP integration test suite
+npm run typecheck:all && npm test
 
-    # Build and launch the interactive MCP Inspector UI against local dist/index.js
-    npm run build && npx @modelcontextprotocol/inspector node dist/index.js mcp
-    # Tip: When auditing external URLs in MCP Inspector from the uirig repo root, pass
-    # `"cwd": "/tmp"` in tool arguments to bypass the repo's local uirig.config.json.
+# Build and launch the interactive MCP Inspector UI against local dist/index.js
+npm run build && npx @modelcontextprotocol/inspector node dist/index.js mcp
+# Tip: When auditing external URLs in MCP Inspector from the uirig repo root, pass
+# `"cwd": "/tmp"` in tool arguments to bypass the repo's local uirig.config.json.
 
-    # Start the interactive Vite + Lit playground
-    npm run playground:dev
+# Start the interactive Vite + Lit playground
+npm run playground:dev
 
-    # Run end-to-end playground verification (headless or headed)
-    npm run playground:test
-    npm run playground:test:headed
+# Run end-to-end playground verification (headless or headed)
+npm run playground:test
+npm run playground:test:headed
 ```
 
 ---
