@@ -115,9 +115,11 @@ export interface ICheckCommandOptions {
 export interface IViewportAuditReport {
   url: string;
   viewport: IViewportConfig;
+  /** Active theme skin name when multi-theme evaluation (`--themes`) is enabled. */
+  theme?: string;
   /** Active `--selectors` / `-s` filters when the audit was component-scoped. */
   scopedSelectors?: Array<string>;
-  /** Number of unique elements matched across Light + Shadow DOM for `scopedSelectors`. */
+  /** Number of unique elements matched across Light + Shadow DOM (Document Object Model) for `scopedSelectors`. */
   matchedSelectorCount?: number;
   /** Compact plain-text bounding-box summary emitted when `--spatial-brief` is enabled. */
   spatialBrief?: string;
@@ -131,6 +133,7 @@ export interface IViewportAuditReport {
   domViolations?: Array<IDomIntegrityViolation>;
   runtimeErrors?: Array<IRuntimeErrorViolation>;
 }
+
 
 export interface ICheckExecutionReport {
   timestamp: string;
