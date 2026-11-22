@@ -11,10 +11,10 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
 
          npx @rlevin/uirig check --json
 
-   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly (combine `--group-by-root`, `--spatial-brief`, and `--top` / `--max-tokens` for compact, root-cause-first feedback):
+   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly (add `--auto-tokens` when no `tokensPath` is configured to auto-discover `:root` CSS variables, Tailwind v4 `@theme`, and W3C `.tokens.json` scales, and combine `--group-by-root`, `--spatial-brief`, and `--top` / `--max-tokens` for compact feedback):
 
-         npx @rlevin/uirig http://localhost:5173 --group-by-root --spatial-brief --top=5 --json
-         npx @rlevin/uirig ./dist/index.html --selectors="ag-button, .pricing-card" --max-tokens=1200 --json
+         npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-brief --top=5 --json
+         npx @rlevin/uirig ./dist/index.html --auto-tokens --selectors="ag-button, .pricing-card" --max-tokens=1200 --json
 
    *(If `@rlevin/uirig` is already installed in `node_modules`, `npx uirig ...` works interchangeably.)*
 2. **Evaluate the POSIX exit code and JSON `stdout` payload:**

@@ -12,6 +12,11 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { chromium, type Browser } from 'playwright';
 import { crawlPageTokens, type ITokenScaleConfig, type ITokenViolation } from '../core/tokens.js';
+import {
+  discoverWorkspaceTokens,
+  extractRootCssVariables,
+  mergeTokenScales,
+} from '../core/auto-tokens.js';
 import { auditPageContrast, type IContrastViolation, MIN_WCAG_AA_CONTRAST } from '../core/matrix.js';
 import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
 import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '../core/cls.js';
@@ -61,6 +66,7 @@ export interface IUirigConfig {
   $schema?: string;
   targetUrls: Array<string>;
   tokensPath?: string;
+  autoTokens?: boolean;
   thresholdBudgets: IThresholdBudgets;
   viewports: Array<IViewportConfig>;
   ignore?: Array<IUirigIgnoreRule>;
@@ -88,6 +94,8 @@ export interface ICheckCommandOptions {
   selectors?: Array<string>;
   /** Optional single-engine filter. Runs all enabled engines when omitted. */
   only?: AuditToolName;
+  /** When true, auto-discovers design tokens from workspace files and live `:root` CSS variables when `tokensPath` is not set. */
+  autoTokens?: boolean;
   /** Optional inline token scale override (useful for programmatic calls & tests). */
   tokenScaleOverride?: ITokenScaleConfig;
   /** Optional viewport list override (e.g., single-viewport fast path for MCP tool calls). */
@@ -101,7 +109,6 @@ export interface ICheckCommandOptions {
   /** Optional working directory override for resolving relative paths in tests. */
   cwd?: string;
 }
-
 export interface IViewportAuditReport {
   url: string;
   viewport: IViewportConfig;
@@ -140,6 +147,7 @@ export interface ICheckExecutionReport {
 
 export const ZERO_CONFIG_DEFAULTS: Omit<IUirigConfig, 'targetUrls'> = {
   tokensPath: undefined,
+  autoTokens: false,
   thresholdBudgets: {
     clsMaxLimit: 0.1,
     overflowPixelTolerance: 2,
@@ -163,11 +171,13 @@ export const FALLBACK_TOKEN_SCALE: ITokenScaleConfig = {
 export function loadUirigConfig(
   configPath: string = resolve(process.cwd(), 'uirig.config.json')
 ): IUirigConfig {
-  logTelemetry('check:config', `Loading configuration from ${paint(configPath, 'cyan')}...`);
+  logTelemetry('check:config', 'Loading configuration from ' + paint(configPath, 'cyan') + '...');
 
   if (!existsSync(configPath)) {
     throw new Error(
-      `ERR_CONFIG_MISSING: Configuration file not found at ${configPath}. Run 'uirig init' or pass a target directly (e.g. 'uirig ./index.html').`
+      'ERR_CONFIG_MISSING: Configuration file not found at ' +
+        configPath +
+        ". Run 'uirig init' or pass a target directly (e.g. 'uirig ./index.html')."
     );
   }
 
@@ -177,33 +187,36 @@ export function loadUirigConfig(
     parsed = JSON.parse(raw);
   } catch (err: unknown) {
     const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`ERR_CONFIG_INVALID_JSON: Failed to parse ${configPath}: ${detail}`);
+    throw new Error('ERR_CONFIG_INVALID_JSON: Failed to parse ' + configPath + ': ' + detail);
   }
 
   if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error(`ERR_CONFIG_SCHEMA: Configuration at ${configPath} must be a JSON object.`);
+    throw new Error('ERR_CONFIG_SCHEMA: Configuration at ' + configPath + ' must be a JSON object.');
   }
 
   const candidate = parsed as Partial<IUirigConfig>;
 
   if (!Array.isArray(candidate.targetUrls) || candidate.targetUrls.length === 0) {
     throw new Error(
-      `ERR_CONFIG_SCHEMA: 'targetUrls' must be a non-empty array of URLs in ${configPath}.`
+      "ERR_CONFIG_SCHEMA: 'targetUrls' must be a non-empty array of URLs in " + configPath + '.'
     );
   }
-
   if (
     candidate.tokensPath !== undefined &&
     (typeof candidate.tokensPath !== 'string' || candidate.tokensPath.trim().length === 0)
   ) {
     throw new Error(
-      `ERR_CONFIG_SCHEMA: 'tokensPath' must be a non-empty file path string when specified in ${configPath}.`
+      "ERR_CONFIG_SCHEMA: 'tokensPath' must be a non-empty file path string when specified in " +
+        configPath +
+        '.'
     );
   }
 
   if (!Array.isArray(candidate.viewports) || candidate.viewports.length === 0) {
     throw new Error(
-      `ERR_CONFIG_SCHEMA: 'viewports' must be a non-empty array of viewport definitions in ${configPath}.`
+      "ERR_CONFIG_SCHEMA: 'viewports' must be a non-empty array of viewport definitions in " +
+        configPath +
+        '.'
     );
   }
 
@@ -216,18 +229,18 @@ export function loadUirigConfig(
     typeof budgets.touchTargetMinSpacingPx !== 'number'
   ) {
     throw new Error(
-      `ERR_CONFIG_SCHEMA: 'thresholdBudgets' must define numeric clsMaxLimit, overflowPixelTolerance, and touchTargetMinSpacingPx.`
+      "ERR_CONFIG_SCHEMA: 'thresholdBudgets' must define numeric clsMaxLimit, overflowPixelTolerance, and touchTargetMinSpacingPx."
     );
   }
 
   const ignoreRules = new Array<IUirigIgnoreRule>();
   if (candidate.ignore !== undefined) {
     if (!Array.isArray(candidate.ignore)) {
-      throw new Error(`ERR_CONFIG_SCHEMA: 'ignore' must be an array of ignore rule objects.`);
+      throw new Error("ERR_CONFIG_SCHEMA: 'ignore' must be an array of ignore rule objects.");
     }
     for (const entry of candidate.ignore) {
       if (typeof entry !== 'object' || entry === null || typeof entry.rule !== 'string') {
-        throw new Error(`ERR_CONFIG_SCHEMA: Each entry in 'ignore' must specify a 'rule' string.`);
+        throw new Error("ERR_CONFIG_SCHEMA: Each entry in 'ignore' must specify a 'rule' string.");
       }
       ignoreRules.push({
         rule: entry.rule,
@@ -241,6 +254,7 @@ export function loadUirigConfig(
     $schema: candidate.$schema,
     targetUrls: candidate.targetUrls,
     tokensPath: candidate.tokensPath,
+    autoTokens: candidate.autoTokens === true,
     thresholdBudgets: {
       clsMaxLimit: budgets.clsMaxLimit,
       overflowPixelTolerance: budgets.overflowPixelTolerance,
@@ -278,7 +292,7 @@ export function resolveExecutionConfig(
   if (options.target) {
     logTelemetry(
       'check:zero-config',
-      `Running in zero-config mode against ${paint(options.target, 'cyan')}...`
+      'Running in zero-config mode against ' + paint(options.target, 'cyan') + '...'
     );
     return {
       config: {
@@ -290,18 +304,18 @@ export function resolveExecutionConfig(
   }
 
   loadUirigConfig(defaultConfigPath);
-  throw new Error(`ERR_CONFIG_MISSING: Configuration file not found at ${defaultConfigPath}.`);
+  throw new Error('ERR_CONFIG_MISSING: Configuration file not found at ' + defaultConfigPath + '.');
 }
 
 export function loadTokenScale(tokensPath: string, configFilePath: string): ITokenScaleConfig {
   const resolvedTokensPath = resolve(dirname(configFilePath), tokensPath);
   logTelemetry(
     'check:tokens',
-    `Loading design token scale from ${paint(resolvedTokensPath, 'cyan')}...`
+    'Loading design token scale from ' + paint(resolvedTokensPath, 'cyan') + '...'
   );
 
   if (!existsSync(resolvedTokensPath)) {
-    throw new Error(`ERR_TOKENS_MISSING: Token scale file not found at ${resolvedTokensPath}.`);
+    throw new Error('ERR_TOKENS_MISSING: Token scale file not found at ' + resolvedTokensPath + '.');
   }
 
   let parsed: unknown;
@@ -310,11 +324,11 @@ export function loadTokenScale(tokensPath: string, configFilePath: string): ITok
     parsed = JSON.parse(raw);
   } catch (err: unknown) {
     const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`ERR_TOKENS_INVALID_JSON: Failed to parse ${resolvedTokensPath}: ${detail}`);
+    throw new Error('ERR_TOKENS_INVALID_JSON: Failed to parse ' + resolvedTokensPath + ': ' + detail);
   }
 
   if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error(`ERR_TOKENS_SCHEMA: Token file at ${resolvedTokensPath} must be a JSON object.`);
+    throw new Error('ERR_TOKENS_SCHEMA: Token file at ' + resolvedTokensPath + ' must be a JSON object.');
   }
 
   const candidate = parsed as Partial<ITokenScaleConfig>;
@@ -325,7 +339,7 @@ export function loadTokenScale(tokensPath: string, configFilePath: string): ITok
     !Array.isArray(candidate.radii)
   ) {
     throw new Error(
-      `ERR_TOKENS_SCHEMA: Token file must define arrays for colors, spacing, fontSizes, and radii.`
+      'ERR_TOKENS_SCHEMA: Token file must define arrays for colors, spacing, fontSizes, and radii.'
     );
   }
 
@@ -364,7 +378,6 @@ export function evaluatePosixExitCode(results: Array<IViewportAuditReport>): Pos
   }
   return 0;
 }
-
 export async function auditViewportInParallel(
   browser: Browser,
   url: string,
@@ -375,10 +388,10 @@ export async function auditViewportInParallel(
   ignoreRules: Array<IUirigIgnoreRule> = new Array<IUirigIgnoreRule>(),
   isLocalStaticTarget: boolean = false,
   selectors?: Array<string>,
-  includeSpatialBrief: boolean = false
+  includeSpatialBrief: boolean = false,
+  autoDiscoverRootTokens: boolean = false
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
-  const runTokens = (!only || only === 'tokens') && tokenScale !== null;
   const runContrast = !only || only === 'contrast';
   const runDarkMode = !only || only === 'dark-mode';
   const runStress = !only || only === 'stress';
@@ -387,16 +400,38 @@ export async function auditViewportInParallel(
   const runRuntimeCapture = !only;
   const hasSelectors = Boolean(selectors && selectors.length > 0);
 
-  const activeScope = only ? `single engine (${only})` : '4 isolated contexts';
-  const selectorTag = hasSelectors && selectors ? ` [scope: ${selectors.join(', ')}]` : '';
+  const activeScope = only ? 'single engine (' + only + ')' : '4 isolated contexts';
+  const selectorTag = hasSelectors && selectors ? ' [scope: ' + selectors.join(', ') + ']' : '';
+  const vpLabel = viewport.name + ' (' + viewport.width + 'x' + viewport.height + ')';
   logTelemetry(
     'check:dispatch',
-    `Running ${activeScope}${selectorTag} for ${paint(url, 'cyan')} @ ${paint(
-      `${viewport.name} (${viewport.width}x${viewport.height})`,
-      'bold',
-      'green'
-    )}...`
+    'Running ' +
+      activeScope +
+      selectorTag +
+      ' for ' +
+      paint(url, 'cyan') +
+      ' @ ' +
+      paint(vpLabel, 'bold', 'green') +
+      '...'
   );
+
+  let effectiveTokenScale: ITokenScaleConfig | null = tokenScale;
+  if (autoDiscoverRootTokens) {
+    const probeContext = await browser.newContext({ viewport: viewportSize });
+    try {
+      const probePage = await probeContext.newPage();
+      await probePage.goto(url, { waitUntil: 'networkidle' });
+      const liveRootTokens = await extractRootCssVariables(probePage);
+      effectiveTokenScale = mergeTokenScales(
+        tokenScale ?? { colors: [], spacing: [], fontSizes: [], radii: [] },
+        liveRootTokens
+      );
+    } finally {
+      await probeContext.close();
+    }
+  }
+
+  const runTokens = (!only || only === 'tokens') && effectiveTokenScale !== null;
 
   const runReadOnlyTrack = async (): Promise<{
     matchedSelectorCount?: number;
@@ -440,7 +475,7 @@ export async function auditViewportInParallel(
             runtimeErrors.push({
               source: 'console_error',
               message: msg.text(),
-              location: loc.url ? `${loc.url}:${loc.lineNumber}` : url,
+              location: loc.url ? loc.url + ':' + loc.lineNumber : url,
             });
           }
         });
@@ -455,7 +490,7 @@ export async function auditViewportInParallel(
           matchedSelectorCount === 0
             ? paint('0 (WARNING: selector matched 0 elements!)', 'bold', 'yellow')
             : paint(String(matchedSelectorCount), 'bold', 'cyan');
-        logTelemetry('check:scope', `Selectors matched on page: ${countBadge}`);
+        logTelemetry('check:scope', 'Selectors matched on page: ' + countBadge);
       }
 
       let spatialBrief: string | undefined;
@@ -467,13 +502,16 @@ export async function auditViewportInParallel(
         spatialBrief = formatSpatialBrief(rawSpatialNodes);
         logTelemetry(
           'check:spatial-brief',
-          `Collected spatial brief (${rawSpatialNodes.length} raw nodes): ${spatialBrief || '(none)'}`
+          'Collected spatial brief (' +
+            rawSpatialNodes.length +
+            ' raw nodes): ' +
+            (spatialBrief || '(none)')
         );
       }
 
       const tokenViolations =
-        runTokens && tokenScale !== null
-          ? await crawlPageTokens(page, tokenScale, ignoreRules, selectors)
+        runTokens && effectiveTokenScale !== null
+          ? await crawlPageTokens(page, effectiveTokenScale, ignoreRules, selectors)
           : new Array<ITokenViolation>();
       const contrastViolations = runContrast
         ? await auditPageContrast(
@@ -481,7 +519,7 @@ export async function auditViewportInParallel(
             MIN_WCAG_AA_CONTRAST,
             ignoreRules,
             'contrast',
-            tokenScale?.colors ?? new Array<string>(),
+            effectiveTokenScale?.colors ?? new Array<string>(),
             selectors
           )
         : new Array<IContrastViolation>();
@@ -506,7 +544,6 @@ export async function auditViewportInParallel(
       await context.close();
     }
   };
-
   const runDarkModeTrack = async (): Promise<Array<IDarkModeViolation>> => {
     if (!runDarkMode) {
       return new Array<IDarkModeViolation>();
@@ -519,7 +556,7 @@ export async function auditViewportInParallel(
         maxSurfaceLuminance:
           budgets.darkModeMaxSurfaceLuminance ?? DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
         ignoreRules,
-        allowedColors: tokenScale?.colors ?? new Array<string>(),
+        allowedColors: effectiveTokenScale?.colors ?? new Array<string>(),
         selectors,
       });
     } finally {
@@ -611,16 +648,18 @@ export async function executeCheckCommand(
         ? options.viewportsOverride
         : config.viewports;
 
+    const autoTokensEnabled = Boolean(options.autoTokens ?? config.autoTokens);
     const tokenAgnosticEngines = new Set<AuditToolName>(['stress', 'cls', 'dom']);
     const softTokenEngines = new Set<AuditToolName>(['contrast', 'dark-mode']);
     let tokenScale: ITokenScaleConfig | null = null;
+    let shouldAutoDiscoverRootTokens = false;
 
     if (options.tokenScaleOverride) {
       tokenScale = options.tokenScaleOverride;
     } else if (options.only && tokenAgnosticEngines.has(options.only)) {
       logTelemetry(
         'tokens:skip',
-        `Skipping token scale load for '${options.only}' engine.`
+        "Skipping token scale load for '" + options.only + "' engine."
       );
     } else if (config.tokensPath) {
       try {
@@ -635,20 +674,30 @@ export async function executeCheckCommand(
           softTokenEngines.has(options.only)
         ) {
           console.error(
-            `[tokens:warn] Missing tokensPath (${config.tokensPath}); continuing '${options.only}' audit without token suggestions.`
+            '[tokens:warn] Missing tokensPath (' +
+              config.tokensPath +
+              "); continuing '" +
+              options.only +
+              "' audit without token suggestions."
           );
           tokenScale = null;
         } else {
           throw err;
         }
       }
+    } else if (autoTokensEnabled) {
+      logTelemetry(
+        'tokens:auto-discover',
+        'Auto-discovering design tokens from workspace files and live :root CSS variables...'
+      );
+      tokenScale = discoverWorkspaceTokens(cwd);
+      shouldAutoDiscoverRootTokens = true;
     } else {
       logTelemetry(
         'tokens:skip',
         'No tokensPath configured; skipping design token scale audit.'
       );
     }
-
 
     const resolvedTargets = new Array<{ displayUrl: string; liveUrl: string; isLocal: boolean }>();
     for (const rawTarget of config.targetUrls) {
@@ -669,7 +718,7 @@ export async function executeCheckCommand(
       const headless = options.headless ?? true;
       logTelemetry(
         'check:browser',
-        `Launching single Chromium instance (headless=${String(headless)})...`
+        'Launching single Chromium instance (headless=' + String(headless) + ')...'
       );
       ownedBrowser = await chromium.launch({ headless });
       browser = ownedBrowser;
@@ -699,7 +748,8 @@ export async function executeCheckCommand(
           config.ignore ?? new Array<IUirigIgnoreRule>(),
           targetEntry.isLocal,
           options.selectors,
-          Boolean(options.spatialBrief)
+          Boolean(options.spatialBrief),
+          shouldAutoDiscoverRootTokens
         );
         results.push({
           ...viewportReport,
@@ -745,7 +795,7 @@ export async function executeCheckCommand(
           top: options.top,
           maxTokens: options.maxTokens,
         });
-        process.stdout.write(`${jsonOutput}\n`);
+        process.stdout.write(jsonOutput + '\n');
       } else {
         process.stdout.write(
           formatConsoleAuditReport(executionReport, { verbose: options.verbose })
@@ -775,11 +825,15 @@ export async function executeCheckCommand(
                 (sum, v) => sum + (v.childCount ?? 0),
                 0
               );
-              process.stdout.write(
-                `${paint(
-                  `🌳 Root-Cause Grouping: Collapsed ${collapsedChildren} child violations into ${groupedParents.length} shared parent container(s).`,
+                            process.stdout.write(
+                paint(
+                  'Root-Cause Grouping: Collapsed ' +
+                    collapsedChildren +
+                    ' child violations into ' +
+                    groupedParents.length +
+                    ' shared parent container(s).',
                   'cyan'
-                )}\n`
+                ) + '\n'
               );
             }
           }
@@ -789,10 +843,16 @@ export async function executeCheckCommand(
             parsedSummary.totalViolations !== undefined
           ) {
             process.stdout.write(
-              `${paint(
-                `🎯 Output Limit: Showing top ${parsedSummary.violations.length} of ${parsedSummary.totalViolations} violations (${parsedSummary.truncatedCount} omitted; re-run without --top/--max-tokens to inspect all).`,
+              paint(
+                'Output Limit: Showing top ' +
+                  parsedSummary.violations.length +
+                  ' of ' +
+                  parsedSummary.totalViolations +
+                  ' violations (' +
+                  parsedSummary.truncatedCount +
+                  ' omitted; re-run without --top/--max-tokens to inspect all).',
                 'yellow'
-              )}\n`
+              ) + '\n'
             );
           }
         }
@@ -800,12 +860,17 @@ export async function executeCheckCommand(
           for (const vpReport of executionReport.results) {
             if (vpReport.spatialBrief !== undefined) {
               const vpTag = paint(
-                `${vpReport.viewport.name} (${vpReport.viewport.width}x${vpReport.viewport.height})`,
+                vpReport.viewport.name +
+                  ' (' +
+                  vpReport.viewport.width +
+                  'x' +
+                  vpReport.viewport.height +
+                  ')',
                 'bold',
                 'cyan'
               );
               process.stdout.write(
-                `📐 Spatial Brief [${vpTag}]: ${vpReport.spatialBrief || '(no visible landmarks)'}\n`
+                'Spatial Brief [' + vpTag + ']: ' + (vpReport.spatialBrief || '(no visible landmarks)') + '\n'
               );
             }
           }
@@ -813,8 +878,8 @@ export async function executeCheckCommand(
         const exitBadge =
           exitCode === 0
             ? paint('0 (PASS)', 'bold', 'green')
-            : paint(`${exitCode} (FAIL)`, 'bold', 'red');
-        logTelemetry('check:complete', `Audit finished. POSIX Exit Code: ${exitBadge}`);
+            : paint(String(exitCode) + ' (FAIL)', 'bold', 'red');
+        logTelemetry('check:complete', 'Audit finished. POSIX Exit Code: ' + exitBadge);
       }
     }
 

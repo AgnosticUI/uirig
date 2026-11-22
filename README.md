@@ -14,7 +14,7 @@
 * **Pierces Web Component Shadow DOMs & Audits `<slot>` Integrity:** `Lighthouse` won't climb inside a Lit or Stencil `ShadowRoot` to tell a coding agent *which custom element* (`hostComponent`) broke dark-mode contrast, layout bounds, or silently dropped an orphaned `slot="..."` child.
 * **Zero Screenshot Diff Flakiness & Zero Vision-Token Bloat:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast (including CSS `background-clip: text` gradient color stops), and W3C session-window CLS scores—plus `--spatial-brief` delivers macro-layout coordinates in ~40 plain-text tokens instead of 1,500–3,000+ vision tokens.
 * **Root-Cause Grouped, Priority-Ranked & Token-Budgeted for AI Agents:** Collapse cascading child failures under their shared parent container with `--group-by-root`, automatically sort violations from highest page impact (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`), and cap output with `--top=<n>` and `--max-tokens=<budget>`.
-* **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, or scope audits to specific components with `--selectors`.
+* **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, pass `--auto-tokens` to auto-discover `:root` CSS variables, Tailwind v4 `@theme`, and W3C `.tokens.json` scales, or scope audits to specific components with `--selectors`.
 * **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout` while keeping colored telemetry on `stderr`.
 
 ---
@@ -28,6 +28,9 @@ Run `uirig` immediately against any running URL or local `.html` file (no instal
 
     # Audit a standalone AI-generated HTML file (auto-served on an ephemeral local port)
     npx @rlevin/uirig ./dist/index.html
+
+    # Auto-discover :root CSS variables, Tailwind v4 @theme, and W3C .tokens.json with zero config
+    npx @rlevin/uirig ./dist/index.html --auto-tokens --verbose
 
     # Print individual failing selectors and details in the terminal
     npx @rlevin/uirig ./dist/index.html --verbose
@@ -49,7 +52,7 @@ Run `uirig` immediately against any running URL or local `.html` file (no instal
 
 | Engine | CLI Gate | What It Audits | Failure Exit Code |
 | :--- | :--- | :--- | :---: |
-| **1. Design Tokens** | `tokens` | Walks Light DOM and open `ShadowRoot` trees to flag hardcoded colors, spacing, font sizes, or radii outside your token scale. | `1` |
+| **1. Design Tokens** | `tokens` | Walks Light DOM and open `ShadowRoot` trees to flag hardcoded colors, spacing, font sizes, or radii outside your configured or `--auto-tokens` scale. | `1` |
 | **2. WCAG Contrast** | `contrast` | Composites ancestor alpha/opacity layers (Porter-Duff Source-Over), evaluates worst-case CSS `background-clip: text` gradient color stops, verifies WCAG 2.1 AA contrast (`>= 4.5:1`), and suggests nearest passing tokens. | `1` |
 | **3. Dark-Mode Parity** | `dark-mode` | Emulates dark color scheme / `[data-theme="dark"]`, re-audits contrast, and flags surfaces stranded at bright light luminance (`> 0.85`). | `1` |
 | **4. Geometric Stress** | `stress` | Injects `+30%` longer text and long space-free strings (like emails and URLs) to check container overflow, `100vw` bleed, avatar squishing, and `24x24px` tap targets. | `2` |
@@ -78,6 +81,7 @@ When you are ready to enforce custom design tokens, multi-viewport budgets, or A
       "$schema": "https://json-schema.org",
       "targetUrls": ["http://localhost:5173"],
       "tokensPath": "./config/default_tokens.json",
+      "autoTokens": false,
       "thresholdBudgets": {
         "clsMaxLimit": 0.1,
         "overflowPixelTolerance": 2,
@@ -92,6 +96,8 @@ When you are ready to enforce custom design tokens, multi-viewport budgets, or A
         { "rule": "tokens", "selector": ".legacy-embed" }
       ]
     }
+
+*(When `tokensPath` is omitted and `--auto-tokens` or `"autoTokens": true` is active, `uirig` automatically discovers design tokens from W3C `*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS blocks, and live `:root` CSS custom properties. Explicit `tokensPath` always takes precedence.)*
 
 ### Bundler-Proof Rule Escape Hatches
 Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comments, you can exempt intentional one-off overrides in two ways:
@@ -129,14 +135,15 @@ Launches a single Chromium instance and executes all 6 verification engines acro
 ### Standalone Engine Commands
 Run any individual verification engine in isolation for rapid inner-loop debugging or targeted AI agent re-checks:
 
-    npx @rlevin/uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-    npx @rlevin/uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig tokens [<url-or-file>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig contrast [<url-or-file>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+    npx @rlevin/uirig dark-mode [<url-or-file>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
     npx @rlevin/uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
     npx @rlevin/uirig cls [<url-or-file>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
     npx @rlevin/uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
 
 ### Shared Options
+* `--auto-tokens`: Auto-discover design tokens from workspace files (`*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS) and live `:root` CSS custom properties when `tokensPath` is not set.
 * `-s, --selectors=<csv>`: Filter element-level checks to matching CSS selectors (comma-separated and repeatable; pierces Web Component `ShadowRoot` boundaries).
 * `--group-by-root`: Collapse cascading child failures under their shared parent container or Web Component host (`childCount` + up to 3 `sampleChildren`).
 * `--top=<n>`: Keep only the top `N` highest-priority violations (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`) and include `totalViolations` + `truncatedCount` metadata when trimmed.
@@ -158,10 +165,10 @@ Run any individual verification engine in isolation for rapid inner-loop debuggi
 
 ## Common Use Cases
 
-### 1. AI Design System Harness Loop (`AGENTS.md` + `--group-by-root --spatial-brief --top=5 --json`)
-`uirig init` generates `.uirig/SKILL.md` so coding agents (Claude Code, Cursor, Codex) can verify macro-layout (`spatialBrief`), collapse cascading child failures under their parent (`--group-by-root`), and tackle the highest-impact defects first without prompt bloat:
+### 1. AI Design System Harness Loop (`AGENTS.md` + `--auto-tokens --group-by-root --spatial-brief --top=5 --json`)
+`uirig init` generates `.uirig/SKILL.md` so coding agents (Claude Code, Cursor, Codex) can auto-discover design tokens (`--auto-tokens`), verify macro-layout (`spatialBrief`), collapse cascading child failures under their parent (`--group-by-root`), and tackle the highest-impact defects first without prompt bloat:
 
-    npx @rlevin/uirig http://localhost:5173 --group-by-root --spatial-brief --top=5 --json
+    npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-brief --top=5 --json
 
 Each entry in `violations` includes `engine`, `hostComponent`, `selector`, `childCount` / `sampleChildren` (when grouped), `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates and re-run until `exitCode === 0`.
 
