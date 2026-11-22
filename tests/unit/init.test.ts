@@ -3,8 +3,8 @@
  * 1-to-1 unit tests for `src/commands/init.ts`.
  * Verifies:
  * 1. Scaffolding of `uirig.config.json`, `.uirig/session.json`, and `.uirig/SKILL.md`.
- * 2. Content integrity of `DEFAULT_UIRIG_CONFIG` (including dark-mode budget and ignore rules)
- *    and `.uirig/SKILL.md` (6-engine suite, zero-config CLI, Shadow host & token remediation).
+ * 2. Content integrity of `DEFAULT_UIRIG_CONFIG` (including Draft 2020-12 $schema, dark-mode budget, and ignore rules)
+ *    and `.uirig/SKILL.md` (Modern Web Guidance pairing, 6-engine suite, zero-config CLI, Shadow host & token remediation).
  * 3. Idempotent behavior (re-running `uirig init` does not overwrite existing files).
  */
 
@@ -46,6 +46,7 @@ describe('init.ts — Workspace & Agent Skill Scaffolder', () => {
     expect(existsSync(skillPath)).toBe(true);
 
     const parsedConfig = JSON.parse(readFileSync(configPath, 'utf8')) as typeof DEFAULT_UIRIG_CONFIG;
+    expect(parsedConfig.$schema).toBe('https://json-schema.org/draft/2020-12/schema');
     expect(parsedConfig.thresholdBudgets.overflowPixelTolerance).toBe(
       DEFAULT_UIRIG_CONFIG.thresholdBudgets.overflowPixelTolerance
     );
@@ -57,6 +58,7 @@ describe('init.ts — Workspace & Agent Skill Scaffolder', () => {
 
     const skillContent = readFileSync(skillPath, 'utf8');
     expect(skillContent).toBe(DEFAULT_UIRIG_SKILL_MD);
+    expect(skillContent).toContain('Google Modern Web Guidance');
     expect(skillContent).toContain('npx @rlevin/uirig check --json');
     expect(skillContent).toContain('npx @rlevin/uirig ./dist/index.html --json');
     expect(skillContent).toContain('dark-mode');
@@ -64,6 +66,7 @@ describe('init.ts — Workspace & Agent Skill Scaffolder', () => {
     expect(skillContent).toContain('hostComponent');
     expect(skillContent).toContain('suggestedToken');
     expect(skillContent).toContain('remediationAdvice');
+    expect(skillContent.length).toBeLessThan(2500);
   });
 
   it('preserves existing uirig.config.json and .uirig/SKILL.md when re-run (idempotency)', async () => {
@@ -73,7 +76,6 @@ describe('init.ts — Workspace & Agent Skill Scaffolder', () => {
 
     await executeInitCommand(tempDir);
 
-    // Simulate team customizations to both config and SKILL.md
     writeFileSync(configPath, '{"custom": true}', 'utf8');
     writeFileSync(skillPath, '# Custom Project Agent Skill\n', 'utf8');
 
