@@ -1,21 +1,24 @@
 /**
  * tests/unit/source-map.test.ts
- * Unit specs for Base64 VLQ (Variable-Length Quantity) Source Map v3 decoder and
- * framework dev-mode source location parser (Issue #9 — Chunk 1).
+ * Unit & live Chromium CDP (Chrome DevTools Protocol) specs for Framework Source-Map
+ * & `file:line` Attribution (Issue #9).
  */
 
 import { describe, it, expect } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import {
   parseDevSourceLocationAttribute,
   parseRawSourceMap,
   resolveOriginalPositionFromSourceMap,
   type IRawSourceMapV3,
 } from '../../src/core/source-map.js';
+import { executeCheckCommand } from '../../src/commands/check.js';
+import { formatAgenticJsonStream, type IAgenticJsonStreamPayload } from '../../src/utils/agent-stream.js';
 
-describe('::: ISSUE #9 (CHUNK 1): VLQ SOURCE-MAP DECODER & DEV METADATA PARSER :::', () => {
+describe('::: ISSUE #9 (CHUNKS 1–2): FRAMEWORK SOURCE-MAP & FILE:LINE ATTRIBUTION :::', () => {
   it('==> Should decode inline Base64 data-URI source maps and resolve 1-based file:line:column', () => {
-    // Source map mapping generated line 0, col 0 -> sources[0] ("src/styles/card.scss"), line 11 (1-based: 12), col 4 (1-based: 5)
-    // VLQ for: 0 -> A, 0 -> A, 11 (<<1 = 22 -> 'W'), 4 (<<1 = 8 -> 'I') => "AAWI"
     const sampleMap: IRawSourceMapV3 = {
       version: 3,
       sources: ['../src/styles/card.scss'],
@@ -56,9 +59,65 @@ describe('::: ISSUE #9 (CHUNK 1): VLQ SOURCE-MAP DECODER & DEV METADATA PARSER :
       columnNumber: 1,
     });
 
-    // Production fallback: corrupt or missing source maps return null without throwing
     expect(parseRawSourceMap('not-valid-json')).toBeNull();
     expect(parseRawSourceMap('data:application/json;base64,%%%invalid%%%')).toBeNull();
     expect(parseDevSourceLocationAttribute(null, '/workspace/app')).toBeNull();
+  });
+
+  it('==> Should resolve live CDP inline CSS source maps to file:line in check --json and fall back to null when unmapped', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'uirig-sourcemap-e2e-'));
+    try {
+      mkdirSync(join(tempDir, 'src', 'styles'), { recursive: true });
+      const rawMap: IRawSourceMapV3 = {
+        version: 3,
+        sources: ['src/styles/banner.scss'],
+        mappings: 'AAOE',
+      };
+      const base64Map = Buffer.from(JSON.stringify(rawMap), 'utf8').toString('base64');
+
+      const htmlPath = join(tempDir, 'index.html');
+      writeFileSync(
+        htmlPath,
+        `<!DOCTYPE html>
+        <html>
+          <head>
+            <style>.low-contrast-banner { background: #ffffff; color: #e2e8f0; }
+/*# sourceMappingURL=data:application/json;base64,${base64Map} */</style>
+          </head>
+          <body>
+            <p id="mapped-banner" class="low-contrast-banner">Mapped warning</p>
+            <span id="unmapped-text" style="background: #ffffff; color: #e2e8f0;">Inline unmapped warning</span>
+          </body>
+        </html>`,
+        'utf8'
+      );
+
+      const report = await executeCheckCommand({
+        target: './index.html',
+        cwd: tempDir,
+        only: 'contrast',
+        viewportsOverride: [{ name: 'desktop', width: 1280, height: 800 }],
+        headless: true,
+        silentStdout: true,
+        reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+      });
+
+      expect(report.exitCode).toBe(1);
+      const payload = JSON.parse(formatAgenticJsonStream(report)) as IAgenticJsonStreamPayload;
+      expect(payload.violations).toHaveLength(2);
+
+      const mapped = payload.violations.find((v) => v.selector.includes('p#mapped-banner'));
+      expect(mapped?.sourceFile).toBe('src/styles/banner.scss');
+      expect(mapped?.lineNumber).toBe(8);
+      expect(mapped?.columnNumber).toBe(3);
+      expect(mapped?.remediationAdvice).toContain('(source: src/styles/banner.scss:8)');
+
+      const unmapped = payload.violations.find((v) => v.selector.includes('span#unmapped-text'));
+      expect(unmapped?.sourceFile).toBeNull();
+      expect(unmapped?.lineNumber).toBeNull();
+      expect(unmapped?.columnNumber).toBeNull();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

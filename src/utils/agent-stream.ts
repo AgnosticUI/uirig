@@ -34,6 +34,12 @@ export interface IAgenticViolation {
   hostComponent: string | null;
   /** Out-of-band A2UI v1.0 component attribution when inside `<a2ui-surface>` (`null` otherwise). */
   a2ui?: IA2uiAttribution | null;
+  /** Resolved original source file path from CSS/JS source maps or dev attributes (`null` when unmapped). */
+  sourceFile?: string | null;
+  /** 1-based original line number in `sourceFile` (`null` when unmapped). */
+  lineNumber?: number | null;
+  /** 1-based original column number in `sourceFile` (`null` when unmapped). */
+  columnNumber?: number | null;
   /** CSS or Shadow-DOM-piercing selector path (`host >> shadow-root >> inner`). */
   selector: string;
   /** True when the offending node lives inside an open ShadowRoot. */
@@ -383,7 +389,7 @@ export function normalizeViewportViolations(
     const fallbackAdvice =
       'Reserve explicit width/height or min-height dimensions for shifting elements (' +
       selectorsList +
-      ') so session-window CLS (' +
+      ') so session-window CLS (Cumulative Layout Shift) (' +
       clsViolation.measuredClsScore.toFixed(3) +
       ') stays at or below ' +
       clsViolation.clsMaxLimit.toFixed(3) +
@@ -411,7 +417,7 @@ export function normalizeViewportViolations(
     });
   }
 
-  // 6. Normalize DOM & Markup Integrity Violations (`dom`)
+    // 6. Normalize DOM & Markup Integrity Violations (`dom`)
   for (const domViolation of viewportReport.domViolations ?? new Array()) {
     const hostComponent =
       domViolation.hostComponent !== undefined
@@ -467,7 +473,8 @@ export function normalizeViewportViolations(
       remediationAdvice,
     });
   }
-  // 7. Normalize Uncaught Runtime JS (JavaScript) & Console Errors (runtime)
+
+  // 7. Normalize Uncaught Runtime JS (JavaScript) & Console Errors (`runtime`)
   for (const runtimeErr of viewportReport.runtimeErrors ?? new Array()) {
     normalized.push({
       engine: 'runtime',
@@ -481,10 +488,28 @@ export function normalizeViewportViolations(
       occurrenceCount: 1,
       measuredDelta: runtimeErr.message,
       remediationAdvice:
-      'Resolve uncaught runtime error (' + runtimeErr.source + '): ' + runtimeErr.message,
+        'Resolve uncaught runtime error (' + runtimeErr.source + '): ' + runtimeErr.message,
     });
   }
-  return normalized;
+
+  return normalized.map((item) => {
+    const loc = viewportReport.sourceLocations?.[item.selector] ?? null;
+    const sourceFile = loc?.sourceFile ?? null;
+    const lineNumber = loc?.lineNumber ?? null;
+    const columnNumber = loc?.columnNumber ?? null;
+    const locationSuffix =
+      sourceFile && lineNumber !== null
+        ? ' (source: ' + sourceFile + ':' + String(lineNumber) + ')'
+        : '';
+
+    return {
+      ...item,
+      sourceFile,
+      lineNumber,
+      columnNumber,
+      remediationAdvice: item.remediationAdvice + locationSuffix,
+    };
+  });
 }
 
 /**

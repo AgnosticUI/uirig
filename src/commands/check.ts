@@ -17,6 +17,8 @@ import {
   extractRootCssVariables,
   mergeTokenScales,
 } from '../core/auto-tokens.js';
+import { resolveViolationSourceLocations } from '../core/source-map.js';
+import { type ISourceLocation } from '../interfaces/locator.js';
 import { auditPageContrast, type IContrastViolation, MIN_WCAG_AA_CONTRAST } from '../core/matrix.js';
 import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
 import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '../core/cls.js';
@@ -128,6 +130,8 @@ export interface IViewportAuditReport {
   spatialBrief?: string;
   /** Out-of-band `<a2ui-surface>` component attribution keyed by violation selector (`null` outside `<a2ui-surface>`). */
   a2uiAttributions?: Record<string, IA2uiAttribution | null>;
+  /** Resolved source-map / dev-metadata locations (`file:line:column`) keyed by violation selector (`null` when unmapped). */
+  sourceLocations?: Record<string, ISourceLocation | null>;
   tokenViolations: Array<ITokenViolation>;
   contrastViolations: Array<IContrastViolation>;
   darkModeViolations?: Array<IDarkModeViolation>;
@@ -136,7 +140,6 @@ export interface IViewportAuditReport {
   domViolations?: Array<IDomIntegrityViolation>;
   runtimeErrors?: Array<IRuntimeErrorViolation>;
 }
-
 
 export interface ICheckExecutionReport {
   timestamp: string;
@@ -408,7 +411,8 @@ export async function auditViewportInParallel(
   selectors?: Array<string>,
   includeSpatialBrief: boolean = false,
   autoDiscoverRootTokens: boolean = false,
-  themeName?: string
+  themeName?: string,
+  cwd: string = process.cwd()
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
   const isDarkThemeSkin = themeName ? /(?:^|[-_])dark(?:$|[-_])/i.test(themeName) : false;
@@ -469,6 +473,7 @@ export async function auditViewportInParallel(
     matchedSelectorCount?: number;
     spatialBrief?: string;
     a2uiAttributions?: Record<string, IA2uiAttribution | null>;
+    sourceLocations?: Record<string, ISourceLocation | null>;
     tokenViolations: Array<ITokenViolation>;
     contrastViolations: Array<IContrastViolation>;
     domViolations: Array<IDomIntegrityViolation>;
@@ -576,15 +581,21 @@ export async function auditViewportInParallel(
         ...domViolations.map((v) => v.selector),
       ];
       let a2uiAttributions: Record<string, IA2uiAttribution | null> | undefined;
+      let sourceLocations: Record<string, ISourceLocation | null> | undefined;
       if (candidateSelectors.length > 0) {
-        const resolvedMap = await resolveA2uiAttributionsForSelectors(page, candidateSelectors);
-        a2uiAttributions = Object.fromEntries(resolvedMap.entries());
+        const [resolvedA2uiMap, resolvedSourceMap] = await Promise.all([
+          resolveA2uiAttributionsForSelectors(page, candidateSelectors),
+          resolveViolationSourceLocations(page, candidateSelectors, cwd),
+        ]);
+        a2uiAttributions = Object.fromEntries(resolvedA2uiMap.entries());
+        sourceLocations = Object.fromEntries(resolvedSourceMap.entries());
       }
 
       return {
         matchedSelectorCount,
         spatialBrief,
         a2uiAttributions,
+        sourceLocations,
         tokenViolations,
         contrastViolations,
         domViolations,
@@ -685,6 +696,9 @@ export async function auditViewportInParallel(
       : {}),
     ...(readOnlyResult.a2uiAttributions !== undefined
       ? { a2uiAttributions: readOnlyResult.a2uiAttributions }
+      : {}),
+    ...(readOnlyResult.sourceLocations !== undefined
+      ? { sourceLocations: readOnlyResult.sourceLocations }
       : {}),
     tokenViolations: readOnlyResult.tokenViolations,
     contrastViolations: readOnlyResult.contrastViolations,

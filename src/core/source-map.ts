@@ -1,12 +1,15 @@
 /**
  * src/core/source-map.ts
  * Framework Source-Map & `file:line` Attribution Engine (Issue #9).
- * Implements a zero-dependency Base64 VLQ (Variable-Length Quantity) Source Map v3 decoder
- * and framework dev-mode metadata resolver (`data-source-loc`, `data-loc`, `data-insp-path`).
+ * Implements a zero-dependency Base64 VLQ (Variable-Length Quantity) Source Map v3 decoder,
+ * framework dev-mode metadata resolver (`data-source-loc`, `data-loc`, `data-insp-path`),
+ * and live Chromium CDP (Chrome DevTools Protocol) `CSS.getMatchedStylesForNode` resolver.
  */
 
+import { existsSync, readFileSync } from 'fs';
 import { relative, resolve, isAbsolute } from 'path';
 import { fileURLToPath } from 'url';
+import type { Page } from 'playwright';
 import type { ISourceLocation } from '../interfaces/locator.js';
 
 export interface IRawSourceMapV3 {
@@ -83,7 +86,12 @@ export function normalizeResolvedSourcePath(
   sourceRoot?: string
 ): string {
   let combined = rawSource.trim();
-  if (sourceRoot && sourceRoot.trim().length > 0 && !combined.startsWith('/') && !combined.includes('://')) {
+  if (
+    sourceRoot &&
+    sourceRoot.trim().length > 0 &&
+    !combined.startsWith('/') &&
+    !combined.includes('://')
+  ) {
     const cleanRoot = sourceRoot.trim().replace(/\/+$/, '');
     combined = cleanRoot + '/' + combined.replace(/^\/+/, '');
   }
@@ -98,7 +106,6 @@ export function normalizeResolvedSourcePath(
     combined = combined.slice('/@fs'.length);
   }
 
-  // Strip Vite/bundler query strings like `?t=12345` or `?direct`
   const queryIdx = combined.indexOf('?');
   if (queryIdx >= 0) {
     combined = combined.slice(0, queryIdx);
@@ -281,4 +288,244 @@ export function parseDevSourceLocationAttribute(
     lineNumber: lineNum,
     columnNumber: Number.isFinite(colNum) && colNum > 0 ? colNum : 1,
   };
+}
+
+interface ICdpStyleSheetHeader {
+  styleSheetId: string;
+  sourceURL?: string;
+  sourceMapURL?: string;
+  origin?: string;
+}
+
+interface ICdpMatchedRuleEntry {
+  rule?: {
+    origin?: string;
+    style?: {
+      styleSheetId?: string;
+      range?: {
+        startLine?: number;
+        startColumn?: number;
+      };
+    };
+  };
+}
+
+async function loadSourceMapForStyleSheet(
+  header: ICdpStyleSheetHeader,
+  cache: Map<string, IRawSourceMapV3 | null>
+): Promise<IRawSourceMapV3 | null> {
+  if (cache.has(header.styleSheetId)) {
+    return cache.get(header.styleSheetId) ?? null;
+  }
+
+  const rawMapUrl = (header.sourceMapURL ?? '').trim();
+  if (!rawMapUrl) {
+    cache.set(header.styleSheetId, null);
+    return null;
+  }
+
+  if (rawMapUrl.startsWith('data:')) {
+    const parsed = parseRawSourceMap(rawMapUrl);
+    cache.set(header.styleSheetId, parsed);
+    return parsed;
+  }
+
+  try {
+    const baseUrl =
+      header.sourceURL && header.sourceURL.trim().length > 0 ? header.sourceURL : undefined;
+    const resolvedUrl = baseUrl ? new URL(rawMapUrl, baseUrl).toString() : rawMapUrl;
+
+    if (resolvedUrl.startsWith('file://')) {
+      const diskPath = fileURLToPath(resolvedUrl);
+      if (!existsSync(diskPath)) {
+        cache.set(header.styleSheetId, null);
+        return null;
+      }
+      const parsed = parseRawSourceMap(readFileSync(diskPath, 'utf8'));
+      cache.set(header.styleSheetId, parsed);
+      return parsed;
+    }
+
+    if (resolvedUrl.startsWith('http://') || resolvedUrl.startsWith('https://')) {
+      const resp = await fetch(resolvedUrl);
+      if (!resp.ok) {
+        cache.set(header.styleSheetId, null);
+        return null;
+      }
+      const parsed = parseRawSourceMap(await resp.text());
+      cache.set(header.styleSheetId, parsed);
+      return parsed;
+    }
+  } catch {
+    // Graceful fallback when external source map cannot be fetched or read
+  }
+
+  cache.set(header.styleSheetId, null);
+  return null;
+}
+
+/**
+ * Resolves original `ISourceLocation` (`sourceFile`, `lineNumber`, `columnNumber`) for
+ * a list of piercing CSS/Shadow-DOM violation selectors on a live Playwright `Page` via:
+ * 1. Framework dev-mode DOM attributes (`data-source-loc`, `data-loc`, `data-insp-path`).
+ * 2. CDP `CSS.getMatchedStylesForNode` + `CSS.styleSheetAdded` inline/external `.map` decoding.
+ * Falls back cleanly to `null` when source maps are absent (production builds).
+ */
+export async function resolveViolationSourceLocations(
+  page: Page,
+  selectors: ReadonlyArray<string>,
+  cwd: string
+): Promise<Map<string, ISourceLocation | null>> {
+  const uniqueSelectors = Array.from(new Set(selectors.filter((s) => s.trim().length > 0)));
+  const resultMap = new Map<string, ISourceLocation | null>();
+  if (uniqueSelectors.length === 0) {
+    return resultMap;
+  }
+
+  const cdp = await page.context().newCDPSession(page);
+  const styleSheetsById = new Map<string, ICdpStyleSheetHeader>();
+  const parsedMapCache = new Map<string, IRawSourceMapV3 | null>();
+
+  const onStyleSheetAdded = (params: { header?: ICdpStyleSheetHeader }): void => {
+    if (params.header && params.header.styleSheetId) {
+      styleSheetsById.set(params.header.styleSheetId, params.header);
+    }
+  };
+
+  cdp.on('CSS.styleSheetAdded', onStyleSheetAdded);
+
+  try {
+    await cdp.send('DOM.enable');
+    await cdp.send('DOM.getDocument', { depth: 0 });
+    await cdp.send('CSS.enable');
+
+    for (const sel of uniqueSelectors) {
+      if (sel === 'document' || sel === 'window') {
+        resultMap.set(sel, null);
+        continue;
+      }
+
+      const evalRes = (await cdp.send('Runtime.evaluate', {
+        expression: `(() => {
+          const selPath = ${JSON.stringify(sel)};
+          const normalized = selPath.replace(/::shadow\\s*>\\s*/g, ' >> shadow-root >> ');
+          const segments = normalized.split('>> shadow-root >>').map((s) => s.trim()).filter(Boolean);
+          let root = document;
+          let found = null;
+          for (let i = 0; i < segments.length; i++) {
+            try { found = root.querySelector(segments[i]); } catch { return null; }
+            if (!found) return null;
+            if (i < segments.length - 1) {
+              if (!found.shadowRoot) return null;
+              root = found.shadowRoot;
+            }
+          }
+          return found;
+        })()`,
+        returnByValue: false,
+      })) as { result?: { objectId?: string; subtype?: string } };
+
+      const objectId = evalRes.result?.objectId;
+      if (!objectId || evalRes.result?.subtype !== 'node') {
+        resultMap.set(sel, null);
+        continue;
+      }
+
+      try {
+        // 1. Check composed ancestors for dev-mode source location attributes
+        const attrRes = (await cdp.send('Runtime.callFunctionOn', {
+          objectId,
+          functionDeclaration: `function() {
+            let cur = this;
+            while (cur) {
+              const raw = cur.getAttribute && (
+                cur.getAttribute('data-source-loc') ||
+                cur.getAttribute('data-loc') ||
+                cur.getAttribute('data-insp-path')
+              );
+              if (raw && raw.trim()) return raw.trim();
+              if (cur.parentElement) {
+                cur = cur.parentElement;
+              } else {
+                const r = cur.getRootNode && cur.getRootNode();
+                cur = r && r.host ? r.host : null;
+              }
+            }
+            return null;
+          }`,
+          returnByValue: true,
+        })) as { result?: { value?: string | null } };
+
+        const devLoc = parseDevSourceLocationAttribute(attrRes.result?.value, cwd);
+        if (devLoc) {
+          resultMap.set(sel, devLoc);
+          continue;
+        }
+
+        // 2. Query CDP matched CSS rules and resolve via Source Map v3
+        const domNode = (await cdp.send('DOM.requestNode', { objectId })) as { nodeId?: number };
+        if (!domNode.nodeId) {
+          resultMap.set(sel, null);
+          continue;
+        }
+
+        const matched = (await cdp.send('CSS.getMatchedStylesForNode', {
+          nodeId: domNode.nodeId,
+        })) as { matchedCSSRules?: Array<ICdpMatchedRuleEntry> };
+
+        const matchedRules = matched.matchedCSSRules ?? new Array<ICdpMatchedRuleEntry>();
+        let resolvedLocation: ISourceLocation | null = null;
+
+        for (let idx = matchedRules.length - 1; idx >= 0; idx--) {
+          const entry = matchedRules[idx];
+          const rule = entry?.rule;
+          if (!rule || rule.origin !== 'regular') {
+            continue;
+          }
+          const sheetId = rule.style?.styleSheetId;
+          const range = rule.style?.range;
+          if (!sheetId || !range || typeof range.startLine !== 'number') {
+            continue;
+          }
+
+          const header = styleSheetsById.get(sheetId);
+          if (!header) {
+            continue;
+          }
+
+          const parsedMap = await loadSourceMapForStyleSheet(header, parsedMapCache);
+          if (parsedMap) {
+            resolvedLocation = resolveOriginalPositionFromSourceMap(
+              parsedMap,
+              range.startLine,
+              range.startColumn ?? 0,
+              cwd
+            );
+            if (resolvedLocation) {
+              break;
+            }
+          }
+        }
+
+        resultMap.set(sel, resolvedLocation);
+      } catch {
+        resultMap.set(sel, null);
+      } finally {
+        try {
+          await cdp.send('Runtime.releaseObject', { objectId });
+        } catch {
+          // Ignore object release errors
+        }
+      }
+    }
+  } finally {
+    cdp.off('CSS.styleSheetAdded', onStyleSheetAdded);
+    try {
+      await cdp.detach();
+    } catch {
+      // Ignore detach errors
+    }
+  }
+
+  return resultMap;
 }
