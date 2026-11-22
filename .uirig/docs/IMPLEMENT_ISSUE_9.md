@@ -4,7 +4,7 @@
 - **Epic:** `AgnosticUI/uirig#33` (`label:epic:a2ui-eval`)
 - **Track:** Track B (Source-Code Auto-Fix Path)
 - **Branch:** `feat/issue-9-source-map-attribution`
-- **Status:** In Progress (Chunks 0–1 Complete)
+- **Status:** Complete (Chunks 0–3 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -38,14 +38,14 @@ Attach `sourceFile`, `lineNumber`, and `columnNumber` directly to violation obje
     - Add unit tests in `tests/unit/source-map.test.ts` covering inline data-URI source maps, `data-source-loc` attributes, and missing/corrupt source-map fallbacks.
   - **Commit:** `feat(dx): add VLQ source-map decoder and framework dev metadata resolver`
 
-- [ ] **Chunk 2: Live Chromium CDP `CSS.getMatchedStylesForNode` Attribution & `check.ts` Integration**
+- [x] **Chunk 2: Live Chromium CDP `CSS.getMatchedStylesForNode` Attribution & `check.ts` Integration**
   - **Files:** `src/core/source-map.ts`, `src/commands/check.ts`, `src/utils/agent-stream.ts`, `tests/unit/source-map.test.ts`
   - **Action:**
     - Implement `resolveViolationSourceLocations(page, selectors, cwd)` using CDP `DOM.enable` + `CSS.enable` (`CSS.styleSheetAdded` -> `CSS.getMatchedStylesForNode`) to populate `sourceFile`, `lineNumber`, and `columnNumber` (normalized relative to `cwd`, or `null` when unmapped).
     - Wire source-location enrichment into `auditViewportInParallel()` (`src/commands/check.ts`) and `normalizeViewportViolations()` (`src/utils/agent-stream.ts`), plus a live Chromium E2E test in `tests/unit/source-map.test.ts`.
   - **Commit:** `feat(dx): resolve live CDP CSS source maps to file:line in check --json`
 
-- [ ] **Chunk 3: Docs Sync (`README.md`, `AGENTS.md`) & Final Verification**
+- [x] **Chunk 3: Docs Sync (`README.md`, `AGENTS.md`) & Final Verification**
   - **Files:** `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_9.md`, `.uirig/docs/NEXT_PROMPT.md`
   - **Action:** Document `sourceFile`, `lineNumber`, and `columnNumber` in `README.md` and `AGENTS.md`, run `npm run typecheck && npm test && npm run build`, mark all chunks `[x]` complete, and merge PR `#9`.
   - **Commit:** `docs(dx): document source-map file:line attribution in --json output (#9)`
@@ -53,7 +53,7 @@ Attach `sourceFile`, `lineNumber`, and `columnNumber` directly to violation obje
 ---
 
 ## 3. Acceptance Checklist (from `AgnosticUI/uirig#9`)
-- [ ] `--json` output schema includes optional `sourceFile`, `lineNumber`, and `columnNumber` fields on violations.
-- [ ] Accurately resolves `file:line` for source-mapped CSS/component dev builds and `data-source-loc` dev attributes.
-- [ ] Falls back cleanly (`null`) without throwing when source maps are disabled or missing in production builds.
-- [ ] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.
+- [x] `--json` output schema includes optional `sourceFile`, `lineNumber`, and `columnNumber` fields on violations.
+- [x] Accurately resolves `file:line` for source-mapped CSS/component dev builds and `data-source-loc` dev attributes.
+- [x] Falls back cleanly (`null`) without throwing when source maps are disabled or missing in production builds.
+- [x] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.

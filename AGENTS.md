@@ -34,12 +34,13 @@ npx @rlevin/uirig ./dist/index.html --auto-tokens --selectors="ag-button, .prici
      - `engine` & `violationType` (including `ax_empty_name`, `ax_hidden_focus`, and `orphaned_slot_content`)
      - `hostComponent` (the enclosing Web Component tag, e.g., `ag-button`)
      - `a2ui` (when inside `<a2ui-surface>` or `[data-a2ui-surface]`: `{ surfaceId, a2uiComponentId, a2uiComponentType, catalogId, wirePath, suggestedPatch }`; `null` otherwise)
+     - `sourceFile`, `lineNumber`, & `columnNumber` (workspace-relative `file:line:column` resolved from CSS/JS source maps or `data-source-loc` dev attributes when present; `null` otherwise)
      - `selector` (including `::shadow` / `>> shadow-root >>` boundaries, or the shared parent container when grouped)
      - `occurrenceCount` / `childCount` / `sampleChildren`
      - `suggestedToken` (nearest passing design token when available)
-     - `remediationAdvice` (actionable fix guidance scoped to the offending element, custom element slots, or A2UI `updateComponents` delta)
+     - `remediationAdvice` (actionable fix guidance scoped to the offending element, source file/line, custom element slots, or A2UI `updateComponents` delta)
    - For A2UI surfaces in opt-in self-healing mode (`runA2uiSelfHealingLoop` / `buildA2uiUpdateComponentsDelta`), emit minimal A2UI v1.0 `updateComponents` deltas scoped to `a2uiComponentId` and re-verify until `exitCode` is `0` (`<= 2` turns).
-   - Otherwise, patch the offending CSS or component template directly using `suggestedToken` and `remediationAdvice`, then re-run `npx @rlevin/uirig check --json` until `exitCode` is `0`.
+   - Otherwise, open `sourceFile` at `lineNumber` directly (when resolved) and patch the offending CSS or component template using `suggestedToken` and `remediationAdvice`, then re-run `npx @rlevin/uirig check --json` until `exitCode` is `0`.
 
 ## Ground Rules for AI Agents
 
