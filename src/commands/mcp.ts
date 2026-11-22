@@ -1,8 +1,9 @@
 /**
  * src/commands/mcp.ts
  * Native Model Context Protocol (MCP) server mode (`uirig mcp`).
- * Exposes `uirig_check` and all 6 individual verification engines over `stdio` or `sse`
- * while keeping a persistent `WarmBrowserPool` alive across tool invocations.
+ * Exposes `uirig_check`, all 6 individual verification engines, `uirig_a2ui_delta`,
+ * and `uirig_discover_tokens` over `stdio` or `sse` while keeping a persistent
+ * `WarmBrowserPool` alive across tool invocations.
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'http';
@@ -16,7 +17,9 @@ import {
   type IViewportConfig,
 } from './check.js';
 import { WarmBrowserPool, DEFAULT_BROWSER_IDLE_TIMEOUT_MS } from '../core/browser-pool.js';
-import { formatAgenticJsonStream } from '../utils/agent-stream.js';
+import { discoverWorkspaceTokens } from '../core/auto-tokens.js';
+import { buildA2uiUpdateComponentsDelta } from '../utils/a2ui-self-heal.js';
+import { formatAgenticJsonStream, type IAgenticViolation } from '../utils/agent-stream.js';
 import { logTelemetry } from '../utils/formatter.js';
 
 export type McpTransportMode = 'stdio' | 'sse';
@@ -33,6 +36,14 @@ const AUDIT_INPUT_SHAPE = {
     .boolean()
     .optional()
     .describe('Auto-discover design tokens from workspace files and live :root CSS custom properties when tokensPath is not configured.'),
+  themes: z
+    .array(z.string())
+    .optional()
+    .describe('Optional list of theme skins (e.g. ["light", "dark", "enterprise-dark"]) evaluated via data-theme and color-scheme emulation.'),
+  fix: z
+    .boolean()
+    .optional()
+    .describe('When true, applies deterministic 1-to-1 fixes on disk inside cwd and automatically runs a re-verification pass.'),
   target: z
     .string()
     .optional()
@@ -76,12 +87,34 @@ const AUDIT_INPUT_SHAPE = {
   cwd: z
     .string()
     .optional()
-    .describe('Optional working directory for resolving relative target or config paths.'),
+    .describe('Optional working directory for resolving relative target, config, source-map, and --fix paths.'),
+};
+
+const A2UI_DELTA_INPUT_SHAPE = {
+  surfaceId: z
+    .string()
+    .min(1)
+    .describe('Target A2UI surface identifier (e.g. "support-ticket").'),
+  violations: z
+    .array(z.record(z.string(), z.unknown()))
+    .describe('Array of violation objects emitted by uirig_check / uirig_dom / uirig_contrast.'),
+};
+
+const DISCOVER_TOKENS_INPUT_SHAPE = {
+  cwd: z
+    .string()
+    .optional()
+    .describe('Workspace root directory to scan for W3C *.tokens.json, Style Dictionary JSON, and Tailwind v4 @theme CSS files.'),
 };
 
 const AuditInputSchema = z.object(AUDIT_INPUT_SHAPE);
 type AuditToolArgs = z.infer<typeof AuditInputSchema>;
 
+const A2uiDeltaInputSchema = z.object(A2UI_DELTA_INPUT_SHAPE);
+type A2uiDeltaToolArgs = z.infer<typeof A2uiDeltaInputSchema>;
+
+const DiscoverTokensInputSchema = z.object(DISCOVER_TOKENS_INPUT_SHAPE);
+type DiscoverTokensToolArgs = z.infer<typeof DiscoverTokensInputSchema>;
 interface IMcpToolSpec {
   name: string;
   description: string;
@@ -127,7 +160,7 @@ const MCP_TOOL_SPECS: Array<IMcpToolSpec> = [
   {
     name: 'uirig_dom',
     description:
-      'Audit Light + Shadow DOM for broken ARIA/label IDs, orphaned <slot> projections, broken media, unsafe links, and prompt-injection traps.',
+      'Audit Light + Shadow DOM and Chromium computed AX tree for broken ARIA/label IDs, ax_empty_name, ax_hidden_focus, orphaned <slot> projections, broken media, unsafe links, and prompt-injection traps.',
     only: 'dom',
   },
 ];
@@ -163,6 +196,8 @@ export function createUirigMcpServer(
             selectors: rawArgs.selectors,
             configPath: rawArgs.configPath,
             autoTokens: rawArgs.autoTokens,
+            themes: rawArgs.themes,
+            fix: rawArgs.fix,
             groupByRoot: rawArgs.groupByRoot,
             top: rawArgs.top,
             maxTokens: rawArgs.maxTokens,
@@ -179,6 +214,7 @@ export function createUirigMcpServer(
             groupByRoot: rawArgs.groupByRoot,
             top: rawArgs.top,
             maxTokens: rawArgs.maxTokens,
+            cwd: rawArgs.cwd,
           });
 
           return {
@@ -200,6 +236,33 @@ export function createUirigMcpServer(
       }
     );
   }
+
+  server.tool(
+    'uirig_a2ui_delta',
+    'Synthesize a standard, catalog-neutral A2UI v1.0 updateComponents delta message from uirig violations attributed to an <a2ui-surface> or [data-a2ui-surface].',
+    A2UI_DELTA_INPUT_SHAPE,
+    async (rawArgs: A2uiDeltaToolArgs) => {
+      const delta = buildA2uiUpdateComponentsDelta(
+        rawArgs.surfaceId,
+        rawArgs.violations as unknown as ReadonlyArray<IAgenticViolation>
+      );
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(delta, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    'uirig_discover_tokens',
+    'Auto-discover design tokens (colors, spacing, fontSizes, radii) from W3C *.tokens.json, Style Dictionary JSON, and Tailwind v4 @theme CSS files in a workspace.',
+    DISCOVER_TOKENS_INPUT_SHAPE,
+    async (rawArgs: DiscoverTokensToolArgs) => {
+      const scale = discoverWorkspaceTokens(rawArgs.cwd ?? process.cwd());
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(scale, null, 2) }],
+      };
+    }
+  );
 
   return server;
 }
