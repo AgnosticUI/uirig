@@ -3,7 +3,7 @@
 - **Issue:** `AgnosticUI/uirig#19` — `Computed Accessibility Tree Snapshot (dom / contrast)`
 - **Epic:** `AgnosticUI/uirig#33` (`label:epic:a2ui-eval`)
 - **Branch:** `feat/issue-19-ax-tree`
-- **Status:** Planned (Next Active Task)
+- **Status:** In Progress (Chunk 0 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -23,7 +23,7 @@ Extend the `dom` verification engine (`src/core/dom.ts`) with native Chromium De
 
 ## 2. Micro-Chunk Execution Breakdown
 
-- [ ] **Chunk 0: Planning & Continuity Capsule Scaffold**
+- [x] **Chunk 0: Planning & Continuity Capsule Scaffold**
   - **Files:** `.uirig/docs/IMPLEMENT_ISSUE_19.md`, `.uirig/docs/NEXT_PROMPT.md`
   - **Action:** Cut branch `feat/issue-19-ax-tree` from `main` and mark `#19` as active in `.uirig/docs/NEXT_PROMPT.md`.
   - **Commit:** `docs(plan): initialize branch and tracking for issue #19 (computed AX tree)`
@@ -32,7 +32,7 @@ Extend the `dom` verification engine (`src/core/dom.ts`) with native Chromium De
   - **Files:** `src/interfaces/locator.ts`, `src/core/ax-tree.ts`, `tests/unit/ax-tree.test.ts`
   - **Action:**
     - Extend `IDomIntegrityViolation['rule']` in `src/interfaces/locator.ts` with `'ax_empty_name' | 'ax_hidden_focus'`.
-    - Create `src/core/ax-tree.ts` with pure, deterministic evaluators (`evaluateAxNodeForEmptyName()`, `findAriaHiddenFocusTraps()`) and interactive role constants (`button`, `link`, `textbox`, `combobox`, `checkbox`, `radio`, `tab`, `menuitem`).
+    - Create `src/core/ax-tree.ts` with pure, deterministic evaluators (`evaluateAxNodeForEmptyName()`, `evaluateAxNodeForHiddenFocus()`) and interactive role constants (`button`, `link`, `textbox`, `combobox`, `checkbox`, `radio`, `tab`, `menuitem`).
     - Write 1-to-1 unit tests in `tests/unit/ax-tree.test.ts` covering empty/whitespace names, valid labels, and `aria-hidden="true"` / `inert` focus traps.
   - **Commit:** `feat(dom): add pure AX-tree rule evaluators for ax_empty_name and ax_hidden_focus`
 
@@ -40,7 +40,7 @@ Extend the `dom` verification engine (`src/core/dom.ts`) with native Chromium De
   - **Files:** `src/core/ax-tree.ts`, `src/core/dom.ts`, `tests/unit/ax-tree.test.ts`
   - **Action:**
     - Add `auditComputedAccessibilityTree(page, options)` in `src/core/ax-tree.ts` using `page.context().newCDPSession(page)` -> `Accessibility.getFullAXTree` + `DOM.resolveNode` to map offending AX nodes back to DOM elements, piercing Shadow DOM selectors (`host >> shadow-root >> inner`), `hostComponent`, `--selectors` scope, and `data-uirig-ignore="dom"` rules.
-    - Wire `auditComputedAccessibilityTree()` into `runDomIntegrityAudit()` in `src/core/dom.ts`.
+    - Wire `auditComputedAccessibilityTree()` into `runDomIntegrityAudit()` in `src/core/dom.ts` (deduplicating overlapping `unlabeled_control` / `ax_empty_name` on the exact same selector).
     - Add live Chromium E2E tests in `tests/unit/ax-tree.test.ts` covering `<div role="button"></div>`, Shadow DOM `<ag-icon-button>` with severed accessible name, and `<button>` trapped inside `<div aria-hidden="true">`.
   - **Commit:** `feat(dom): integrate native CDP Accessibility.getFullAXTree inspection into dom engine`
 
