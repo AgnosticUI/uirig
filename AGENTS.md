@@ -13,7 +13,7 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, A2UI sur
 npx @rlevin/uirig check --json
 ```
 
-   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly (add `--auto-tokens` when no `tokensPath` is configured, `--themes="light, dark"` for multi-theme matrix evaluation, and `--group-by-root`, `--spatial-brief`, and `--top` / `--max-tokens` for compact feedback):
+   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly (add `--auto-tokens` when no `tokensPath` is configured, `--themes="light, dark"` or `--themes="enterprise-light, enterprise-dark"` for multi-theme matrix evaluation, and `--group-by-root`, `--spatial-brief`, and `--top` / `--max-tokens` for compact feedback):
 
 ```bash
 npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-brief --top=5 --json
@@ -38,8 +38,8 @@ npx @rlevin/uirig ./dist/index.html --auto-tokens --selectors="ag-button, .prici
      - `occurrenceCount` / `childCount` / `sampleChildren`
      - `suggestedToken` (nearest passing design token when available)
      - `remediationAdvice` (actionable fix guidance scoped to the offending element, custom element slots, or A2UI `updateComponents` delta)
-   - Patch the offending CSS, component template, or A2UI `updateComponents` payload directly using `suggestedToken`, `a2ui`, and `remediationAdvice`.
-   - Re-run `npx @rlevin/uirig check --json` (or `npx @rlevin/uirig <target> --selectors="..." --json`) until `exitCode` is `0`.
+   - For A2UI surfaces in opt-in self-healing mode (`runA2uiSelfHealingLoop` / `buildA2uiUpdateComponentsDelta`), emit minimal A2UI v1.0 `updateComponents` deltas scoped to `a2uiComponentId` and re-verify until `exitCode` is `0` (`<= 2` turns).
+   - Otherwise, patch the offending CSS or component template directly using `suggestedToken` and `remediationAdvice`, then re-run `npx @rlevin/uirig check --json` until `exitCode` is `0`.
 
 ## Ground Rules for AI Agents
 

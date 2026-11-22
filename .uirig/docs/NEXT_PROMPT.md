@@ -1,17 +1,18 @@
-# Session Continuity: Issue #32 (`feat/issue-32-a2ui-support-center-demo`)
+# Session Continuity: Issue #32 Complete -> Next Issue `#9` (Track B — Task 2)
 
 ## Current Context
 - **Repository:** `AgnosticUI/uirig`
-- **Active Branch:** `feat/issue-32-a2ui-support-center-demo`
-- **Active Issue:** `#32` — `feat(a2ui): AgnosticUI Support Center Studio eval gate & self-healing demo` (Track A — Task 5 of Epic `#33`)
-- **Tracking Plan:** `.uirig/docs/IMPLEMENT_ISSUE_32.md`
+- **Completed Branch:** `feat/issue-32-a2ui-support-center-demo` (ready to merge into `main`)
+- **Completed Issue:** `#32` — `feat(a2ui): AgnosticUI Support Center Studio eval gate & self-healing demo` (Track A — Task 5 of Epic `#33` — **All Track A Tasks Complete!**)
+- **Tracking Plan:** `.uirig/docs/IMPLEMENT_ISSUE_32.md` (all Chunks 0–3 marked `[x]` complete)
 
-## Completed
-- **Chunk 0:** Branch `feat/issue-32-a2ui-support-center-demo` created and tracking docs initialized.
-- **Chunk 1:** Created `src/utils/a2ui-self-heal.ts` and Always-On Eval Gate tests in `tests/integration/a2ui-support-center.test.ts`.
-- **Chunk 2:** Added compound dark-skin detection (`enterprise-dark`, `high-contrast-dark`) in `src/commands/check.ts`, implemented `runA2uiSelfHealingLoop()` in `src/utils/a2ui-self-heal.ts`, and verified `<= 2`-turn convergence E2E in `tests/integration/a2ui-support-center.test.ts`.
+## Roadmap Progress (`epic:a2ui-eval` `#33`)
+- [x] **Track A — Task 1 (`#19`):** Computed Accessibility Tree Snapshot (`ax_empty_name`, `ax_hidden_focus`)
+- [x] **Track A — Task 4 (`#31`):** Universal `<a2ui-surface>` Component Attribution & Eval Mode
+- [x] **Track A — Task 5 (`#32`):** AgnosticUI Support Center Studio Eval Gate & Self-Healing Demo
+- [ ] **Track B — Task 2 (`#9`):** Framework Source-Map & `file:line` Attribution (`.uirig/docs/IMPLEMENT_ISSUE_9.md`)
+- [ ] **Track B — Task 3 (`#13`):** Deterministic Auto-Fix Patch Generation (`--fix` / `unifiedDiff`) (`.uirig/docs/IMPLEMENT_ISSUE_13.md`)
 
-## Next Step (Chunk 3 — Final)
-1. Document the "Self-Healing Generative UI with `uirig`" 2-mode workflow and Support Center trace in `README.md` and `AGENTS.md`.
-2. Mark Chunk 3 `[x]` complete in `.uirig/docs/IMPLEMENT_ISSUE_32.md` and update `.uirig/docs/NEXT_PROMPT.md` to point to Track B — Task 2 (`#9`).
-3. Run `npm run typecheck && npm test && npm run build`, commit Chunk 3, and merge PR `#32` into `main`.
+## Immediate Next Step
+1. Verify `git checkout main && git pull origin main` after merging PR `#32`.
+2. Cut branch `feat/issue-9-source-map-attribution` from `main` and begin **Track B — Task 2 (`#9` — Chunk 1)** (VLQ source-map decoder & framework dev metadata resolver in `src/core/source-map.ts`).

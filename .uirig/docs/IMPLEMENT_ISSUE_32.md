@@ -4,7 +4,7 @@
 - **Epic:** `AgnosticUI/uirig#33` (`label:epic:a2ui-eval`)
 - **Depends on:** `AgnosticUI/uirig#31`
 - **Branch:** `feat/issue-32-a2ui-support-center-demo`
-- **Status:** In Progress (Chunks 0–2 Complete)
+- **Status:** Complete (Chunks 0–3 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -44,7 +44,7 @@ Operationalize `uirig` against the **A2UI Support Center Studio** as both a live
     - Add E2E convergence test in `tests/integration/a2ui-support-center.test.ts` proving the Support Center ticket escalation scenario (`close_drawer_btn` missing `ariaLabel` + low-contrast dark-mode status badge) converges to `exitCode === 0` within `<= 2` turns.
   - **Commit:** `feat(a2ui): add opt-in self-healing updateComponents convergence harness and E2E test`
 
-- [ ] **Chunk 3: Documentation Guide & Final Verification**
+- [x] **Chunk 3: Documentation Guide & Final Verification**
   - **Files:** `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_32.md`, `.uirig/docs/NEXT_PROMPT.md`
   - **Action:**
     - Document the "Self-Healing Generative UI with `uirig`" 2-mode workflow (Always-On Detection + Opt-In Self-Healing) with the end-to-end Support Center trace example in `README.md` and `AGENTS.md`.
@@ -56,4 +56,4 @@ Operationalize `uirig` against the **A2UI Support Center Studio** as both a live
 ## 3. Acceptance Checklist (from `AgnosticUI/uirig#32`)
 - [x] **Support Center Eval Gate:** `uirig` audits `<a2ui-surface>` scenarios across Light/Dark themes and mobile (`375px`) / desktop (`1440px`) viewports (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom` AX-tree).
 - [x] **2-Mode Workflow:** Demonstrates standalone read-only grading (`exitCode: 1`) alongside opt-in `updateComponents` delta repair converging to `exitCode: 0` within `<= 2` turns.
-- [ ] **Docs Guide:** Documents the "Self-Healing Generative UI with `uirig`" workflow for `://agnosticui.com` and repo docs.
+- [x] **Docs Guide:** Documents the "Self-Healing Generative UI with `uirig`" workflow for `://agnosticui.com` and repo docs.
