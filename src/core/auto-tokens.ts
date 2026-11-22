@@ -267,7 +267,8 @@ export function parseTailwindThemeCss(rawCss: string): ITokenScaleConfig {
   let match: RegExpExecArray | null;
 
   while ((match = themeHeaderRegex.exec(withoutComments)) !== null) {
-    const bodyStart = match.index + match.length;
+    const matchedHeader = match.at(0) ?? '';
+    const bodyStart = match.index + matchedHeader.length;
     let depth = 1;
     let cursor = bodyStart;
 
