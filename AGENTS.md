@@ -4,17 +4,21 @@ This repository uses **`@rlevin/uirig`** as its deterministic, live-viewport UI 
 
 ## Mandatory Post-Edit UI Verification Loop
 
-Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI styles:
+Whenever you create or modify HTML, CSS, Web Components, Lit templates, A2UI surfaces, or UI styles:
 
 1. **Run the deterministic JSON verification gate:**
    - If `uirig.config.json` is configured and your dev server is running:
 
-         npx @rlevin/uirig check --json
+```bash
+npx @rlevin/uirig check --json
+```
 
-   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly (add `--auto-tokens` when no `tokensPath` is configured to auto-discover `:root` CSS variables, Tailwind v4 `@theme`, and W3C `.tokens.json` scales, and combine `--group-by-root`, `--spatial-brief`, and `--top` / `--max-tokens` for compact feedback):
+   - Or target a live URL, standalone `.html` file, or specific edited component (`--selectors` / `-s`) directly (add `--auto-tokens` when no `tokensPath` is configured, `--themes="light, dark"` for multi-theme matrix evaluation, and `--group-by-root`, `--spatial-brief`, and `--top` / `--max-tokens` for compact feedback):
 
-         npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-brief --top=5 --json
-         npx @rlevin/uirig ./dist/index.html --auto-tokens --selectors="ag-button, .pricing-card" --max-tokens=1200 --json
+```bash
+npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-brief --top=5 --json
+npx @rlevin/uirig ./dist/index.html --auto-tokens --selectors="ag-button, .pricing-card" --max-tokens=1200 --json
+```
 
    *(If `@rlevin/uirig` is already installed in `node_modules`, `npx uirig ...` works interchangeably.)*
 2. **Evaluate the POSIX exit code and JSON `stdout` payload:**
@@ -29,11 +33,12 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
    - Inspect each entry in `violations`:
      - `engine` & `violationType` (including `ax_empty_name`, `ax_hidden_focus`, and `orphaned_slot_content`)
      - `hostComponent` (the enclosing Web Component tag, e.g., `ag-button`)
+     - `a2ui` (when inside `<a2ui-surface>` or `[data-a2ui-surface]`: `{ surfaceId, a2uiComponentId, a2uiComponentType, catalogId, wirePath, suggestedPatch }`; `null` otherwise)
      - `selector` (including `::shadow` / `>> shadow-root >>` boundaries, or the shared parent container when grouped)
      - `occurrenceCount` / `childCount` / `sampleChildren`
      - `suggestedToken` (nearest passing design token when available)
-     - `remediationAdvice` (actionable fix guidance scoped to the offending element or custom element slots)
-   - Patch the offending CSS or component template directly using `suggestedToken` and `remediationAdvice`.
+     - `remediationAdvice` (actionable fix guidance scoped to the offending element, custom element slots, or A2UI `updateComponents` delta)
+   - Patch the offending CSS, component template, or A2UI `updateComponents` payload directly using `suggestedToken`, `a2ui`, and `remediationAdvice`.
    - Re-run `npx @rlevin/uirig check --json` (or `npx @rlevin/uirig <target> --selectors="..." --json`) until `exitCode` is `0`.
 
 ## Ground Rules for AI Agents

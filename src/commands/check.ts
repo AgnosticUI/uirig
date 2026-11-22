@@ -41,7 +41,9 @@ import {
   validateSelectorsInBrowser,
 } from '../utils/scope.js';
 import type { IUirigIgnoreRule } from '../utils/ignore.js';
+import { resolveA2uiAttributionsForSelectors } from '../utils/a2ui-attribution.js';
 import type {
+  IA2uiAttribution,
   IDarkModeViolation,
   IDomIntegrityViolation,
   IRuntimeErrorViolation,
@@ -109,6 +111,7 @@ export interface ICheckCommandOptions {
   /** Optional working directory override for resolving relative paths in tests. */
   cwd?: string;
 }
+
 export interface IViewportAuditReport {
   url: string;
   viewport: IViewportConfig;
@@ -118,6 +121,8 @@ export interface IViewportAuditReport {
   matchedSelectorCount?: number;
   /** Compact plain-text bounding-box summary emitted when `--spatial-brief` is enabled. */
   spatialBrief?: string;
+  /** Out-of-band `<a2ui-surface>` component attribution keyed by violation selector (`null` outside `<a2ui-surface>`). */
+  a2uiAttributions?: Record<string, IA2uiAttribution | null>;
   tokenViolations: Array<ITokenViolation>;
   contrastViolations: Array<IContrastViolation>;
   darkModeViolations?: Array<IDarkModeViolation>;
@@ -378,6 +383,7 @@ export function evaluatePosixExitCode(results: Array<IViewportAuditReport>): Pos
   }
   return 0;
 }
+
 export async function auditViewportInParallel(
   browser: Browser,
   url: string,
@@ -436,6 +442,7 @@ export async function auditViewportInParallel(
   const runReadOnlyTrack = async (): Promise<{
     matchedSelectorCount?: number;
     spatialBrief?: string;
+    a2uiAttributions?: Record<string, IA2uiAttribution | null>;
     tokenViolations: Array<ITokenViolation>;
     contrastViolations: Array<IContrastViolation>;
     domViolations: Array<IDomIntegrityViolation>;
@@ -532,9 +539,21 @@ export async function auditViewportInParallel(
           })
         : new Array<IDomIntegrityViolation>();
 
+      const candidateSelectors = [
+        ...tokenViolations.map((v) => v.selector),
+        ...contrastViolations.map((v) => v.selector),
+        ...domViolations.map((v) => v.selector),
+      ];
+      let a2uiAttributions: Record<string, IA2uiAttribution | null> | undefined;
+      if (candidateSelectors.length > 0) {
+        const resolvedMap = await resolveA2uiAttributionsForSelectors(page, candidateSelectors);
+        a2uiAttributions = Object.fromEntries(resolvedMap.entries());
+      }
+
       return {
         matchedSelectorCount,
         spatialBrief,
+        a2uiAttributions,
         tokenViolations,
         contrastViolations,
         domViolations,
@@ -616,6 +635,9 @@ export async function auditViewportInParallel(
       : {}),
     ...(readOnlyResult.spatialBrief !== undefined
       ? { spatialBrief: readOnlyResult.spatialBrief }
+      : {}),
+    ...(readOnlyResult.a2uiAttributions !== undefined
+      ? { a2uiAttributions: readOnlyResult.a2uiAttributions }
       : {}),
     tokenViolations: readOnlyResult.tokenViolations,
     contrastViolations: readOnlyResult.contrastViolations,
