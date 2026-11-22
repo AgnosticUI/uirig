@@ -15,3 +15,16 @@
 ## Next Step
 1. Verify `git checkout main && git pull origin main` after merging PR `#26`.
 2. Pick the next open issue from `https://github.com/AgnosticUI/uirig/issues` (recommended: **Issue `#10`** — `Zero-Config Design Token Auto-Discovery (--auto-tokens)`), cut a feature branch, and scaffold `.uirig/docs/IMPLEMENT_ISSUE_10.md` + `.uirig/docs/NEXT_PROMPT.md`.
+# Session Continuity: Issue #10 (`feat/issue-10-auto-tokens`)
+
+## Current Context
+- **Repository:** `AgnosticUI/uirig`
+- **Active Branch:** `feat/issue-10-auto-tokens`
+- **Issue:** `#10` — `Zero-Config Design Token Auto-Discovery (--auto-tokens)`
+- **Tracking Plan:** `.uirig/docs/IMPLEMENT_ISSUE_10.md`
+
+## Completed
+- **Chunk 0:** Branch `feat/issue-10-auto-tokens` created, `.uirig/docs/IMPLEMENT_ISSUE_10.md` and `.uirig/docs/NEXT_PROMPT.md` scaffolded.
+
+## Next Step (Chunk 1)
+Create `src/core/auto-tokens.ts` with `classifyAndNormalizeTokenValue()` and `mergeTokenScales()`, add 1-to-1 unit tests in `tests/unit/auto-tokens.test.ts`, run `npm run typecheck && npx vitest run tests/unit/auto-tokens.test.ts && npm run build`, and commit Chunk 1.
