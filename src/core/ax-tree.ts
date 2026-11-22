@@ -305,11 +305,13 @@ export async function auditComputedAccessibilityTree(
   const cdp = await page.context().newCDPSession(page);
   try {
     await cdp.send('DOM.enable');
+    await cdp.send('DOM.getDocument', { depth: 0 });
     await cdp.send('Accessibility.enable');
 
     const treeResponse = (await cdp.send('Accessibility.getFullAXTree')) as {
       nodes?: Array<ICdpAxNode>;
     };
+
     const axNodes = treeResponse.nodes ?? new Array<ICdpAxNode>();
     const nodeById = new Map<string, ICdpAxNode>();
     for (const axNode of axNodes) {
