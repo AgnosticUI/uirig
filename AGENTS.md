@@ -19,7 +19,7 @@ Whenever you create or modify HTML, CSS, Web Components, Lit templates, or UI st
    *(If `@rlevin/uirig` is already installed in `node_modules`, `npx uirig ...` works interchangeably.)*
 2. **Evaluate the POSIX exit code and JSON `stdout` payload:**
    - **Exit Code `0` (`"passed": true`):** All 6 engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`) and runtime JS error checks passed. You may finish your task.
-   - **Exit Code `1`:** Design token drift (`tokens`), light/dark WCAG contrast failure (`contrast`, `dark-mode`), structural DOM/ARIA/Web Component `<slot>` violation (`dom`), or uncaught runtime JS error.
+   - **Exit Code `1`:** Design token drift (`tokens`), light/dark WCAG contrast failure (`contrast`, `dark-mode`, including worst-case CSS `background-clip: text` gradient stops), structural DOM/ARIA/Web Component `<slot>` violation (`dom`), or uncaught runtime JS error.
    - **Exit Code `2`:** Structural layout break (`stress`: container overflow, `100vw` scrollbar bleed, squished avatar, `<24px` tap target) or Cumulative Layout Shift budget breach (`cls`).
 3. **Verify Macro-Layout via `spatialBrief` (No Vision Screenshots Required):**
    - When `--spatial-brief` is passed, inspect the top-level `"spatialBrief"` field (e.g. `header[0,0 1440x64] | aside[0,64 260x836] | main[260,64 1180x836]`) to confirm side-by-side vs. stacked alignment and bounding-box dimensions without attaching vision screenshots.

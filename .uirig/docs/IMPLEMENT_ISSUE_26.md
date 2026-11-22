@@ -2,7 +2,7 @@
 
 - **Issue:** `AgnosticUI/uirig#26` — `feat(contrast): support CSS background-clip: text gradient luminance in matrix.ts`
 - **Branch:** `feat/issue-26-background-clip-text`
-- **Status:** In Progress (Chunks 0–2 Complete)
+- **Status:** Complete (Chunks 0–3 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -60,7 +60,7 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
     - Add live Chromium tests in `tests/unit/matrix.test.ts` covering VitePress-style `.name.clip` hero headings (`-webkit-background-clip: text; -webkit-text-fill-color: transparent; background: -webkit-linear-gradient(...)`) for both passing dark-backdrop gradients and failing light-backdrop low-contrast gradients.
   - **Commit:** `feat(contrast): detect live background-clip: text gradients in browser contrast crawler`
 
-- [ ] **Chunk 3: Docs Sync (`README.md`, `AGENTS.md`) & Final Verification**
+- [x] **Chunk 3: Docs Sync (`README.md`, `AGENTS.md`) & Final Verification**
   - **Files:** `README.md`, `AGENTS.md`, `.uirig/docs/IMPLEMENT_ISSUE_26.md`, `.uirig/docs/NEXT_PROMPT.md`
   - **Action:**
     - Document CSS `background-clip: text` gradient luminance evaluation under the `contrast` engine in `README.md` and `AGENTS.md`.
@@ -74,4 +74,4 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
 - [x] Gradient color stops (hex, `rgb`/`rgba`, `hsl`/`hsla`, `oklch`, named colors, with percentage/length stop positions) are parsed accurately.
 - [x] Worst-case (lowest contrast) stop is evaluated against the composited ancestor background (without self-compositing the clipped background behind the glyphs).
 - [x] High-contrast gradient headings (e.g., VitePress `.name.clip` on dark surfaces) pass without `1.00:1` false positives, while low-contrast gradient stops fail with accurate `foregroundRgb` and `contrastRatio`.
-- [ ] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.
+- [x] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.

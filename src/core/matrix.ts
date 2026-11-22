@@ -403,8 +403,9 @@ export function evaluateContrastEntry(params: {
 
 /**
  * Crawls a live Playwright Page across Light DOM and open ShadowRoot boundaries,
- * extracting foreground text colors and ancestor `{ backgroundColor, opacity }` stacks
- * for visible elements that render direct text nodes (or projected `<slot>` text nodes).
+ * extracting foreground text colors, `background-clip: text` gradient stops, and ancestor
+ * `{ backgroundColor, opacity }` stacks for visible elements that render direct text nodes
+ * (or projected `<slot>` text nodes).
  */
 export async function extractTextContrastSnapshots(
   page: Page,
@@ -417,7 +418,11 @@ export async function extractTextContrastSnapshots(
     'Dispatching shadow-piercing contrast walker into browser sandbox...'
   );
 
-  const snapshots = await page.evaluate(
+  interface IRawExtractedTextSnapshot extends IExtractedTextContrastEntry {
+    clippedBackgroundImage?: string;
+  }
+
+  const rawSnapshots = await page.evaluate(
     ({
       rules,
       activeSelectors,
@@ -432,7 +437,7 @@ export async function extractTextContrastSnapshots(
       ignoreHelperSrc: string;
       scopeHelperSrc: string;
       activeRule: string;
-    }): IExtractedTextContrastEntry[] => {
+    }): IRawExtractedTextSnapshot[] => {
       const buildWalker = new Function(
         `return (${walkerFactorySrc});`
       )() as typeof createBrowserDomWalker;
@@ -443,7 +448,7 @@ export async function extractTextContrastSnapshots(
         activeSelectors,
         scopeHelperSrc
       );
-      const results: IExtractedTextContrastEntry[] = [];
+      const results: IRawExtractedTextSnapshot[] = [];
 
       // Only treat direct text nodes NOT projected into a Shadow DOM <slot> as painted by `el`
       function hasDirectUnassignedVisibleText(el: Element): boolean {
@@ -473,6 +478,48 @@ export async function extractTextContrastSnapshots(
           }
         }
         return false;
+      }
+
+      function isTransparentCssColor(rawColor: string): boolean {
+        const normalized = rawColor.trim().toLowerCase();
+        if (!normalized || normalized === 'transparent') {
+          return true;
+        }
+        const rgbaMatch = normalized.match(
+          /^rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)$/
+        );
+        if (rgbaMatch && rgbaMatch[1] !== undefined) {
+          return Number.parseFloat(rgbaMatch[1]) <= 0.05;
+        }
+        const slashAlphaMatch = normalized.match(/\/\s*([\d.]+%?)\s*\)$/);
+        if (slashAlphaMatch && slashAlphaMatch[1] !== undefined) {
+          const rawAlpha = slashAlphaMatch[1];
+          const numericAlpha = rawAlpha.endsWith('%')
+            ? Number.parseFloat(rawAlpha) / 100
+            : Number.parseFloat(rawAlpha);
+          return numericAlpha <= 0.05;
+        }
+        return false;
+      }
+
+      function hasClippedTextGradient(computed: CSSStyleDeclaration): boolean {
+        const clip = (
+          computed.backgroundClip ||
+          computed.getPropertyValue('-webkit-background-clip') ||
+          ''
+        )
+          .trim()
+          .toLowerCase();
+        if (clip !== 'text') {
+          return false;
+        }
+        const bgImage = (computed.backgroundImage || '').toLowerCase();
+        if (!bgImage.includes('gradient(')) {
+          return false;
+        }
+        const textFill =
+          computed.getPropertyValue('-webkit-text-fill-color') || computed.color || '';
+        return isTransparentCssColor(textFill);
       }
 
       // Walk upward from `el` through `parentElement` and `ShadowRoot.host` boundaries,
@@ -509,11 +556,23 @@ export async function extractTextContrastSnapshots(
           (hasDirectUnassignedVisibleText(currentNode) || hasSlottedDirectText(currentNode)) &&
           !walker.isIgnored(currentNode, activeRule)
         ) {
+          const clippedGradient = hasClippedTextGradient(computed);
           const styleLayers = collectAncestorStyleLayers(currentNode);
+
+          // When `background-clip: text` is active, the element's own background paints inside
+          // the glyph fill rather than as a rectangular backdrop behind the characters.
+          if (clippedGradient && styleLayers.length > 0) {
+            const leafLayer = styleLayers[styleLayers.length - 1];
+            if (leafLayer) {
+              leafLayer.backgroundColor = 'rgba(0, 0, 0, 0)';
+            }
+          }
+
           results.push({
             selector: meta.selector,
             hostComponent: meta.hostComponent,
             foregroundColor: computed.color,
+            ...(clippedGradient ? { clippedBackgroundImage: computed.backgroundImage } : {}),
             backgroundLayers: styleLayers.map((layer) => layer.backgroundColor),
             styleLayers,
             inShadowDom: meta.inShadowDom,
@@ -530,6 +589,16 @@ export async function extractTextContrastSnapshots(
       ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
       scopeHelperSrc: isElementInSelectorScope.toString(),
       activeRule: ruleName,
+    }
+  );
+
+  const snapshots: IExtractedTextContrastEntry[] = rawSnapshots.map(
+    ({ clippedBackgroundImage, ...entry }) => {
+      if (!clippedBackgroundImage) {
+        return entry;
+      }
+      const gradientColors = extractGradientColorStops(clippedBackgroundImage);
+      return gradientColors.length > 0 ? { ...entry, gradientColors } : entry;
     }
   );
 
