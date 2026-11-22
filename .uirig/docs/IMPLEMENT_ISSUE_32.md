@@ -4,7 +4,7 @@
 - **Epic:** `AgnosticUI/uirig#33` (`label:epic:a2ui-eval`)
 - **Depends on:** `AgnosticUI/uirig#31`
 - **Branch:** `feat/issue-32-a2ui-support-center-demo`
-- **Status:** In Progress (Chunk 0 Complete)
+- **Status:** In Progress (Chunks 0–2 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -29,16 +29,17 @@ Operationalize `uirig` against the **A2UI Support Center Studio** as both a live
   - **Action:** Cut branch `feat/issue-32-a2ui-support-center-demo` from `main` and update continuity docs.
   - **Commit:** `docs(plan): initialize branch and tracking for issue #32`
 
-- [ ] **Chunk 1: Support Center `<a2ui-surface>` Scenario Fixtures & Multi-Theme/Viewport Eval Gate**
+- [x] **Chunk 1: Support Center `<a2ui-surface>` Scenario Fixtures & Multi-Theme/Viewport Eval Gate**
   - **Files:** `src/utils/a2ui-self-heal.ts`, `tests/integration/a2ui-support-center.test.ts`
   - **Action:**
     - Create `src/utils/a2ui-self-heal.ts` with the Support Center A2UI v1.0 component model, HTML renderer, and `buildA2uiUpdateComponentsDelta()` helper that translates `IAgenticViolation[]` into standard A2UI v1.0 `updateComponents` messages.
     - Add integration tests in `tests/integration/a2ui-support-center.test.ts` verifying Always-On Violation Detection (`exitCode: 1`) across Light/Dark themes and mobile (`375x812`) / desktop (`1440x900`) viewports.
   - **Commit:** `feat(a2ui): add Support Center Studio eval gate and updateComponents delta builder`
 
-- [ ] **Chunk 2: Closed-Loop Self-Healing Convergence Harness (`<= 2` Repair Turns)**
-  - **Files:** `src/utils/a2ui-self-heal.ts`, `tests/integration/a2ui-support-center.test.ts`
+- [x] **Chunk 2: Closed-Loop Self-Healing Convergence Harness (`<= 2` Repair Turns)**
+  - **Files:** `src/commands/check.ts`, `src/utils/a2ui-self-heal.ts`, `tests/integration/a2ui-support-center.test.ts`
   - **Action:**
+    - Support compound dark skins (`enterprise-dark`, `high-contrast-dark`) in `auditViewportInParallel()` (`src/commands/check.ts`).
     - Implement `runA2uiSelfHealingLoop()` in `src/utils/a2ui-self-heal.ts` to execute up to `maxTurns` (default `2`) of audit -> `updateComponents` delta application -> re-audit until `exitCode === 0`.
     - Add E2E convergence test in `tests/integration/a2ui-support-center.test.ts` proving the Support Center ticket escalation scenario (`close_drawer_btn` missing `ariaLabel` + low-contrast dark-mode status badge) converges to `exitCode === 0` within `<= 2` turns.
   - **Commit:** `feat(a2ui): add opt-in self-healing updateComponents convergence harness and E2E test`
@@ -53,6 +54,6 @@ Operationalize `uirig` against the **A2UI Support Center Studio** as both a live
 ---
 
 ## 3. Acceptance Checklist (from `AgnosticUI/uirig#32`)
-- [ ] **Support Center Eval Gate:** `uirig` audits `<a2ui-surface>` scenarios across Light/Dark themes and mobile (`375px`) / desktop (`1440px`) viewports (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom` AX-tree).
-- [ ] **2-Mode Workflow:** Demonstrates standalone read-only grading (`exitCode: 1`) alongside opt-in `updateComponents` delta repair converging to `exitCode: 0` within `<= 2` turns.
+- [x] **Support Center Eval Gate:** `uirig` audits `<a2ui-surface>` scenarios across Light/Dark themes and mobile (`375px`) / desktop (`1440px`) viewports (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom` AX-tree).
+- [x] **2-Mode Workflow:** Demonstrates standalone read-only grading (`exitCode: 1`) alongside opt-in `updateComponents` delta repair converging to `exitCode: 0` within `<= 2` turns.
 - [ ] **Docs Guide:** Documents the "Self-Healing Generative UI with `uirig`" workflow for `://agnosticui.com` and repo docs.

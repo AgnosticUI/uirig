@@ -6,13 +6,12 @@
 - **Active Issue:** `#32` — `feat(a2ui): AgnosticUI Support Center Studio eval gate & self-healing demo` (Track A — Task 5 of Epic `#33`)
 - **Tracking Plan:** `.uirig/docs/IMPLEMENT_ISSUE_32.md`
 
-## Roadmap Progress (`epic:a2ui-eval` `#33`)
-- [x] **Track A — Task 1 (`#19`):** Computed Accessibility Tree Snapshot (`ax_empty_name`, `ax_hidden_focus`)
-- [x] **Track A — Task 4 (`#31`):** Universal `<a2ui-surface>` Component Attribution & Eval Mode
-- [ ] **Track A — Task 5 (`#32`):** AgnosticUI Support Center Studio Eval Gate & Self-Healing Demo (In Progress — Chunk 0 Complete)
-- [ ] **Track B — Task 2 (`#9`):** Framework Source-Map & `file:line` Attribution (`.uirig/docs/IMPLEMENT_ISSUE_9.md`)
-- [ ] **Track B — Task 3 (`#13`):** Deterministic Auto-Fix Patch Generation (`--fix` / `unifiedDiff`) (`.uirig/docs/IMPLEMENT_ISSUE_13.md`)
+## Completed
+- **Chunk 0:** Branch `feat/issue-32-a2ui-support-center-demo` created and tracking docs initialized.
+- **Chunk 1:** Created `src/utils/a2ui-self-heal.ts` and Always-On Eval Gate tests in `tests/integration/a2ui-support-center.test.ts`.
+- **Chunk 2:** Added compound dark-skin detection (`enterprise-dark`, `high-contrast-dark`) in `src/commands/check.ts`, implemented `runA2uiSelfHealingLoop()` in `src/utils/a2ui-self-heal.ts`, and verified `<= 2`-turn convergence E2E in `tests/integration/a2ui-support-center.test.ts`.
 
-## Immediate Next Step (Chunk 1)
-1. Create `src/utils/a2ui-self-heal.ts` with the A2UI v1.0 Support Center component model, HTML renderer, and `buildA2uiUpdateComponentsDelta()` translator.
-2. Add Always-On Eval Gate tests in `tests/integration/a2ui-support-center.test.ts` across Light/Dark themes and mobile (`375x812`) / desktop (`1440x900`) viewports, run verification, and commit Chunk 1.
+## Next Step (Chunk 3 — Final)
+1. Document the "Self-Healing Generative UI with `uirig`" 2-mode workflow and Support Center trace in `README.md` and `AGENTS.md`.
+2. Mark Chunk 3 `[x]` complete in `.uirig/docs/IMPLEMENT_ISSUE_32.md` and update `.uirig/docs/NEXT_PROMPT.md` to point to Track B — Task 2 (`#9`).
+3. Run `npm run typecheck && npm test && npm run build`, commit Chunk 3, and merge PR `#32` into `main`.
