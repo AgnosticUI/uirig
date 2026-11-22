@@ -59,11 +59,14 @@ export interface IExtractedTextContrastEntry {
   selector: string;
   hostComponent?: string | null;
   foregroundColor: string;
+  /** Optional CSS gradient color stops resolved when `background-clip: text` is active. */
+  gradientColors?: string[];
   backgroundLayers: string[];
   /** Ordered `{ backgroundColor, opacity }` layers from root (`<html>`) to leaf text element. */
   styleLayers?: IAncestorStyleLayer[];
   inShadowDom: boolean;
 }
+
 
 function extractSafeRgbCoords(color: Color): [number, number, number] {
   const srgb = color.to('srgb');
@@ -201,6 +204,130 @@ export function compositeContrastLayers(
 }
 
 /**
+ * Splits a CSS argument list by top-level commas while preserving nested parentheses
+ * (such as `rgb(...)`, `rgba(...)`, `hsl(...)`, `oklch(...)`, or `calc(...)`).
+ */
+function splitTopLevelCommaArgs(input: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === '(') {
+      depth++;
+    } else if (ch === ')') {
+      depth = Math.max(0, depth - 1);
+    } else if (ch === ',' && depth === 0) {
+      const segment = input.slice(start, i).trim();
+      if (segment.length > 0) {
+        parts.push(segment);
+      }
+      start = i + 1;
+    }
+  }
+
+  const tail = input.slice(start).trim();
+  if (tail.length > 0) {
+    parts.push(tail);
+  }
+  return parts;
+}
+
+/**
+ * Extracts valid CSS color stop strings from a computed `background-image` containing
+ * one or more CSS `gradient(...)` functions (e.g., `linear-gradient(...)`,
+ * `-webkit-linear-gradient(...)`, `radial-gradient(...)`, `conic-gradient(...)`).
+ */
+export function extractGradientColorStops(backgroundImage: string): string[] {
+  if (!backgroundImage || !backgroundImage.toLowerCase().includes('gradient(')) {
+    return [];
+  }
+
+  const colors: string[] = [];
+  const gradientHeaderRegex = /(?:-[a-z]+-)?(?:repeating-)?(?:linear|radial|conic)-gradient\s*\(/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = gradientHeaderRegex.exec(backgroundImage)) !== null) {
+    const argsStart = match.index + match[0].length;
+    let depth = 1;
+    let cursor = argsStart;
+
+    while (cursor < backgroundImage.length && depth > 0) {
+      const ch = backgroundImage[cursor];
+      if (ch === '(') {
+        depth++;
+      } else if (ch === ')') {
+        depth--;
+      }
+      cursor++;
+    }
+
+    if (depth !== 0) {
+      continue;
+    }
+
+    const innerArgs = backgroundImage.slice(argsStart, cursor - 1);
+    const segments = splitTopLevelCommaArgs(innerArgs);
+
+    for (const segment of segments) {
+      // Split color stop from optional trailing position/angle stops at top-level whitespace
+      const tokens: string[] = [];
+      let parenDepth = 0;
+      let tokenStart = 0;
+
+      for (let i = 0; i < segment.length; i++) {
+        const ch = segment[i];
+        if (ch === '(') {
+          parenDepth++;
+        } else if (ch === ')') {
+          parenDepth = Math.max(0, parenDepth - 1);
+        } else if (/\s/.test(ch) && parenDepth === 0) {
+          const tok = segment.slice(tokenStart, i).trim();
+          if (tok.length > 0) {
+            tokens.push(tok);
+          }
+          tokenStart = i + 1;
+        }
+      }
+      const lastTok = segment.slice(tokenStart).trim();
+      if (lastTok.length > 0) {
+        tokens.push(lastTok);
+      }
+
+      if (tokens.length === 0) {
+        continue;
+      }
+
+      // Color is either the first token (`#bd34fe 30%`) or last token (`30% #bd34fe`)
+      const candidates = [tokens[0] as string];
+      if (tokens.length > 1) {
+        candidates.push(tokens[tokens.length - 1] as string);
+      }
+
+      for (const candidate of candidates) {
+        // Ignore pure numeric/percentage/angle/length stop positions or keywords like `to`, `at`, `from`
+        if (/^[+-]?(?:\d+\.?\d*|\.\d+)(?:%|px|em|rem|deg|rad|grad|turn|vw|vh)?$/i.test(candidate)) {
+          continue;
+        }
+        try {
+          const parsed = new Color(candidate);
+          // Ensure `colorjs.io` actually resolved a valid color space (not an unparsed keyword)
+          if (parsed && parsed.space) {
+            colors.push(candidate);
+            break;
+          }
+        } catch {
+          // Not a CSS color token (e.g. `120deg`, `to`, `circle`)
+        }
+      }
+    }
+  }
+
+  return colors;
+}
+
+/**
  * Evaluates a foreground text color against ancestor background/opacity layers,
  * returning an `IContrastViolation` if WCAG 2.1 contrast drops below `minRatio`.
  */
@@ -208,6 +335,7 @@ export function evaluateContrastEntry(params: {
   selector: string;
   hostComponent?: string | null;
   foregroundColor: string;
+  gradientColors?: string[];
   backgroundLayers: string[];
   styleLayers?: IAncestorStyleLayer[];
   inShadowDom: boolean;
@@ -224,17 +352,34 @@ export function evaluateContrastEntry(params: {
     params.styleLayers ??
     params.backgroundLayers.map((backgroundColor) => ({ backgroundColor, opacity: 1 }));
 
-  const { resolvedFg, resolvedBg } = compositeContrastLayers(
-    effectiveLayers,
-    params.foregroundColor
-  );
+  const candidateForegrounds =
+    params.gradientColors && params.gradientColors.length > 0
+      ? params.gradientColors
+      : [params.foregroundColor];
 
-  const rawRatio = resolvedBg.contrast(resolvedFg, 'WCAG21');
-  const roundedRatio = Math.round(rawRatio * 100) / 100;
+  let worstResolvedFg: Color | null = null;
+  let worstResolvedBg: Color | null = null;
+  let lowestRatio = Number.POSITIVE_INFINITY;
 
-  if (rawRatio < threshold) {
-    const fgRgb = formatRgbString(resolvedFg);
-    const bgRgb = formatRgbString(resolvedBg);
+  for (const candidateFg of candidateForegrounds) {
+    const { resolvedFg, resolvedBg } = compositeContrastLayers(effectiveLayers, candidateFg);
+    const ratio = resolvedBg.contrast(resolvedFg, 'WCAG21');
+    if (ratio < lowestRatio) {
+      lowestRatio = ratio;
+      worstResolvedFg = resolvedFg;
+      worstResolvedBg = resolvedBg;
+    }
+  }
+
+  if (!worstResolvedFg || !worstResolvedBg) {
+    return null;
+  }
+
+  const roundedRatio = Math.round(lowestRatio * 100) / 100;
+
+  if (lowestRatio < threshold) {
+    const fgRgb = formatRgbString(worstResolvedFg);
+    const bgRgb = formatRgbString(worstResolvedBg);
     const suggestedToken = findNearestPassingColorToken(
       fgRgb,
       bgRgb,
@@ -258,8 +403,9 @@ export function evaluateContrastEntry(params: {
 
 /**
  * Crawls a live Playwright Page across Light DOM and open ShadowRoot boundaries,
- * extracting foreground text colors and ancestor `{ backgroundColor, opacity }` stacks
- * for visible elements that render direct text nodes (or projected `<slot>` text nodes).
+ * extracting foreground text colors, `background-clip: text` gradient stops, and ancestor
+ * `{ backgroundColor, opacity }` stacks for visible elements that render direct text nodes
+ * (or projected `<slot>` text nodes).
  */
 export async function extractTextContrastSnapshots(
   page: Page,
@@ -272,7 +418,11 @@ export async function extractTextContrastSnapshots(
     'Dispatching shadow-piercing contrast walker into browser sandbox...'
   );
 
-  const snapshots = await page.evaluate(
+  interface IRawExtractedTextSnapshot extends IExtractedTextContrastEntry {
+    clippedBackgroundImage?: string;
+  }
+
+  const rawSnapshots = await page.evaluate(
     ({
       rules,
       activeSelectors,
@@ -287,7 +437,7 @@ export async function extractTextContrastSnapshots(
       ignoreHelperSrc: string;
       scopeHelperSrc: string;
       activeRule: string;
-    }): IExtractedTextContrastEntry[] => {
+    }): IRawExtractedTextSnapshot[] => {
       const buildWalker = new Function(
         `return (${walkerFactorySrc});`
       )() as typeof createBrowserDomWalker;
@@ -298,7 +448,7 @@ export async function extractTextContrastSnapshots(
         activeSelectors,
         scopeHelperSrc
       );
-      const results: IExtractedTextContrastEntry[] = [];
+      const results: IRawExtractedTextSnapshot[] = [];
 
       // Only treat direct text nodes NOT projected into a Shadow DOM <slot> as painted by `el`
       function hasDirectUnassignedVisibleText(el: Element): boolean {
@@ -328,6 +478,48 @@ export async function extractTextContrastSnapshots(
           }
         }
         return false;
+      }
+
+      function isTransparentCssColor(rawColor: string): boolean {
+        const normalized = rawColor.trim().toLowerCase();
+        if (!normalized || normalized === 'transparent') {
+          return true;
+        }
+        const rgbaMatch = normalized.match(
+          /^rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)$/
+        );
+        if (rgbaMatch && rgbaMatch[1] !== undefined) {
+          return Number.parseFloat(rgbaMatch[1]) <= 0.05;
+        }
+        const slashAlphaMatch = normalized.match(/\/\s*([\d.]+%?)\s*\)$/);
+        if (slashAlphaMatch && slashAlphaMatch[1] !== undefined) {
+          const rawAlpha = slashAlphaMatch[1];
+          const numericAlpha = rawAlpha.endsWith('%')
+            ? Number.parseFloat(rawAlpha) / 100
+            : Number.parseFloat(rawAlpha);
+          return numericAlpha <= 0.05;
+        }
+        return false;
+      }
+
+      function hasClippedTextGradient(computed: CSSStyleDeclaration): boolean {
+        const clip = (
+          computed.backgroundClip ||
+          computed.getPropertyValue('-webkit-background-clip') ||
+          ''
+        )
+          .trim()
+          .toLowerCase();
+        if (clip !== 'text') {
+          return false;
+        }
+        const bgImage = (computed.backgroundImage || '').toLowerCase();
+        if (!bgImage.includes('gradient(')) {
+          return false;
+        }
+        const textFill =
+          computed.getPropertyValue('-webkit-text-fill-color') || computed.color || '';
+        return isTransparentCssColor(textFill);
       }
 
       // Walk upward from `el` through `parentElement` and `ShadowRoot.host` boundaries,
@@ -364,11 +556,23 @@ export async function extractTextContrastSnapshots(
           (hasDirectUnassignedVisibleText(currentNode) || hasSlottedDirectText(currentNode)) &&
           !walker.isIgnored(currentNode, activeRule)
         ) {
+          const clippedGradient = hasClippedTextGradient(computed);
           const styleLayers = collectAncestorStyleLayers(currentNode);
+
+          // When `background-clip: text` is active, the element's own background paints inside
+          // the glyph fill rather than as a rectangular backdrop behind the characters.
+          if (clippedGradient && styleLayers.length > 0) {
+            const leafLayer = styleLayers[styleLayers.length - 1];
+            if (leafLayer) {
+              leafLayer.backgroundColor = 'rgba(0, 0, 0, 0)';
+            }
+          }
+
           results.push({
             selector: meta.selector,
             hostComponent: meta.hostComponent,
             foregroundColor: computed.color,
+            ...(clippedGradient ? { clippedBackgroundImage: computed.backgroundImage } : {}),
             backgroundLayers: styleLayers.map((layer) => layer.backgroundColor),
             styleLayers,
             inShadowDom: meta.inShadowDom,
@@ -385,6 +589,16 @@ export async function extractTextContrastSnapshots(
       ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
       scopeHelperSrc: isElementInSelectorScope.toString(),
       activeRule: ruleName,
+    }
+  );
+
+  const snapshots: IExtractedTextContrastEntry[] = rawSnapshots.map(
+    ({ clippedBackgroundImage, ...entry }) => {
+      if (!clippedBackgroundImage) {
+        return entry;
+      }
+      const gradientColors = extractGradientColorStops(clippedBackgroundImage);
+      return gradientColors.length > 0 ? { ...entry, gradientColors } : entry;
     }
   );
 

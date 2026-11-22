@@ -12,6 +12,7 @@ import {
   compositeBackgroundStack,
   compositeContrastLayers,
   evaluateContrastEntry,
+  extractGradientColorStops,
   findNearestPassingColorToken,
   MIN_WCAG_AA_CONTRAST,
 } from '../../src/core/matrix.js';
@@ -251,5 +252,42 @@ describe('::: PHASE 3 TASK 3.2 + ISSUE #7 (CHUNK 1): COLORJS.IO CONTRAST, ALPHA 
     expect(violations.at(0)?.hostComponent).toBe('ag-button');
     expect(violations.at(0)?.inShadowDom).toBe(true);
     expect(violations.at(0)?.contrastRatio).toBeLessThan(MIN_WCAG_AA_CONTRAST);
+  });
+
+    it('==> Should evaluate worst-case gradient color stop luminance when gradientColors are provided', () => {
+    // VitePress-style gradient (#bd34fe + #41d1ff) on deep dark hero surface (#0a0a0f) passes AA (>= 4.5:1)
+    const darkHeroPass = evaluateContrastEntry({
+      selector: 'h1.name.clip',
+      foregroundColor: 'rgba(0, 0, 0, 0)',
+      gradientColors: ['#bd34fe', '#41d1ff'],
+      backgroundLayers: ['rgb(10, 10, 15)'],
+      inShadowDom: false,
+    });
+    expect(darkHeroPass).toBeNull();
+
+    // On mid-dark slate (#0f172a), #bd34fe drops to ~4.29:1 (< 4.5:1) and is flagged as the worst-case stop
+    const midDarkFail = evaluateContrastEntry({
+      selector: 'h1.name.clip',
+      foregroundColor: 'rgba(0, 0, 0, 0)',
+      gradientColors: ['#bd34fe', '#41d1ff'],
+      backgroundLayers: ['rgb(15, 23, 42)'],
+      inShadowDom: false,
+    });
+    expect(midDarkFail).not.toBeNull();
+    expect(midDarkFail?.foregroundRgb).toBe('rgb(189, 52, 254)');
+    expect(midDarkFail?.contrastRatio).toBeLessThan(MIN_WCAG_AA_CONTRAST);
+
+    // On white backdrop (#ffffff), bright cyan (#41d1ff) has the lowest contrast and is flagged
+    const lightHeroFail = evaluateContrastEntry({
+      selector: 'h1.name.clip',
+      foregroundColor: 'rgba(0, 0, 0, 0)',
+      gradientColors: ['#bd34fe', '#41d1ff'],
+      backgroundLayers: ['rgb(255, 255, 255)'],
+      inShadowDom: false,
+    });
+    expect(lightHeroFail).not.toBeNull();
+    expect(lightHeroFail?.foregroundRgb).toBe('rgb(65, 209, 255)');
+    expect(lightHeroFail?.backgroundRgb).toBe('rgb(255, 255, 255)');
+    expect(lightHeroFail?.contrastRatio).toBeLessThan(MIN_WCAG_AA_CONTRAST);
   });
 });
