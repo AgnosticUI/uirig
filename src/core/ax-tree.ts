@@ -178,10 +178,10 @@ function inspectResolvedDomElementInBrowser(
   activeSelectors: Array<string> | undefined,
   scopeHelperSrc: string
 ): IResolvedDomTargetMetadata | null {
-  if (!(this instanceof Element)) {
+  if (!this || (this as Node).nodeType !== 1) {
     return null;
   }
-  const targetEl: Element = this;
+  const targetEl = this as Element;
 
   const isIgnoredFn = new Function(
     'return (' + ignoreHelperSrc + ');'
