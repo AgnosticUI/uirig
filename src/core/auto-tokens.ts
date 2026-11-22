@@ -272,7 +272,7 @@ export function parseTailwindThemeCss(rawCss: string): ITokenScaleConfig {
     let cursor = bodyStart;
 
     while (cursor < withoutComments.length && depth > 0) {
-      const ch = withoutComments[cursor];
+      const ch = withoutComments.charAt(cursor);
       if (ch === '{') {
         depth++;
       } else if (ch === '}') {
@@ -290,8 +290,8 @@ export function parseTailwindThemeCss(rawCss: string): ITokenScaleConfig {
     let declMatch: RegExpExecArray | null;
 
     while ((declMatch = declRegex.exec(themeBody)) !== null) {
-      const propName = declMatch[1] ?? '';
-      const propValue = (declMatch[2] ?? '').trim();
+      const propName = declMatch.at(1) ?? '';
+      const propValue = (declMatch.at(2) ?? '').trim();
       const classified = classifyAndNormalizeTokenValue(propName, propValue);
       if (classified) {
         scale[classified.category].push(classified.normalizedValue);
@@ -301,6 +301,7 @@ export function parseTailwindThemeCss(rawCss: string): ITokenScaleConfig {
 
   return mergeTokenScales(scale);
 }
+
 
 /**
  * Scans `cwd` (up to `maxDepth` subdirectories, respecting `BLOCKLIST_DIRECTORIES`) for:
