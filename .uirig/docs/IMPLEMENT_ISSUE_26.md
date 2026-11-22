@@ -2,7 +2,7 @@
 
 - **Issue:** `AgnosticUI/uirig#26` — `feat(contrast): support CSS background-clip: text gradient luminance in matrix.ts`
 - **Branch:** `feat/issue-26-background-clip-text`
-- **Status:** In Progress (Chunk 0 Complete)
+- **Status:** In Progress (Chunks 0–2 Complete)
 - **Tracking:** `.uirig/docs/NEXT_PROMPT.md`
 
 ---
@@ -30,7 +30,7 @@ Extend the `contrast` verification engine (`src/core/matrix.ts`) to detect CSS g
    - Skip non-color arguments (angles like `120deg`, directions like `to right`, shape/size keywords like `circle at center`, `from 0deg`).
    - For each color stop (e.g., `#bd34fe 30%`, `rgba(255, 255, 255, 0.8) 50%`), extract the CSS color token and validate it via `colorjs.io` (`new Color(...)`).
 3. **Worst-Case Stop Evaluation (`evaluateContrastEntry`):**
-   - When `gradientStops` are present on `IExtractedTextContrastEntry`, evaluate **every** parsed stop against the composited ancestor backdrop (`effectiveLayers`) using `compositeContrastLayers`.
+   - When `gradientColors` are present on `IExtractedTextContrastEntry`, evaluate **every** parsed stop against the composited ancestor backdrop (`effectiveLayers`) using `compositeContrastLayers`.
    - Select the stop yielding the **lowest WCAG 2.1 contrast ratio** (worst-case legibility along the gradient).
    - If that worst-case ratio is `< threshold`, emit an `IContrastViolation` using that stop's resolved `foregroundRgb` (and `suggestedToken` when `allowedColors` are configured); otherwise return `null` (PASS).
 
@@ -45,7 +45,7 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
   - **Action:** Cut branch `feat/issue-26-background-clip-text`, save this implementation plan, and initialize the continuity capsule.
   - **Commit:** `docs(plan): add implementation plan and continuity capsule for issue #26 (background-clip: text)`
 
-- [ ] **Chunk 1: Gradient Stop Parser & Worst-Case Contrast Evaluator in `src/core/matrix.ts` + Unit Tests**
+- [x] **Chunk 1: Gradient Stop Parser & Worst-Case Contrast Evaluator in `src/core/matrix.ts` + Unit Tests**
   - **Files:** `src/core/matrix.ts`, `tests/unit/matrix.test.ts`
   - **Action:**
     - Add `extractGradientColorStops(backgroundImage: string): string[]` in `src/core/matrix.ts` to parse color stops from `linear-gradient`, `radial-gradient`, `conic-gradient`, and `repeating-*` variants (including `-webkit-linear-gradient(...)`).
@@ -53,7 +53,7 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
     - Add unit tests in `tests/unit/matrix.test.ts` verifying gradient stop extraction and worst-case evaluation (passing high-contrast gradient stops vs. failing low-contrast stops on light/dark backdrops).
   - **Commit:** `feat(contrast): parse CSS gradient color stops and evaluate worst-case contrast in matrix.ts`
 
-- [ ] **Chunk 2: Live Browser `background-clip: text` Extraction & Chromium E2E Tests**
+- [x] **Chunk 2: Live Browser `background-clip: text` Extraction & Chromium E2E Tests**
   - **Files:** `src/core/matrix.ts`, `tests/unit/matrix.test.ts`
   - **Action:**
     - Update `extractTextContrastSnapshots` in `src/core/matrix.ts` to detect `backgroundClip === 'text'` / `webkitBackgroundClip === 'text'` + `gradient(...)` + transparent text fill, strip the clipped gradient from the backdrop stack, and attach `gradientColors`.
@@ -70,8 +70,8 @@ Each micro-chunk is small, testable, and committed immediately upon passing `npm
 ---
 
 ## 4. Acceptance Checklist (from `AgnosticUI/uirig#26`)
-- [ ] `backgroundClip === 'text'` / `webkitBackgroundClip === 'text'` with `gradient(...)` and transparent text fill is detected in `src/core/matrix.ts`.
-- [ ] Gradient color stops (hex, `rgb`/`rgba`, `hsl`/`hsla`, `oklch`, named colors, with percentage/length stop positions) are parsed accurately.
-- [ ] Worst-case (lowest contrast) stop is evaluated against the composited ancestor background (without self-compositing the clipped background behind the glyphs).
-- [ ] High-contrast gradient headings (e.g., VitePress `.name.clip` on dark surfaces) pass without `1.00:1` false positives, while low-contrast gradient stops fail with accurate `foregroundRgb` and `contrastRatio`.
+- [x] `backgroundClip === 'text'` / `webkitBackgroundClip === 'text'` with `gradient(...)` and transparent text fill is detected in `src/core/matrix.ts`.
+- [x] Gradient color stops (hex, `rgb`/`rgba`, `hsl`/`hsla`, `oklch`, named colors, with percentage/length stop positions) are parsed accurately.
+- [x] Worst-case (lowest contrast) stop is evaluated against the composited ancestor background (without self-compositing the clipped background behind the glyphs).
+- [x] High-contrast gradient headings (e.g., VitePress `.name.clip` on dark surfaces) pass without `1.00:1` false positives, while low-contrast gradient stops fail with accurate `foregroundRgb` and `contrastRatio`.
 - [ ] All unit/Chromium tests, typechecks, and builds pass, and docs are synced.

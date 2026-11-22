@@ -59,11 +59,14 @@ export interface IExtractedTextContrastEntry {
   selector: string;
   hostComponent?: string | null;
   foregroundColor: string;
+  /** Optional CSS gradient color stops resolved when `background-clip: text` is active. */
+  gradientColors?: string[];
   backgroundLayers: string[];
   /** Ordered `{ backgroundColor, opacity }` layers from root (`<html>`) to leaf text element. */
   styleLayers?: IAncestorStyleLayer[];
   inShadowDom: boolean;
 }
+
 
 function extractSafeRgbCoords(color: Color): [number, number, number] {
   const srgb = color.to('srgb');
@@ -201,6 +204,130 @@ export function compositeContrastLayers(
 }
 
 /**
+ * Splits a CSS argument list by top-level commas while preserving nested parentheses
+ * (such as `rgb(...)`, `rgba(...)`, `hsl(...)`, `oklch(...)`, or `calc(...)`).
+ */
+function splitTopLevelCommaArgs(input: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === '(') {
+      depth++;
+    } else if (ch === ')') {
+      depth = Math.max(0, depth - 1);
+    } else if (ch === ',' && depth === 0) {
+      const segment = input.slice(start, i).trim();
+      if (segment.length > 0) {
+        parts.push(segment);
+      }
+      start = i + 1;
+    }
+  }
+
+  const tail = input.slice(start).trim();
+  if (tail.length > 0) {
+    parts.push(tail);
+  }
+  return parts;
+}
+
+/**
+ * Extracts valid CSS color stop strings from a computed `background-image` containing
+ * one or more CSS `gradient(...)` functions (e.g., `linear-gradient(...)`,
+ * `-webkit-linear-gradient(...)`, `radial-gradient(...)`, `conic-gradient(...)`).
+ */
+export function extractGradientColorStops(backgroundImage: string): string[] {
+  if (!backgroundImage || !backgroundImage.toLowerCase().includes('gradient(')) {
+    return [];
+  }
+
+  const colors: string[] = [];
+  const gradientHeaderRegex = /(?:-[a-z]+-)?(?:repeating-)?(?:linear|radial|conic)-gradient\s*\(/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = gradientHeaderRegex.exec(backgroundImage)) !== null) {
+    const argsStart = match.index + match[0].length;
+    let depth = 1;
+    let cursor = argsStart;
+
+    while (cursor < backgroundImage.length && depth > 0) {
+      const ch = backgroundImage[cursor];
+      if (ch === '(') {
+        depth++;
+      } else if (ch === ')') {
+        depth--;
+      }
+      cursor++;
+    }
+
+    if (depth !== 0) {
+      continue;
+    }
+
+    const innerArgs = backgroundImage.slice(argsStart, cursor - 1);
+    const segments = splitTopLevelCommaArgs(innerArgs);
+
+    for (const segment of segments) {
+      // Split color stop from optional trailing position/angle stops at top-level whitespace
+      const tokens: string[] = [];
+      let parenDepth = 0;
+      let tokenStart = 0;
+
+      for (let i = 0; i < segment.length; i++) {
+        const ch = segment[i];
+        if (ch === '(') {
+          parenDepth++;
+        } else if (ch === ')') {
+          parenDepth = Math.max(0, parenDepth - 1);
+        } else if (/\s/.test(ch) && parenDepth === 0) {
+          const tok = segment.slice(tokenStart, i).trim();
+          if (tok.length > 0) {
+            tokens.push(tok);
+          }
+          tokenStart = i + 1;
+        }
+      }
+      const lastTok = segment.slice(tokenStart).trim();
+      if (lastTok.length > 0) {
+        tokens.push(lastTok);
+      }
+
+      if (tokens.length === 0) {
+        continue;
+      }
+
+      // Color is either the first token (`#bd34fe 30%`) or last token (`30% #bd34fe`)
+      const candidates = [tokens[0] as string];
+      if (tokens.length > 1) {
+        candidates.push(tokens[tokens.length - 1] as string);
+      }
+
+      for (const candidate of candidates) {
+        // Ignore pure numeric/percentage/angle/length stop positions or keywords like `to`, `at`, `from`
+        if (/^[+-]?(?:\d+\.?\d*|\.\d+)(?:%|px|em|rem|deg|rad|grad|turn|vw|vh)?$/i.test(candidate)) {
+          continue;
+        }
+        try {
+          const parsed = new Color(candidate);
+          // Ensure `colorjs.io` actually resolved a valid color space (not an unparsed keyword)
+          if (parsed && parsed.space) {
+            colors.push(candidate);
+            break;
+          }
+        } catch {
+          // Not a CSS color token (e.g. `120deg`, `to`, `circle`)
+        }
+      }
+    }
+  }
+
+  return colors;
+}
+
+/**
  * Evaluates a foreground text color against ancestor background/opacity layers,
  * returning an `IContrastViolation` if WCAG 2.1 contrast drops below `minRatio`.
  */
@@ -208,6 +335,7 @@ export function evaluateContrastEntry(params: {
   selector: string;
   hostComponent?: string | null;
   foregroundColor: string;
+  gradientColors?: string[];
   backgroundLayers: string[];
   styleLayers?: IAncestorStyleLayer[];
   inShadowDom: boolean;
@@ -224,17 +352,34 @@ export function evaluateContrastEntry(params: {
     params.styleLayers ??
     params.backgroundLayers.map((backgroundColor) => ({ backgroundColor, opacity: 1 }));
 
-  const { resolvedFg, resolvedBg } = compositeContrastLayers(
-    effectiveLayers,
-    params.foregroundColor
-  );
+  const candidateForegrounds =
+    params.gradientColors && params.gradientColors.length > 0
+      ? params.gradientColors
+      : [params.foregroundColor];
 
-  const rawRatio = resolvedBg.contrast(resolvedFg, 'WCAG21');
-  const roundedRatio = Math.round(rawRatio * 100) / 100;
+  let worstResolvedFg: Color | null = null;
+  let worstResolvedBg: Color | null = null;
+  let lowestRatio = Number.POSITIVE_INFINITY;
 
-  if (rawRatio < threshold) {
-    const fgRgb = formatRgbString(resolvedFg);
-    const bgRgb = formatRgbString(resolvedBg);
+  for (const candidateFg of candidateForegrounds) {
+    const { resolvedFg, resolvedBg } = compositeContrastLayers(effectiveLayers, candidateFg);
+    const ratio = resolvedBg.contrast(resolvedFg, 'WCAG21');
+    if (ratio < lowestRatio) {
+      lowestRatio = ratio;
+      worstResolvedFg = resolvedFg;
+      worstResolvedBg = resolvedBg;
+    }
+  }
+
+  if (!worstResolvedFg || !worstResolvedBg) {
+    return null;
+  }
+
+  const roundedRatio = Math.round(lowestRatio * 100) / 100;
+
+  if (lowestRatio < threshold) {
+    const fgRgb = formatRgbString(worstResolvedFg);
+    const bgRgb = formatRgbString(worstResolvedBg);
     const suggestedToken = findNearestPassingColorToken(
       fgRgb,
       bgRgb,
