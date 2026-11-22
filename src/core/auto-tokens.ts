@@ -224,7 +224,7 @@ export function parseTailwindThemeCss(rawCss: string): ITokenScaleConfig {
   }
 
   const withoutComments = rawCss.replace(/\/\*[\s\S]*?\*\//g, '');
-  const themeHeaderRegex = /@theme(?:\s+[^{]+)?\{/gi;
+  const themeHeaderRegex = /@theme\b[^{]*\{/gi;
   let match: RegExpExecArray | null;
 
   while ((match = themeHeaderRegex.exec(withoutComments)) !== null) {
