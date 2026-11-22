@@ -34,8 +34,8 @@ npx @rlevin/uirig ./dist/index.html
 # Auto-discover :root CSS variables, Tailwind v4 @theme, and W3C .tokens.json with zero config
 npx @rlevin/uirig ./dist/index.html --auto-tokens --verbose
 
-# Evaluate across multiple theme skins (Light, Dark, custom brand skins) in one pass
-npx @rlevin/uirig http://localhost:5173 --themes="light, dark, enterprise" --json
+# Evaluate across multiple theme skins (Light, Dark, compound brand skins) in one pass
+npx @rlevin/uirig http://localhost:5173 --themes="light, dark, enterprise-dark" --json
 
 # Scope checks to specific components or CSS selectors (Light DOM + Shadow DOM)
 npx @rlevin/uirig http://localhost:5173 --selectors="#hero, ag-button, .pricing-card"
@@ -63,7 +63,6 @@ npx @rlevin/uirig http://localhost:5173 --group-by-root --spatial-brief --top=5 
 | **6. DOM & AX Integrity** | `dom` | Inspects Chromium's computed accessibility tree (`ax_empty_name`, `ax_hidden_focus`) plus dangling `aria-labelledby`/`for` IDs, unlabeled controls, broken `<img>` loads, `javascript:` URIs, orphaned Web Component `<slot>` children, and hidden AI prompt-injection traps. | `1` |
 
 *(Full suite runs also automatically fail with exit code `1` if the page throws uncaught runtime JavaScript errors during load.)*
-
 ---
 
 ## Installation & Workspace Setup
@@ -163,7 +162,7 @@ npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--co
 
 ### Shared Options
 * `--auto-tokens`: Auto-discover design tokens from workspace files (`*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS) and live `:root` CSS custom properties when `tokensPath` is not set.
-* `--themes=<csv>`: Evaluate the target across multiple theme skins (e.g. `--themes="light, dark, enterprise"`) via `data-theme` and color-scheme emulation in a single session.
+* `--themes=<csv>`: Evaluate the target across multiple theme skins (e.g. `--themes="light, dark, enterprise-dark"`) via `data-theme` and color-scheme emulation in a single session.
 * `-s, --selectors=<csv>`: Filter element-level checks to matching CSS selectors (comma-separated and repeatable; pierces Web Component `ShadowRoot` boundaries).
 * `--group-by-root`: Collapse cascading child failures under their shared parent container or Web Component host (`childCount` + up to 3 `sampleChildren`).
 * `--top=<n>`: Keep only the top `N` highest-priority violations (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`) and include `totalViolations` + `truncatedCount` metadata when trimmed.
@@ -180,6 +179,64 @@ npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--co
 * `0`: All token, contrast, dark-mode parity, geometric stress, CLS, DOM integrity, and runtime checks passed.
 * `1`: Design token drift, WCAG/dark-mode contrast failure, DOM/ARIA/hygiene violation, uncaught runtime JS error, or config error.
 * `2`: Structural layout break (overflow, horizontal scrollbar, tap-target collision) or CLS budget breach.
+---
+
+## How Self-Healing Actually Works: Sensor vs. Actor Ownership
+
+`uirig` never silently rewrites your UI or mutates your application state on its own. Instead, self-healing works as a closed-loop **Sensor vs. Actor** cycle between `uirig` and your AI coding agent (or opt-in A2UI harness):
+
+| Responsibility | Owner | What Happens at Runtime |
+| :--- | :--- | :--- |
+| **Deterministic Measurement & Attribution** | **`uirig` (The Sensor)** | Audits live Chromium viewports across Light/Dark themes and ShadowRoots, emitting structured `violations[]` with `hostComponent`, `a2ui` component IDs (`a2uiComponentId`, `wirePath`), `suggestedToken`, `remediationAdvice`, and POSIX exit codes (`0`, `1`, `2`). |
+| **UI/UX Authorship & Code/Delta Synthesis** | **LLM Agent / Studio Harness (The Actor)** | Owns all creative layout decisions, copywriting, component selection, and code edits. Reads `exitCode !== 0`, patches the offending CSS/template or emits an A2UI v1.0 `updateComponents` delta, and re-runs `uirig` until `exitCode === 0`. |
+| **End-User Experience** | **CI Gate or Coding Host** | In **Mode 1 (Always-On Detection)**, users see a deterministic pass/fail CI check and Markdown PR report. In **Mode 2 (Opt-In Self-Healing)**, Turn 1's defect is repaired automatically behind the scenes in ~2–4s and the user receives the verified UI alongside a concise audit summary (*"Auto-repaired 1 unlabeled icon button; verified `exitCode: 0`"*). |
+
+### End-to-End 2-Turn Self-Healing Trace (`A2UI v1.0`)
+
+1. **Turn 1 — Initial Audit (`exitCode: 1`):** The agent generates an `<a2ui-surface>` Support Center ticket drawer and runs `uirig`:
+
+```bash
+npx @rlevin/uirig http://localhost:5173 --selectors="a2ui-surface" --themes="light,dark" --json
+```
+
+`uirig` detects an icon-only button missing an accessible name inside `<ag-icon-button>` and emits component-attributed JSON to `stdout`:
+
+```json
+{
+  "tool": "uirig",
+  "exitCode": 1,
+  "passed": false,
+  "violations": [
+    {
+      "engine": "dom",
+      "violationType": "unlabeled_control",
+      "viewport": "desktop (1440x900) [theme: light]",
+      "hostComponent": "ag-icon-button",
+      "a2ui": {
+        "surfaceId": "support-ticket",
+        "a2uiComponentId": "close_drawer_btn",
+        "a2uiComponentType": "IconButton",
+        "catalogId": "agnosticui-v1",
+        "wirePath": "/components/1"
+      },
+      "remediationAdvice": "In A2UI updateComponents for surface 'support-ticket', update component 'close_drawer_btn' (IconButton): add a non-empty 'ariaLabel' or 'label' property so the rendered control exposes an accessible name."
+    }
+  ]
+}
+```
+
+2. **Turn 2 — Minimal `updateComponents` Delta & Re-Verification (`exitCode: 0`):** Using `a2ui.a2uiComponentId`, the agent (or `runA2uiSelfHealingLoop()`) emits a standard A2UI v1.0 delta touching only `close_drawer_btn` and re-runs `uirig` to confirm `exitCode === 0`:
+
+```json
+{
+  "updateComponents": {
+    "surfaceId": "support-ticket",
+    "components": [
+      { "id": "close_drawer_btn", "ariaLabel": "Close Drawer Btn" }
+    ]
+  }
+}
+```
 
 ---
 
@@ -192,32 +249,7 @@ npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--selectors=<csv>] [--co
 npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-brief --top=5 --json
 ```
 
-Each entry in `violations` includes `engine`, `hostComponent`, `a2ui` (when inside `<a2ui-surface>` or `[data-a2ui-surface]`), `selector`, `childCount` / `sampleChildren` (when grouped), `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates or A2UI `updateComponents` payloads and re-run until `exitCode === 0`.
-
-### 1a. Self-Healing Generative UI with `uirig` (A2UI v1.0 2-Mode Workflow)
-When evaluating or self-healing A2UI v1.0 generative surfaces (such as the **AgnosticUI Support Center Studio**), `uirig` operates in two clean modes with zero modifications to official A2UI wire schemas:
-
-1. **Violation Detection (Always On — Read-Only Gate):** Run `uirig` across Light/Dark themes (or compound skins like `enterprise-light, enterprise-dark`) and mobile/desktop viewports to grade live `<a2ui-surface>` output (`exitCode: 1` or `2`):
-
-```bash
-npx @rlevin/uirig check --selectors="a2ui-surface" --themes="light, dark" --json
-```
-
-2. **Self-Healing Remediation (Opt-In Loop):** Feed `uirig`'s `a2ui`-attributed diagnostics (`surfaceId`, `a2uiComponentId`, `wirePath`, `remediationAdvice`) back into your LLM (Large Language Model) or `runA2uiSelfHealingLoop()` to emit minimal A2UI v1.0 `updateComponents` deltas and re-verify until `exitCode === 0` (`<= 2` turns):
-
-```json
-{
-  "updateComponents": {
-    "surfaceId": "support-ticket",
-    "components": [
-      { "id": "close_drawer_btn", "ariaLabel": "Close Drawer Btn" },
-      { "id": "escalation_status_badge", "contrastSafe": true }
-    ]
-  }
-}
-```
-
-### 1b. Native MCP Server Mode (`uirig mcp`)
+### 2. Native MCP Server Mode (`uirig mcp`)
 Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Cursor, Windsurf, Codex) by registering `uirig mcp`, which keeps a warm headless Chromium pool alive across edits and exposes `uirig_check`, `uirig_tokens`, `uirig_contrast`, `uirig_dark_mode`, `uirig_stress`, `uirig_cls`, and `uirig_dom` as native MCP tools:
 
 ```json
@@ -233,7 +265,7 @@ Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Curso
 
 *(You can also inspect or debug tools interactively via `npx @modelcontextprotocol/inspector npx @rlevin/uirig mcp`, or run over HTTP/SSE with `npx @rlevin/uirig mcp --transport=sse --port=3333`.)*
 
-### 2. GitHub Actions CI/CD Gate
+### 3. GitHub Actions CI/CD Gate
 
 ```yml
 - name: Run uirig UI verification gate
@@ -244,7 +276,7 @@ Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Curso
 
 On every `uirig check` run, `.uirig/github_pr_comment.md` is generated and ready to post onto Pull Requests.
 
-### 3. Git Pre-Commit Hook (`.git/hooks/pre-commit`)
+### 4. Git Pre-Commit Hook (`.git/hooks/pre-commit`)
 
 ```bash
 #!/usr/bin/env bash
@@ -252,7 +284,7 @@ set -e
 npx @rlevin/uirig check --config=uirig.config.json
 ```
 
-### 4. Local Development & Playground
+### 5. Local Development & Playground
 
 ```bash
 # Build, typecheck, and run the full unit & MCP integration test suite
@@ -270,6 +302,7 @@ npm run playground:dev
 npm run playground:test
 npm run playground:test:headed
 ```
+
 ---
 
 ## License
