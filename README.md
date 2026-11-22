@@ -194,6 +194,29 @@ npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-
 
 Each entry in `violations` includes `engine`, `hostComponent`, `a2ui` (when inside `<a2ui-surface>` or `[data-a2ui-surface]`), `selector`, `childCount` / `sampleChildren` (when grouped), `suggestedToken`, and `remediationAdvice` so the agent can patch CSS/templates or A2UI `updateComponents` payloads and re-run until `exitCode === 0`.
 
+### 1a. Self-Healing Generative UI with `uirig` (A2UI v1.0 2-Mode Workflow)
+When evaluating or self-healing A2UI v1.0 generative surfaces (such as the **AgnosticUI Support Center Studio**), `uirig` operates in two clean modes with zero modifications to official A2UI wire schemas:
+
+1. **Violation Detection (Always On — Read-Only Gate):** Run `uirig` across Light/Dark themes (or compound skins like `enterprise-light, enterprise-dark`) and mobile/desktop viewports to grade live `<a2ui-surface>` output (`exitCode: 1` or `2`):
+
+```bash
+npx @rlevin/uirig check --selectors="a2ui-surface" --themes="light, dark" --json
+```
+
+2. **Self-Healing Remediation (Opt-In Loop):** Feed `uirig`'s `a2ui`-attributed diagnostics (`surfaceId`, `a2uiComponentId`, `wirePath`, `remediationAdvice`) back into your LLM (Large Language Model) or `runA2uiSelfHealingLoop()` to emit minimal A2UI v1.0 `updateComponents` deltas and re-verify until `exitCode === 0` (`<= 2` turns):
+
+```json
+{
+  "updateComponents": {
+    "surfaceId": "support-ticket",
+    "components": [
+      { "id": "close_drawer_btn", "ariaLabel": "Close Drawer Btn" },
+      { "id": "escalation_status_badge", "contrastSafe": true }
+    ]
+  }
+}
+```
+
 ### 1b. Native MCP Server Mode (`uirig mcp`)
 Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Cursor, Windsurf, Codex) by registering `uirig mcp`, which keeps a warm headless Chromium pool alive across edits and exposes `uirig_check`, `uirig_tokens`, `uirig_contrast`, `uirig_dark_mode`, `uirig_stress`, `uirig_cls`, and `uirig_dom` as native MCP tools:
 
@@ -247,7 +270,6 @@ npm run playground:dev
 npm run playground:test
 npm run playground:test:headed
 ```
-
 ---
 
 ## License
