@@ -53,7 +53,19 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
     expect(htmlSource).not.toMatch(/#contrast-token-trap\s*\{/);
   });
 
-  it('==> Should document the 3-step hands-on playground walkthrough in README.md', () => {
+  it('==> Should provide a valid config/default_tokens.json scale for out-of-the-box CLI DX and document the 3-step playground walkthrough in README.md', () => {
+    const defaultTokensPath = resolve(process.cwd(), 'config/default_tokens.json');
+    const parsedTokens = JSON.parse(readFileSync(defaultTokensPath, 'utf8')) as {
+      colors: Record<string, string>;
+      spacing: Record<string, string>;
+      fontSizes: Record<string, string>;
+      radii: Record<string, string>;
+    };
+    expect(Object.keys(parsedTokens.colors).length).toBeGreaterThan(0);
+    expect(Object.keys(parsedTokens.spacing).length).toBeGreaterThan(0);
+    expect(Object.keys(parsedTokens.fontSizes).length).toBeGreaterThan(0);
+    expect(Object.keys(parsedTokens.radii).length).toBeGreaterThan(0);
+
     const readmePath = resolve(process.cwd(), 'README.md');
     const readmeSource = readFileSync(readmePath, 'utf8');
 
@@ -61,11 +73,10 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
     expect(readmeSource).toContain('npm run playground:dev');
     expect(readmeSource).toContain('http://localhost:5173');
     expect(readmeSource).toContain('playground/src/traps.css');
-    expect(readmeSource).toContain('npx uirig verify http://localhost:5173 --json');
-    expect(readmeSource).toContain('npx uirig matrix http://localhost:5173 --themes light,dark');
-    expect(readmeSource).toContain('npx uirig verify http://localhost:5173 --fix');
+    expect(readmeSource).toContain('npm run uirig -- check http://localhost:5173 --json');
+    expect(readmeSource).toContain('npm run uirig -- check http://localhost:5173 --themes light,dark');
+    expect(readmeSource).toContain('npm run uirig -- check http://localhost:5173 --fix');
   });
-
   it('==> Should import ag-tokens.css and ag-tokens-dark.css in playground/src/main.ts', () => {
     const mainPath = resolve(process.cwd(), 'playground/src/main.ts');
     const mainSource = readFileSync(mainPath, 'utf8');
@@ -74,7 +85,7 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
     expect(mainSource).toContain('./components/ag/styles/ag-tokens-dark.css');
   });
 
-  it('==> Should inject #late-unsized-banner styled with --ag-* tokens after delay to induce a layout shift', () => {
+    it('==> Should inject #late-unsized-banner styled with --ag-* tokens after delay to induce a layout shift', () => {
     vi.useFakeTimers();
 
     try {
@@ -101,7 +112,7 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
       vi.advanceTimersByTime(150);
 
       expect(appendedChildren.length).toBe(1);
-      const injectedBanner = appendedChildren[0];
+      const injectedBanner = appendedChildren.at(0);
       expect(injectedBanner).toBeDefined();
       expect(injectedBanner?.id).toBe('late-unsized-banner');
       expect(injectedBanner?.style.height).toBe('140px');
@@ -213,9 +224,9 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
       expect(coloredSummary).toContain('hint:');
       expect(coloredSummary).toContain('--- a/playground/index.html');
       expect(coloredSummary).toContain('Try Next (Sections 2 & 3 above are intentional adversarial traps):');
-      expect(coloredSummary).toContain('npx uirig verify http://localhost:5173 --json');
-      expect(coloredSummary).toContain('npx uirig matrix http://localhost:5173 --themes light,dark');
-      expect(coloredSummary).toContain('npx uirig verify http://localhost:5173 --fix');
+      expect(coloredSummary).toContain('npm run uirig -- check http://localhost:5173 --json');
+      expect(coloredSummary).toContain('npm run uirig -- check http://localhost:5173 --themes light,dark');
+      expect(coloredSummary).toContain('npm run uirig -- check http://localhost:5173 --fix');
 
       process.env.NO_COLOR = '1';
       const plainSummary = formatSpotCheckSummary(sampleReport);

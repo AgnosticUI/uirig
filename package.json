@@ -27,6 +27,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "uirig": "node ./bin/uirig",
     "prepack": "npm run build",
     "prepublishOnly": "npm run typecheck:all && npm test",
     "pretest": "npm run build",
