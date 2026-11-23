@@ -6,16 +6,18 @@
 
 ---
 
-## Why `uirig`? (And Why It Beats Just Running `axe` or `Lighthouse` First)
+## Why `uirig`? (And Why Run It Before `axe` or `Lighthouse`)
 
-General-purpose auditors like `axe-core` and Lighthouse are essential for final compliance, **but they are blind to layout breaks, design drift, and Shadow DOM nuances that AI coding agents introduce every day:**
+`axe-core` and Lighthouse are absolutely essential for final compliance and should certainly be used alongside `uirig`, **but they may miss runtime layout breaks, design drift, and Shadow DOM issues that AI agents introduce daily:**
 
-1. **Structural Layout & Overflow Fuzzing (`stress`):** `axe` and Lighthouse never test what happens when copy grows by +30% or when a long unbreakable email/URL hits a flex container. `uirig` mutates text nodes inside an isolated browser context to catch clipped buttons, overlapping siblings, horizontal scrollbar bleed (`100vw`), squished avatars, stuck `opacity: 0` elements, and `< 24x24px` tap-target collisions.
-2. **Dark-Mode Theme Parity (`dark-mode`):** `axe` only checks whatever theme is currently rendered. `uirig` automatically emulates `prefers-color-scheme: dark` and `data-theme="dark"` in an isolated context—re-running Porter-Duff composited contrast checks and catching large surfaces stranded in blinding light mode (`luminance > 0.85`).
-3. **Design System Token Drift (`tokens`):** `axe` does not know your design system's spacing, color, typography, or border-radius scale. `uirig` crawls rendered computed styles across both Light DOM and open `ShadowRoot` trees, flags off-scale hardcoded values, and suggests the nearest passing token (`suggestedToken`).
-4. **Session-Window CLS & Runtime Crash Capture (`cls` + `runtime`):** Measures Google's W3C 1s/5s session-window Cumulative Layout Shift (`hadRecentInput: false`) and captures uncaught `pageerror` / `console.error` exceptions during navigation.
-5. **Markup & Prompt-Injection Hygiene (`dom`):** Verifies `aria-labelledby` / `label[for]` ID resolution across Light + Shadow DOM, detects broken `<img>` elements (`naturalWidth === 0`), blocks unsafe `javascript:` URIs and missing `rel="noopener"`, and flags invisible AI prompt-injection traps.
-6. **Renderer-Agnostic A2UI Surface Attribution (`a2ui`):** When auditing generative UIs rendered inside `<a2ui-surface>` or `[data-a2ui-surface]` (across Lit, React, Vue, Angular, or Flutter Web), `uirig` climbs composed `ShadowRoot.host` boundaries to resolve the exact `surfaceId`, `a2uiComponentId`, `a2uiComponentType`, `catalogId`, `wirePath`, and a ready-to-apply `suggestedPatch` into an out-of-band `a2ui` diagnostic block—and generates catalog-neutral `updateComponents` `remediationAdvice` without ever mutating A2UI wire schemas.
+| Engine / Capability | What `axe` & Lighthouse May Miss | What `uirig` Catches in Headless Chromium |
+| :--- | :--- | :--- |
+| **`stress`** | Static snapshots never test copy expansion | Mutates text (+30% copy & long strings) to catch clipped buttons, overlapping siblings, `100vw` scrollbar bleed, squished avatars, stuck `opacity: 0`, and `< 24x24px` tap targets |
+| **`dark-mode`** | Only audits whichever theme is currently active | Emulates `prefers-color-scheme: dark` + `data-theme="dark"`, re-runs Porter-Duff contrast checks, and flags surfaces stranded above `0.85` luminance |
+| **`tokens`** | Unaware of your design system's scale | Crawls Light DOM + open `ShadowRoot` computed styles for off-scale colors, spacing, font sizes, and radii, and emits `suggestedToken` |
+| **`cls` + `runtime`** | Misses uncaught console/page errors during shifts | Measures Google's W3C 1s/5s session-window CLS (`hadRecentInput: false`) and captures uncaught `pageerror` / `console.error` exceptions |
+| **`dom`** | Limited Shadow DOM & prompt-injection coverage | Validates Light + Shadow `aria-labelledby` / `label[for]` IDs, broken `<img>` loads, `javascript:` / missing `rel="noopener"` links, and hidden prompt-injection traps |
+| **`a2ui` Attribution** | No awareness of generative `<a2ui-surface>` trees | Climbs composed `ShadowRoot.host` boundaries across Lit, React, Vue, Angular, or Flutter Web to map failures to `surfaceId`, `a2uiComponentId`, `wirePath`, and `updateComponents` hints |
 
 ---
 
@@ -50,7 +52,7 @@ npx @rlevin/uirig check
 **`uirig.config.json` is completely optional.** You can run `uirig` on any URL or `.html` file with zero configuration—it automatically uses sensible built-in defaults (`mobile` 375×812 + `desktop` 1440×900 viewports, `clsMaxLimit: 0.1`, `overflowPixelTolerance: 2`, `touchTargetMinSpacingPx: 24`, and `darkModeMaxSurfaceLuminance: 0.85`).
 
 When you want persistent project settings:
-* **How to create it:** Run `npx @rlevin/uirig init` to generate `uirig.config.json` automatically (alongside `.uirig/session.json` and `.uirig/SKILL.md`), or create it by hand. `uirig init` will never overwrite an existing `uirig.config.json`.
+* **How to create it:** Run `npx @rlevin/uirig init` to generate `uirig.config.json` in your repository root (plus `.uirig/session.json` and `.uirig/SKILL.md` inside `.uirig/`), or create it manually. `uirig init` will never overwrite an existing `uirig.config.json`.
 * **Where it lives:** Place `uirig.config.json` in your **repository root** (top-level directory alongside `package.json`), or pass a custom path anywhere via `--config=<path>`.
 
 ```json
