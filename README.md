@@ -332,7 +332,7 @@ npx @rlevin/uirig check --changed --config=uirig.config.json
 
 2. **Inspect structured JSON attribution, multi-theme parity, and auto-fix patches (Terminal 2):**
 
-   > **Note:** When running `uirig` from within the cloned `uirig` repository, use `npm run uirig -- <command>` (which wraps `node ./bin/uirig`) rather than `npx uirig`. Because the local `package.json` declares `"name": "@rlevin/uirig"`, `npx` resolves against the local workspace (where `node_modules/.bin/uirig` is not self-linked) instead of downloading from npm, resulting in `uirig: command not found`. Include `--` after `npm run uirig` so npm forwards flags like `--json`, `--themes`, and `--fix` directly to the CLI (run `npm run build` first if `dist/` has not been compiled yet).
+   > **Note:** When running `uirig` from within the cloned `uirig` repository, use `npm run uirig -- <command>` (which wraps `node ./bin/uirig`) rather than `npx uirig`. Because the local `package.json` declares `"name": "@rlevin/uirig"`, `npx` resolves against the local workspace (where `node_modules/.bin/uirig` is not self-linked) instead of downloading from npm, resulting in `uirig: command not found`. Include `--` after `npm run uirig` so npm forwards flags like `--json`, `--themes`, and `--fix` directly to the CLI (run `npm run build` first if `dist/` has not been compiled yet). Also note, that if you've changed the uirig lib code itself, you will need to run npm run build so `./bin/uirig` reflects those changes.
 
    With `http://localhost:5173` running in Terminal 1, run `npm run uirig -- check` directly against the live sandbox in a second terminal (pass `--auto-tokens` in external repos without `config/default_tokens.json` to auto-harvest all CSS custom properties from the live page):
 
