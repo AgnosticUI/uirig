@@ -1032,4 +1032,93 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     }
   });
 
+  it('loads W3C ($value), Style Dictionary (value), and CSS custom property token files via tokensPath or options.tokensPath and guides on invalid schemas', async () => {
+    const configFile = join(tempDir, 'uirig.config.json');
+
+    // 1. W3C Design Tokens ($value) JSON
+    const w3cFile = join(tempDir, 'design.tokens.json');
+    writeFileSync(
+      w3cFile,
+      JSON.stringify({
+        color: {
+          surface: { $value: '#ffffff' },
+          ink: { $value: '#111827' },
+        },
+        spacing: { md: { $value: '1rem' } },
+        font: { size: { body: { $value: '16px' } } },
+        radius: { sm: { $value: '4px' } },
+      }),
+      'utf8'
+    );
+    const w3cScale = loadTokenScale('./design.tokens.json', configFile);
+    expect(w3cScale).toEqual({
+      colors: ['rgb(255, 255, 255)', 'rgb(17, 24, 39)'],
+      spacing: ['16px', '0px'],
+      fontSizes: ['16px'],
+      radii: ['4px', '0px'],
+    });
+
+    // 2. Style Dictionary (value) JSON
+    const sdFile = join(tempDir, 'style-dict.json');
+    writeFileSync(
+      sdFile,
+      JSON.stringify({
+        color: { primary: { value: '#2563eb' } },
+        size: { space: { value: '12px' } },
+      }),
+      'utf8'
+    );
+    const sdScale = loadTokenScale('./style-dict.json', configFile);
+    expect(sdScale.colors).toEqual(['rgb(37, 99, 235)']);
+    expect(sdScale.spacing).toEqual(['12px', '0px']);
+
+    // 3. CSS Custom Properties (.css)
+    const cssFile = join(tempDir, 'tokens.css');
+    writeFileSync(
+      cssFile,
+      ':root { --bg: #ffffff; --fg: #111827; --space-4: 16px; --font-size-base: 16px; --radius-none: 0px; }',
+      'utf8'
+    );
+    const cssScale = loadTokenScale('./tokens.css', configFile);
+    expect(cssScale.colors).toEqual(['rgb(255, 255, 255)', 'rgb(17, 24, 39)']);
+    expect(cssScale.spacing).toEqual(['16px', '0px']);
+
+    // 4. Actionable ERR_TOKENS_SCHEMA guidance when unrecognized format is provided
+    const unrecognizedFile = join(tempDir, 'unrecognized.json');
+    writeFileSync(unrecognizedFile, JSON.stringify({ randomKey: 123 }), 'utf8');
+    expect(() => loadTokenScale('./unrecognized.json', configFile)).toThrow(
+      /Supported formats for tokensPath \/ --tokens-path/
+    );
+
+    // 5. End-to-end zero-config check with options.tokensPath pointing to CSS token file
+    const htmlPath = join(tempDir, 'themed-tokens.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background: #ffffff; color: #111827; font-size: 16px; border-radius: 0px; }
+          </style>
+        </head>
+        <body><p style="margin: 0; font-size: 16px;">Token compliant</p></body>
+      </html>`,
+      'utf8'
+    );
+
+    const report = await executeCheckCommand({
+      target: './themed-tokens.html',
+      cwd: tempDir,
+      tokensPath: './tokens.css',
+      only: 'tokens',
+      viewportsOverride: [{ name: 'desktop', width: 1280, height: 800 }],
+      headless: true,
+      silentStdout: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    expect(report.exitCode).toBe(0);
+    expect(report.summary.totalTokenViolations).toBe(0);
+  });
+
 });

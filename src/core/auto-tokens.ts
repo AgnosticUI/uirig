@@ -1,10 +1,10 @@
 /**
  * src/core/auto-tokens.ts
- * Zero-Config Design Token Auto-Discovery (`--auto-tokens`).
+ * Zero-Config Design Token Auto-Discovery (`--auto-tokens`) & Multi-Format Scale Parser (`tokensPath`).
  * Classifies and normalizes CSS colors and dimensional lengths into `ITokenScaleConfig`
- * buckets (`colors`, `spacing`, `fontSizes`, `radii`), discovers tokens from W3C `.tokens.json`,
- * Style Dictionary JSON, and Tailwind v4 `@theme` CSS files, scrapes live `:root` CSS
- * custom properties in Chromium, and merges token sources.
+ * buckets (`colors`, `spacing`, `fontSizes`, `radii`), parses flat `ITokenScaleConfig` JSON,
+ * W3C `.tokens.json` (`$value`), Style Dictionary JSON (`value`), Tailwind v4 `@theme` CSS,
+ * and `:root` / `[data-theme]` CSS custom property stylesheets, and scrapes live `:root` variables.
  */
 
 import { readdirSync, readFileSync, statSync } from 'fs';
@@ -70,6 +70,7 @@ export function normalizeCssColorToken(rawValue: string): string | null {
     return null;
   }
 }
+
 export function normalizeCssLengthToPx(rawValue: string, rootFontSizePx: number = 16): string | null {
   const trimmed = rawValue.trim().toLowerCase();
   if (trimmed === '0') {
@@ -258,6 +259,68 @@ export function parseTailwindThemeCss(rawCss: string): ITokenScaleConfig {
       const propName = declMatch.at(1) ?? '';
       const propValue = (declMatch.at(2) ?? '').trim();
       const classified = classifyAndNormalizeTokenValue(propName, propValue);
+      if (classified) {
+        scale[classified.category].push(classified.normalizedValue);
+      }
+    }
+  }
+
+  return mergeTokenScales(scale);
+}
+
+/**
+ * Parses CSS custom properties (`--*`) from stylesheets containing `:root`, `html`,
+ * `[data-theme=...]`, or `@theme` blocks, resolving nested `var(--alias, fallback)` references.
+ */
+export function parseCssCustomPropertyTokens(rawCss: string): ITokenScaleConfig {
+  const scale = createEmptyTokenScale();
+  if (!rawCss || !rawCss.includes('--')) {
+    return scale;
+  }
+
+  const withoutComments = rawCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rawVars = new Map<string, string[]>();
+  const declRegex = /(--[A-Za-z0-9_-]+)\s*:\s*([^;{}]+);/g;
+  let declMatch: RegExpExecArray | null;
+
+  while ((declMatch = declRegex.exec(withoutComments)) !== null) {
+    const propName = (declMatch.at(1) ?? '').trim();
+    const propValue = (declMatch.at(2) ?? '').trim();
+    if (!propName || !propValue) {
+      continue;
+    }
+    const existing = rawVars.get(propName) ?? [];
+    existing.push(propValue);
+    rawVars.set(propName, existing);
+  }
+
+  function resolveCssVarValue(rawValue: string, visited: Set<string>): string {
+    const trimmed = rawValue.trim();
+    const varMatch = /^var\(\s*(--[A-Za-z0-9_-]+)(?:\s*,\s*([^)]+))?\s*\)$/.exec(trimmed);
+    if (!varMatch) {
+      return trimmed;
+    }
+    const targetName = varMatch[1] ?? '';
+    const fallback = varMatch[2]?.trim();
+    if (visited.has(targetName)) {
+      return fallback ? resolveCssVarValue(fallback, visited) : trimmed;
+    }
+    const targets = rawVars.get(targetName);
+    if (targets && targets.length > 0) {
+      const nextVisited = new Set(visited);
+      nextVisited.add(targetName);
+      const firstTarget = targets[0];
+      if (firstTarget !== undefined) {
+        return resolveCssVarValue(firstTarget, nextVisited);
+      }
+    }
+    return fallback ? resolveCssVarValue(fallback, visited) : trimmed;
+  }
+
+  for (const [propName, values] of rawVars.entries()) {
+    for (const rawVal of values) {
+      const resolved = resolveCssVarValue(rawVal, new Set([propName]));
+      const classified = classifyAndNormalizeTokenValue(propName, resolved);
       if (classified) {
         scale[classified.category].push(classified.normalizedValue);
       }

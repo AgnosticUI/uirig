@@ -17,6 +17,7 @@ import {
   mergeTokenScales,
   normalizeCssColorToken,
   normalizeCssLengthToPx,
+  parseCssCustomPropertyTokens,
   parseTailwindThemeCss,
   parseW3cOrStyleDictionaryTokens,
 } from '../../src/core/auto-tokens.js';
@@ -141,7 +142,7 @@ describe('::: ISSUE #10 (CHUNKS 1–2): TOKEN CLASSIFIER & WORKSPACE FILE DISCOV
     });
   });
 
-    it('==> Should parse W3C Design Tokens ($value) and Style Dictionary (value) JSON trees', () => {
+  it('==> Should parse W3C Design Tokens ($value) and Style Dictionary (value) JSON trees', () => {
     const w3cJson = JSON.stringify({
       $schema: 'https://designtokens.org',
       color: {
@@ -255,4 +256,28 @@ describe('::: ISSUE #10 (CHUNKS 1–2): TOKEN CLASSIFIER & WORKSPACE FILE DISCOV
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it('==> Should parse CSS custom property files (:root, [data-theme], @theme) and resolve var() aliases', () => {
+    const cssTokens = [
+      ':root {',
+      '  --brand-primary: #2563eb;',
+      '  --color-action: var(--brand-primary);',
+      '  --color-fallback: var(--missing-var, #0f172a);',
+      '  --ag-space-4: 1rem;',
+      '  --ag-font-size-md: 16px;',
+      '  --ag-radius-md: 0.5rem;',
+      '}',
+      ':root[data-theme="dark"] {',
+      '  --brand-primary: #60a5fa;',
+      '}',
+    ].join('\n');
+
+    expect(parseCssCustomPropertyTokens(cssTokens)).toEqual({
+      colors: ['rgb(37, 99, 235)', 'rgb(96, 165, 250)', 'rgb(15, 23, 42)'],
+      spacing: ['16px', '0px'],
+      fontSizes: ['16px'],
+      radii: ['8px', '0px'],
+    });
+  });
+
 });

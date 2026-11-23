@@ -15,6 +15,8 @@ import {
   discoverWorkspaceTokens,
   extractRootCssVariables,
   mergeTokenScales,
+  parseCssCustomPropertyTokens,
+  parseW3cOrStyleDictionaryTokens,
 } from '../core/auto-tokens.js';
 import { auditPageContrast, type IContrastViolation, MIN_WCAG_AA_CONTRAST } from '../core/matrix.js';
 import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
@@ -90,10 +92,13 @@ export interface IUirigConfig {
 }
 
 export type AuditToolName = 'tokens' | 'contrast' | 'dark-mode' | 'stress' | 'cls' | 'dom';
+
 export interface ICheckCommandOptions {
   /** Optional positional `<url-or-file>` target for zero-config or single-target overrides. */
   target?: string;
   configPath?: string;
+  /** Optional explicit token scale path override (`--tokens-path` / `--token-path`), resolved relative to `cwd`. */
+  tokensPath?: string;
   json?: boolean;
   headless?: boolean;
   /** When true, prints every individual failing selector beneath each engine section in human output. */
@@ -106,7 +111,7 @@ export interface ICheckCommandOptions {
   top?: number;
   /** Optional approximate token budget for serialized JSON output (`--max-tokens <budget>`). */
   maxTokens?: number;
-  /** Optional CSS (Cascading Style Sheets) selectors limiting element-level audits to matching subtrees (`--selectors` / `-s`). */
+  /** Optional CSS selectors limiting element-level audits to matching subtrees (`--selectors` / `-s`). */
   selectors?: Array<string>;
   /** When true, inspects `git diff` to infer modified custom element selectors and exits cleanly (`0`) if no UI files changed (`--changed`). */
   changed?: boolean;
@@ -124,13 +129,13 @@ export interface ICheckCommandOptions {
   fix?: boolean;
   /** Optional inline token scale override (useful for programmatic calls & tests). */
   tokenScaleOverride?: ITokenScaleConfig;
-  /** Optional viewport list override (e.g., single-viewport fast path for MCP [Model Context Protocol] tool calls). */
+  /** Optional viewport list override (e.g., single-viewport fast path for MCP tool calls). */
   viewportsOverride?: Array<IViewportConfig>;
   /** Optional persistent warm browser pool (used by `uirig mcp` to eliminate Chromium cold starts). */
   browserPool?: WarmBrowserPool;
-  /** When true, suppresses writing CLI (Command-Line Interface) output to `process.stdout` (used by `uirig mcp` over stdio). */
+  /** When true, suppresses writing CLI output to `process.stdout` (used by `uirig mcp` over stdio). */
   silentStdout?: boolean;
-  /** Optional custom output path for the Markdown PR (Pull Request) comment report (defaults to `.uirig/github_pr_comment.md`). */
+  /** Optional custom output path for the Markdown PR comment report (defaults to `.uirig/github_pr_comment.md`). */
   reportOutputPath?: string;
   /** Optional working directory override for resolving relative paths in tests. */
   cwd?: string;
@@ -366,48 +371,131 @@ export function resolveExecutionConfig(
   throw new Error('ERR_CONFIG_MISSING: Configuration file not found at ' + defaultConfigPath + '.');
 }
 
-export function loadTokenScale(tokensPath: string, configFilePath: string): ITokenScaleConfig {
-  const resolvedTokensPath = resolve(dirname(configFilePath), tokensPath);
+const TOKEN_FORMAT_REMEDIATION_GUIDE =
+  'Supported formats for tokensPath / --tokens-path: ' +
+  '(1) W3C Design Tokens JSON (nested objects with "$value" leaves), ' +
+  '(2) Style Dictionary JSON (nested objects with "value" leaves), ' +
+  '(3) Flat scale JSON ({ "colors": [...], "spacing": [...], "fontSizes": [...], "radii": [...] }), or ' +
+  '(4) CSS custom properties stylesheet (.css with :root { --*: ... } or @theme { --*: ... }). ' +
+  'Alternatively, omit tokensPath and pass --auto-tokens to auto-discover tokens automatically.';
+
+function hasAnyNormalizedTokens(scale: ITokenScaleConfig): boolean {
+  return (
+    scale.colors.length > 0 ||
+    scale.spacing.length > 0 ||
+    scale.fontSizes.length > 0 ||
+    scale.radii.length > 0
+  );
+}
+
+export function loadTokenScale(tokensPath: string, basePathForResolution: string): ITokenScaleConfig {
+  const baseDir =
+    basePathForResolution.endsWith('.json')
+      ? dirname(basePathForResolution)
+      : basePathForResolution;
+  const resolvedTokensPath = resolve(baseDir, tokensPath);
   logTelemetry(
     'check:tokens',
     'Loading design token scale from ' + paint(resolvedTokensPath, 'cyan') + '...'
   );
 
   if (!existsSync(resolvedTokensPath)) {
-    throw new Error('ERR_TOKENS_MISSING: Token scale file not found at ' + resolvedTokensPath + '.');
+    throw new Error(
+      'ERR_TOKENS_MISSING: Token scale file not found at ' +
+        resolvedTokensPath +
+        '. Check the path in tokensPath / --tokens-path, or pass --auto-tokens.'
+    );
+  }
+
+  let raw: string;
+  try {
+    raw = readFileSync(resolvedTokensPath, 'utf8');
+  } catch (err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error('ERR_TOKENS_MISSING: Unable to read ' + resolvedTokensPath + ': ' + detail);
+  }
+
+  if (resolvedTokensPath.toLowerCase().endsWith('.css')) {
+    const cssScale = parseCssCustomPropertyTokens(raw);
+    if (!hasAnyNormalizedTokens(cssScale)) {
+      throw new Error(
+        'ERR_TOKENS_SCHEMA: No valid CSS custom properties (--*) with color or length values were found in ' +
+          resolvedTokensPath +
+          '. ' +
+          TOKEN_FORMAT_REMEDIATION_GUIDE
+      );
+    }
+    return cssScale;
   }
 
   let parsed: unknown;
   try {
-    const raw = readFileSync(resolvedTokensPath, 'utf8');
     parsed = JSON.parse(raw);
   } catch (err: unknown) {
     const detail = err instanceof Error ? err.message : String(err);
-    throw new Error('ERR_TOKENS_INVALID_JSON: Failed to parse ' + resolvedTokensPath + ': ' + detail);
-  }
-
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error('ERR_TOKENS_SCHEMA: Token file at ' + resolvedTokensPath + ' must be a JSON object.');
-  }
-
-  const candidate = parsed as Partial<ITokenScaleConfig>;
-  if (
-    !Array.isArray(candidate.colors) ||
-    !Array.isArray(candidate.spacing) ||
-    !Array.isArray(candidate.fontSizes) ||
-    !Array.isArray(candidate.radii)
-  ) {
     throw new Error(
-      'ERR_TOKENS_SCHEMA: Token file must define arrays for colors, spacing, fontSizes, and radii.'
+      'ERR_TOKENS_INVALID_JSON: Failed to parse ' +
+        resolvedTokensPath +
+        ': ' +
+        detail +
+        '. ' +
+        TOKEN_FORMAT_REMEDIATION_GUIDE
     );
   }
 
-  return {
-    colors: candidate.colors,
-    spacing: candidate.spacing,
-    fontSizes: candidate.fontSizes,
-    radii: candidate.radii,
-  };
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      'ERR_TOKENS_SCHEMA: Token file at ' +
+        resolvedTokensPath +
+        ' must be a JSON object. ' +
+        TOKEN_FORMAT_REMEDIATION_GUIDE
+    );
+  }
+
+  const candidate = parsed as Partial<ITokenScaleConfig>;
+  const hasFlatArrayShape =
+    Array.isArray(candidate.colors) ||
+    Array.isArray(candidate.spacing) ||
+    Array.isArray(candidate.fontSizes) ||
+    Array.isArray(candidate.radii);
+
+  if (hasFlatArrayShape) {
+    if (
+      !Array.isArray(candidate.colors) ||
+      !Array.isArray(candidate.spacing) ||
+      !Array.isArray(candidate.fontSizes) ||
+      !Array.isArray(candidate.radii) ||
+      !candidate.colors.every((v) => typeof v === 'string') ||
+      !candidate.spacing.every((v) => typeof v === 'string') ||
+      !candidate.fontSizes.every((v) => typeof v === 'string') ||
+      !candidate.radii.every((v) => typeof v === 'string')
+    ) {
+      throw new Error(
+        'ERR_TOKENS_SCHEMA: Flat token scale JSON at ' +
+          resolvedTokensPath +
+          ' must define string arrays for all four keys: colors, spacing, fontSizes, and radii. ' +
+          TOKEN_FORMAT_REMEDIATION_GUIDE
+      );
+    }
+    return {
+      colors: candidate.colors,
+      spacing: candidate.spacing,
+      fontSizes: candidate.fontSizes,
+      radii: candidate.radii,
+    };
+  }
+
+  const dictionaryScale = parseW3cOrStyleDictionaryTokens(raw);
+  if (!hasAnyNormalizedTokens(dictionaryScale)) {
+    throw new Error(
+      'ERR_TOKENS_SCHEMA: Token file at ' +
+        resolvedTokensPath +
+        ' did not match flat scale arrays or W3C ($value) / Style Dictionary (value) token entries. ' +
+        TOKEN_FORMAT_REMEDIATION_GUIDE
+    );
+  }
+
+  return dictionaryScale;
 }
 
 export function evaluatePosixExitCode(results: Array<IViewportAuditReport>): PosixExitCode {
@@ -853,10 +941,13 @@ export async function executeCheckCommand(
         ? options.viewportsOverride
         : config.viewports;
     const autoTokensEnabled = Boolean(options.autoTokens ?? config.autoTokens);
+    const effectiveTokensPath = options.tokensPath ?? config.tokensPath;
+    const tokensResolutionBase = options.tokensPath ? cwd : configLabel;
     const tokenAgnosticEngines = new Set<AuditToolName>(['stress', 'cls', 'dom']);
     const softTokenEngines = new Set<AuditToolName>(['contrast', 'dark-mode']);
     let tokenScale: ITokenScaleConfig | null = null;
     let shouldAutoDiscoverRootTokens = false;
+
     if (options.tokenScaleOverride) {
       tokenScale = options.tokenScaleOverride;
     } else if (options.only && tokenAgnosticEngines.has(options.only)) {
@@ -864,9 +955,9 @@ export async function executeCheckCommand(
         'tokens:skip',
         "Skipping token scale load for '" + options.only + "' engine."
       );
-    } else if (config.tokensPath) {
+    } else if (effectiveTokensPath) {
       try {
-        tokenScale = loadTokenScale(config.tokensPath, configLabel);
+        tokenScale = loadTokenScale(effectiveTokensPath, tokensResolutionBase);
       } catch (err: unknown) {
         const isMissingTokens =
           err instanceof Error && err.message.startsWith('ERR_TOKENS_MISSING');
@@ -878,7 +969,7 @@ export async function executeCheckCommand(
         ) {
           console.error(
             '[tokens:warn] Missing tokensPath (' +
-              config.tokensPath +
+              effectiveTokensPath +
               "); continuing '" +
               options.only +
               "' audit without token suggestions."
@@ -901,7 +992,6 @@ export async function executeCheckCommand(
         'No tokensPath configured; skipping design token scale audit.'
       );
     }
-
     const resolvedTargets = new Array<{ displayUrl: string; liveUrl: string; isLocal: boolean }>();
     for (const rawTarget of config.targetUrls) {
       if (isLocalFileTarget(rawTarget)) {
@@ -974,6 +1064,7 @@ export async function executeCheckCommand(
 
     let results = await runMatrixSweep();
     let appliedFixes = new Array<IDeterministicAutoFix>();
+
     if (options.fix && evaluatePosixExitCode(results) !== 0) {
       const candidateFixes = new Array<IDeterministicAutoFix>();
       for (const vpReport of results) {
