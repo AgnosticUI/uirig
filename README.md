@@ -332,17 +332,19 @@ npx @rlevin/uirig check --changed --config=uirig.config.json
 
 2. **Inspect structured JSON attribution, multi-theme parity, and auto-fix patches (Terminal 2):**
 
-   With `http://localhost:5173` running in Terminal 1, run `uirig` directly against the live sandbox in a second terminal:
+   > **Note:** When running `uirig` from within the cloned `uirig` repository, use `npm run uirig -- <command>` (which wraps `node ./bin/uirig`) rather than `npx uirig`. Because the local `package.json` declares `"name": "@rlevin/uirig"`, `npx` resolves against the local workspace (where `node_modules/.bin/uirig` is not self-linked) instead of downloading from npm, resulting in `uirig: command not found`. Include `--` after `npm run uirig` so npm forwards flags like `--json`, `--themes`, and `--fix` directly to the CLI (run `npm run build` first if `dist/` has not been compiled yet).
+
+   With `http://localhost:5173` running in Terminal 1, run `npm run uirig -- check` directly against the live sandbox in a second terminal (pass `--auto-tokens` in external repos without `config/default_tokens.json` to auto-harvest all CSS custom properties from the live page):
 
    ```bash
-   # 1. Structured JSON report with CSS source-map file:line, A2UI attribution, and unifiedDiff
-   npx uirig verify http://localhost:5173 --json
+   # 1. Structured JSON report with source-map file:line, A2UI attribution, and unifiedDiff
+   npm run uirig -- check http://localhost:5173 --json
 
    # 2. Multi-theme Light & Dark contrast parity matrix
-   npx uirig matrix http://localhost:5173 --themes light,dark
+   npm run uirig -- check http://localhost:5173 --themes light,dark
 
    # 3. Preview and apply deterministic auto-fixes (e.g., replacing href="javascript:void(0)")
-   npx uirig verify http://localhost:5173 --fix
+   npm run uirig -- check http://localhost:5173 --fix
    ```
 
 3. **Edit & watch Vite live-reload self-heal down to `0 PASS`:**
@@ -354,6 +356,9 @@ npx @rlevin/uirig check --changed --config=uirig.config.json
 ```bash
 # Run core library unit tests (no Chromium required)
 npm test
+
+# Run the local compiled uirig CLI from inside this repository
+npm run uirig -- --help
 
 # Start the local Vite + AgnosticUI playground with automatic live 6-engine + v0.3.0 spot-checking on boot and file save
 npm run playground:dev

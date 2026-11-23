@@ -304,9 +304,9 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
       'bold',
       'cyan'
     ),
-    '  • JSON report + source-map attribution : npx uirig verify http://localhost:5173 --json',
-    '  • Multi-theme light/dark parity matrix : npx uirig matrix http://localhost:5173 --themes light,dark',
-    '  • Preview/apply deterministic auto-fix : npx uirig verify http://localhost:5173 --fix',
+    '  • JSON report + source-map attribution : npm run uirig -- check http://localhost:5173 --json',
+    '  • Multi-theme light/dark parity matrix : npm run uirig -- check http://localhost:5173 --themes light,dark',
+    '  • Preview/apply deterministic auto-fix : npm run uirig -- check http://localhost:5173 --fix',
     divider,
     '',
   ];
