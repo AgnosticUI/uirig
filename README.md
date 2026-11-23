@@ -47,11 +47,18 @@ npx @rlevin/uirig check
 
 ## Configuration (`uirig.config.json`)
 
+**`uirig.config.json` is completely optional.** You can run `uirig` on any URL or `.html` file with zero configuration—it automatically uses sensible built-in defaults (`mobile` 375×812 + `desktop` 1440×900 viewports, `clsMaxLimit: 0.1`, `overflowPixelTolerance: 2`, `touchTargetMinSpacingPx: 24`, and `darkModeMaxSurfaceLuminance: 0.85`).
+
+When you want persistent project settings:
+* **How to create it:** Run `npx @rlevin/uirig init` to generate `uirig.config.json` automatically (alongside `.uirig/session.json` and `.uirig/SKILL.md`), or create it by hand. `uirig init` will never overwrite an existing `uirig.config.json`.
+* **Where it lives:** Place `uirig.config.json` in your **repository root** (top-level directory alongside `package.json`), or pass a custom path anywhere via `--config=<path>`.
+
 ```json
 {
   "$schema": "./node_modules/@rlevin/uirig/schema/uirig.config.schema.json",
   "targetUrls": ["http://localhost:5173"],
   "tokensPath": "./tokens/design.tokens.json",
+  "autoTokens": false,
   "themes": ["light", "dark"],
   "changedPaths": {
     "include": ["src/components/**", "src/styles/**"],
@@ -75,6 +82,8 @@ npx @rlevin/uirig check
 ```
 
 ### Ignoring Intentional Exceptions (`data-uirig-ignore` & `ignore` Rules)
+
+You can silence known exceptions without weakening global budgets:
 
 1. **In HTML / Web Component Markup (`data-uirig-ignore`):** Add `data-uirig-ignore` on any element (or container) to exempt it and its subtree—including nested `ShadowRoot` nodes—from specific engines or all rules:
 
@@ -101,232 +110,19 @@ npx @rlevin/uirig check
 
 ---
 
-## Design Token Setup (`tokensPath`, `--tokens-path`, & `--auto-tokens`)
+## Design Token Setup (`tokensPath`, `--tokens-path`, `autoTokens`, & `--auto-tokens`)
 
 `uirig`'s `tokens` engine audits rendered Light DOM and Web Component `ShadowRoot` styles (`color`, `backgroundColor`, `padding*`, `margin*`, `fontSize`, and `borderRadius`) against your design system's valid values—and feeds your color palette into `contrast` / `dark-mode` so violations include an actionable `suggestedToken`.
 
-You never have to manually flatten nested token dictionaries or copy CSS variables into arrays. You can supply tokens in any of three ways (ordered from highest to lowest precedence):
+You never have to manually flatten nested token dictionaries or copy CSS variables into arrays. You can supply tokens via explicit file path or zero-config auto-discovery (ordered from highest to lowest precedence):
 
-1. **CLI Override (`--tokens-path=<path>` / `--token-path=<path>`):** Point directly at a token file on the command line (overrides `config.tokensPath` when both are set):
-
-```bash
-npx @rlevin/uirig check http://localhost:5173 --tokens-path=./design.tokens.json --verbose
-```
-
-2. **Config File (`tokensPath` in `uirig.config.json`):** Set a relative path to your project's token file (resolved relative to `uirig.config.json`):
-
-```json
-{
-  "targetUrls": ["http://localhost:5173"],
-  "tokensPath": "./tokens/design.tokens.json"
-}
-```
-
-3. **Zero-Config Auto-Discovery (`--auto-tokens` or `"autoTokens": true`):** When neither `--tokens-path` nor `tokensPath` is set, `uirig` scans workspace token files (`*.tokens.json`, `*token*.json`, and Tailwind v4 `@theme` CSS blocks) **and** scrapes live `:root` / `html` CSS custom properties (`--*`) directly from the rendered page in Chromium:
-
-```bash
-npx @rlevin/uirig http://localhost:5173 --auto-tokens --verbose
-```
-
-### Supported Token File Formats
-
-Files referenced by `tokensPath` or `--tokens-path` may use **any** of these four formats—`uirig` automatically normalizes hex, `hsl()`, `oklch()`, and `rgb()`/`rgba()` colors to computed `rgb(...)` strings and converts `rem`/`em` lengths to `px`:
-
-1. **W3C Design Tokens Format (`$value` leaves):**
-
-```json
-{
-  "color": {
-    "brand": { "primary": { "$value": "#2563eb", "$type": "color" } },
-    "surface": { "canvas": { "$value": "#ffffff", "$type": "color" } }
-  },
-  "spacing": { "md": { "$value": "1rem", "$type": "dimension" } },
-  "font": { "size": { "body": { "$value": "16px", "$type": "dimension" } } },
-  "radius": { "card": { "$value": "0.5rem", "$type": "dimension" } }
-}
-```
-
-2. **Style Dictionary Format (`value` leaves):**
-
-```json
-{
-  "color": { "text": { "primary": { "value": "#0f172a" } } },
-  "size": { "padding": { "base": { "value": "12px" } } }
-}
-```
-
-3. **CSS Custom Properties Stylesheet (`.css` with `:root`, `[data-theme]`, or `@theme`):**
-
-```css
-:root {
-  --brand-primary: #2563eb;
-  --color-action: var(--brand-primary);
-  --space-4: 1rem;
-  --font-size-md: 16px;
-  --radius-md: 0.5rem;
-}
-```
-
-4. **Flat Scale JSON (`colors`, `spacing`, `fontSizes`, `radii` string arrays — e.g. `config/default_tokens.json`):**
-
-```json
-{
-  "colors": ["rgb(255, 255, 255)", "rgb(17, 24, 39)", "rgb(37, 99, 235)"],
-  "spacing": ["0px", "4px", "8px", "16px", "24px", "32px"],
-  "fontSizes": ["12px", "14px", "16px", "20px", "24px"],
-  "radii": ["0px", "4px", "8px", "9999px"]
-}
-```
-
-*(If a file cannot be parsed or contains no recognized color/length tokens, `uirig` exits with `ERR_TOKENS_SCHEMA` and prints the supported formats and `--auto-tokens` fallback guidance.)*
-
-### Ignoring Intentional One-Off Exceptions
-You can silence known exceptions without weakening global budgets:
-
-1. **In HTML / Web Component Markup (`data-uirig-ignore`):**
-
-```html
-<!-- Exempt a single rule -->
-<div data-uirig-ignore="tokens">Intentional one-off hero gradient</div>
-
-<!-- Exempt multiple comma-separated rules -->
-<ag-card data-uirig-ignore="tokens, dark-mode">Custom promotional card</ag-card>
-
-<!-- Exempt all engines on a third-party widget -->
-<section data-uirig-ignore="all">Legacy third-party embed</section>
-```
-
-2. **In `uirig.config.json` (`ignore`):** Exempt specific selectors or route URLs (including trailing `*` wildcards) centrally without touching markup:
-
-```json
-"ignore": [
-  { "rule": "tokens", "selector": ".legacy-embed" },
-  { "rule": "contrast", "url": "http://localhost:5173/admin/*" },
-  { "rule": "all", "selector": "#third-party-chat" }
-]
-```
-
----
-
-## Design Token Setup (`tokensPath`, `--tokens-path`, & `--auto-tokens`)
-
-`uirig`'s `tokens` engine audits rendered Light DOM and Web Component `ShadowRoot` styles (`color`, `backgroundColor`, `padding*`, `margin*`, `fontSize`, and `borderRadius`) against your design system's valid values—and feeds your color palette into `contrast` / `dark-mode` so violations include an actionable `suggestedToken`.
-
-You never have to manually flatten nested token dictionaries or copy CSS variables into arrays. You can supply tokens in any of three ways (ordered from highest to lowest precedence):
-
-1. **CLI Override (`--tokens-path=<path>` / `--token-path=<path>`):** Point directly at a token file on the command line (overrides `config.tokensPath` when both are set):
-
-```bash
-npx @rlevin/uirig check http://localhost:5173 --tokens-path=./design.tokens.json --verbose
-```
-
-2. **Config File (`tokensPath` in `uirig.config.json`):** Set a relative path to your project's token file (resolved relative to `uirig.config.json`):
-
-```json
-{
-  "targetUrls": ["http://localhost:5173"],
-  "tokensPath": "./tokens/design.tokens.json"
-}
-```
-
-3. **Zero-Config Auto-Discovery (`--auto-tokens` or `"autoTokens": true`):** When neither `--tokens-path` nor `tokensPath` is set, `uirig` scans workspace token files (`*.tokens.json`, `*token*.json`, and Tailwind v4 `@theme` CSS blocks) **and** scrapes live `:root` / `html` CSS custom properties (`--*`) directly from the rendered page in Chromium:
-
-```bash
-npx @rlevin/uirig http://localhost:5173 --auto-tokens --verbose
-```
-
-### Supported Token File Formats
-
-Files referenced by `tokensPath` or `--tokens-path` may use **any** of these four formats—`uirig` automatically normalizes hex, `hsl()`, `oklch()`, and `rgb()`/`rgba()` colors to computed `rgb(...)` strings and converts `rem`/`em` lengths to `px`:
-
-1. **W3C Design Tokens Format (`$value` leaves):**
-
-```json
-{
-  "color": {
-    "brand": { "primary": { "$value": "#2563eb", "$type": "color" } },
-    "surface": { "canvas": { "$value": "#ffffff", "$type": "color" } }
-  },
-  "spacing": { "md": { "$value": "1rem", "$type": "dimension" } },
-  "font": { "size": { "body": { "$value": "16px", "$type": "dimension" } } },
-  "radius": { "card": { "$value": "0.5rem", "$type": "dimension" } }
-}
-```
-
-2. **Style Dictionary Format (`value` leaves):**
-
-```json
-{
-  "color": { "text": { "primary": { "value": "#0f172a" } } },
-  "size": { "padding": { "base": { "value": "12px" } } }
-}
-```
-
-3. **CSS Custom Properties Stylesheet (`.css` with `:root`, `[data-theme]`, or `@theme`):**
-
-```css
-:root {
-  --brand-primary: #2563eb;
-  --color-action: var(--brand-primary);
-  --space-4: 1rem;
-  --font-size-md: 16px;
-  --radius-md: 0.5rem;
-}
-```
-
-4. **Flat Scale JSON (`colors`, `spacing`, `fontSizes`, `radii` string arrays — e.g. `config/default_tokens.json`):**
-
-```json
-{
-  "colors": ["rgb(255, 255, 255)", "rgb(17, 24, 39)", "rgb(37, 99, 235)"],
-  "spacing": ["0px", "4px", "8px", "16px", "24px", "32px"],
-  "fontSizes": ["12px", "14px", "16px", "20px", "24px"],
-  "radii": ["0px", "4px", "8px", "9999px"]
-}
-```
-
-*(If a file cannot be parsed or contains no recognized color/length tokens, `uirig` exits with `ERR_TOKENS_SCHEMA` and prints the supported formats and `--auto-tokens` fallback guidance.)*
-
-### Ignoring Intentional Exceptions
-
-1. **Inline in HTML / Web Components (`data-uirig-ignore`):**
-
-```html
-<!-- Exempt a single rule -->
-<div data-uirig-ignore="tokens">Intentional one-off hero gradient</div>
-
-<!-- Exempt multiple comma-separated rules -->
-<ag-card data-uirig-ignore="tokens, dark-mode">Custom promotional card</ag-card>
-
-<!-- Exempt all engines on a third-party widget -->
-<section data-uirig-ignore="all">Legacy third-party embed</section>
-```
-
-2. **In `uirig.config.json` (`ignore`):** Exempt specific selectors or route URLs (including trailing `*` wildcards) centrally without touching markup:
-
-```json
-"ignore": [
-  { "rule": "tokens", "selector": ".legacy-embed" },
-  { "rule": "contrast", "url": "http://localhost:5173/admin/*" },
-  { "rule": "all", "selector": "#third-party-chat" }
-]
-```
-
----
-
-## Design Token Setup (`tokensPath`, `--tokens-path`, & `--auto-tokens`)
-
-`uirig`'s `tokens` engine audits rendered Light DOM and Web Component `ShadowRoot` styles (`color`, `backgroundColor`, `padding*`, `margin*`, `fontSize`, and `borderRadius`) against your design system's valid values—and feeds your color palette into `contrast` / `dark-mode` so violations include an actionable `suggestedToken`.
-
-You never have to manually flatten nested token dictionaries or copy CSS variables into arrays. You can supply tokens in any of three ways (ordered from highest to lowest precedence):
-
-1. **CLI Override (`--tokens-path=<path>` / `--token-path=<path>`):** Point directly at a token file on the command line (overrides `config.tokensPath` when both are set):
+1. **CLI Token File (`--tokens-path=<path>` / `--token-path=<path>`):** Point directly at a token file on the command line (overrides `tokensPath`, `autoTokens`, and `--auto-tokens` when set):
 
    ```bash
    npx @rlevin/uirig check http://localhost:5173 --tokens-path=./design.tokens.json --verbose
    ```
 
-2. **Config File (`tokensPath` in `uirig.config.json`):** Set a relative path to your project's token file (resolved relative to `uirig.config.json`):
+2. **Config Token File (`tokensPath` in `uirig.config.json`):** Set a relative path to your project's token file (resolved relative to `uirig.config.json`; takes precedence over `autoTokens` / `--auto-tokens`):
 
    ```json
    {
@@ -335,10 +131,19 @@ You never have to manually flatten nested token dictionaries or copy CSS variabl
    }
    ```
 
-3. **Zero-Config Auto-Discovery (`--auto-tokens` or `"autoTokens": true`):** When neither `--tokens-path` nor `tokensPath` is set, `uirig` scans workspace token files (`*.tokens.json`, `*token*.json`, and Tailwind v4 `@theme` CSS blocks) **and** scrapes live `:root` / `html` CSS custom properties (`--*`) directly from the rendered page in Chromium:
+3. **Zero-Config Auto-Discovery (`autoTokens: true` in `uirig.config.json` or `--auto-tokens` on the CLI):** When neither `--tokens-path` nor `tokensPath` is set, `uirig` scans workspace token files (`*.tokens.json`, `*token*.json`, and Tailwind v4 `@theme` CSS blocks) **and** scrapes live `:root` / `html` CSS custom properties (`--*`) directly from the rendered page in Chromium:
 
    ```bash
+   # Via CLI flag
    npx @rlevin/uirig http://localhost:5173 --auto-tokens --verbose
+   ```
+
+   ```json
+   // Or persistently in uirig.config.json
+   {
+     "targetUrls": ["http://localhost:5173"],
+     "autoTokens": true
+   }
    ```
 
 ### Supported Token File Formats
@@ -409,12 +214,17 @@ Launches a single Chromium instance and executes all 6 verification engines acro
 Run any individual verification engine in isolation for rapid inner-loop debugging or targeted AI agent re-checks:
 
 ```bash
-npx @rlevin/uirig tokens [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig contrast [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig dark-mode [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig stress [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig cls [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig tokens # [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+
+npx @rlevin/uirig contrast # [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+
+npx @rlevin/uirig dark-mode # [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+
+npx @rlevin/uirig stress # [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+
+npx @rlevin/uirig cls # [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+
+npx @rlevin/uirig dom # [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
 ```
 
 ### Shared Options
@@ -613,6 +423,6 @@ npm run playground:test:headed
 
 ---
 
-## License
+**License**
 
 MIT
