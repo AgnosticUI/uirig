@@ -28,8 +28,9 @@ describe('::: PHASE 4 + v0.3.0: LIVE 6-TOOL AGNOSTICUI PLAYGROUND VERIFICATION :
         slowMoMs: isHeaded ? 450 : 0,
       });
 
+      const summary = formatSpotCheckSummary(report);
       if (isHeaded) {
-        console.log(formatSpotCheckSummary(report));
+        console.log(summary);
       }
 
       // 1. Token Auditor (`crawlPageTokens`): catches off-scale styles on `#contrast-token-trap`
@@ -95,6 +96,12 @@ describe('::: PHASE 4 + v0.3.0: LIVE 6-TOOL AGNOSTICUI PLAYGROUND VERIFICATION :
       });
       expect((report.v030Diagnostics?.generatedUnifiedDiffs.length ?? 0)).toBeGreaterThanOrEqual(1);
       expect(report.v030Diagnostics?.generatedUnifiedDiffs.at(0)).toContain('href="#"');
+
+      // 6. Verify enhanced terminal DX summary output on live report
+      expect(summary).toContain('playground-support-ticket/close-ticket-btn');
+      expect(summary).toContain('playground/index.html:225');
+      expect(summary).toContain('--- a/playground/index.html');
+      expect(summary).toContain('Try Next (Sections 2 & 3 above are intentional adversarial traps):');
 
       console.log(
         '[+] Verified all 6 engines + v0.3.0 A2UI/source-map/unifiedDiff end-to-end against live AgnosticUI Web Components!'

@@ -53,7 +53,6 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
     expect(htmlSource).not.toMatch(/#contrast-token-trap\s*\{/);
   });
 
-
   it('==> Should import ag-tokens.css and ag-tokens-dark.css in playground/src/main.ts', () => {
     const mainPath = resolve(process.cwd(), 'playground/src/main.ts');
     const mainSource = readFileSync(mainPath, 'utf8');
@@ -102,12 +101,13 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
     }
   });
 
-  it('==> Should format a color-coded terminal report and respect NO_COLOR', () => {
+  it('==> Should format a color-coded terminal report with file:line, hostComponent, A2UI details, suggestedToken, dark-mode details, unifiedDiff, and Try Next footer while respecting NO_COLOR', () => {
     const sampleReport: ISpotCheckReport = {
       lightMode: {
         tokenViolations: [
           {
             selector: 'div#contrast-token-trap',
+            hostComponent: 'ag-card',
             property: 'fontSize',
             actualValue: '13px',
             inShadowDom: false,
@@ -119,6 +119,7 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
             foregroundRgb: 'rgb(156, 163, 175)',
             backgroundRgb: 'rgb(243, 244, 246)',
             contrastRatio: 2.54,
+            suggestedToken: 'var(--ag-text-secondary)',
             inShadowDom: false,
           },
         ],
@@ -140,10 +141,48 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
             offendingSelectors: ['main.sandbox-grid'],
           },
         },
+        domViolations: [
+          {
+            rule: 'unlabeled_control',
+            selector: 'button#a2ui-unlabeled-close-btn',
+            detail: '<button> has no visible text content and no aria-label.',
+            inShadowDom: false,
+          },
+        ],
       },
       darkMode: {
         activeThemeAttr: 'dark',
-        contrastViolations: [],
+        contrastViolations: [
+          {
+            selector: 'div#contrast-token-trap',
+            foregroundRgb: 'rgb(156, 163, 175)',
+            backgroundRgb: 'rgb(243, 244, 246)',
+            contrastRatio: 2.54,
+            inShadowDom: false,
+          },
+        ],
+      },
+      v030Diagnostics: {
+        a2uiAttributions: {
+          'button#a2ui-unlabeled-close-btn': {
+            surfaceId: 'playground-support-ticket',
+            a2uiComponentId: 'close-ticket-btn',
+            a2uiComponentType: 'IconButton',
+            catalogId: 'agnosticui-v1',
+            wirePath: '/components/0',
+            suggestedPatch: null,
+          },
+        },
+        sourceLocations: {
+          'div#contrast-token-trap': {
+            sourceFile: 'playground/src/traps.css',
+            lineNumber: 5,
+            columnNumber: 3,
+          },
+        },
+        generatedUnifiedDiffs: [
+          '--- a/playground/index.html\n+++ b/playground/index.html\n@@ -225,1 +225,1 @@\n- href="javascript:void(0)"\n+ href="#"',
+        ],
       },
     };
 
@@ -153,15 +192,25 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
       const coloredSummary = formatSpotCheckSummary(sampleReport);
       expect(coloredSummary).toContain('\x1b[');
       expect(coloredSummary).toContain('uirig Live 6-Tool + v0.3.0 Check Report');
+      expect(coloredSummary).toContain('playground/src/traps.css:5');
+      expect(coloredSummary).toContain('in <ag-card>');
+      expect(coloredSummary).toContain('var(--ag-text-secondary)');
+      expect(coloredSummary).toContain('playground-support-ticket/close-ticket-btn');
       expect(coloredSummary).toContain('div#contrast-token-trap');
-      expect(coloredSummary).toContain('2.54:1 < 4.5:1');
-      expect(coloredSummary).toContain('+185px');
-      expect(coloredSummary).toContain('FAIL (Shift Detected)');
+      expect(coloredSummary).toContain('hint:');
+      expect(coloredSummary).toContain('--- a/playground/index.html');
+      expect(coloredSummary).toContain('Try Next (Sections 2 & 3 above are intentional adversarial traps):');
+      expect(coloredSummary).toContain('npx uirig verify http://localhost:5173 --json');
+      expect(coloredSummary).toContain('npx uirig matrix http://localhost:5173 --themes light,dark');
+      expect(coloredSummary).toContain('npx uirig verify http://localhost:5173 --fix');
 
       process.env.NO_COLOR = '1';
       const plainSummary = formatSpotCheckSummary(sampleReport);
       expect(plainSummary).not.toContain('\x1b[');
+      expect(plainSummary).toContain('3. [dark-mode] Dark Mode (dark) Parity  : 1 FAIL');
+      expect(plainSummary).toContain('div#contrast-token-trap (2.54:1 < 4.5:1');
       expect(plainSummary).toContain('div#contrast-token-trap (fontSize: 13px)');
+      expect(plainSummary).toContain('playground/src/traps.css:5');
       expect(plainSummary).toContain('span#overflow-trap-label -> div#overflow-trap-box (+185px)');
     } finally {
       if (previousNoColor === undefined) {

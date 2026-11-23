@@ -93,6 +93,66 @@ export interface ISpotCheckRunOptions {
   existingUrl?: string;
 }
 
+function getDomRemediationHint(rule: IDomIntegrityViolation['rule']): string {
+  switch (rule) {
+    case 'unlabeled_control':
+      return 'Add aria-label or visible text';
+    case 'ax_empty_name':
+      return 'Ensure non-empty accessible name in AX tree';
+    case 'unsafe_uri':
+      return 'Replace javascript: URI with href="#" or <button>';
+    case 'dangling_aria_ref':
+      return 'Fix broken aria-labelledby / aria-describedby ID';
+    case 'orphaned_slot_content':
+      return 'Match element slot attribute to Web Component <slot name>';
+    default:
+      return 'Fix DOM/AX accessibility attribute';
+  }
+}
+
+function getStressRemediationHint(type: IGeometricViolation['violationType']): string {
+  switch (type) {
+    case 'container_overflow':
+      return 'Allow wrapping or increase container width';
+    case 'undersized_touch_target':
+      return 'Increase clickable box to >= 24x24px';
+    case 'touch_target_collision':
+      return 'Add >= 24px gap between interactive controls';
+    case 'horizontal_scrollbar':
+      return 'Prevent horizontal viewport overflow';
+    default:
+      return 'Fix layout geometry under +30% text expansion';
+  }
+}
+
+function formatViolationContext(options: {
+  sourceLocation?: ISourceLocation | null;
+  hostComponent?: string | null;
+  a2ui?: IA2uiAttribution | null;
+  suggestedToken?: string | null;
+  hint?: string | null;
+}): string {
+  const parts: string[] = [];
+  if (options.sourceLocation?.sourceFile && options.sourceLocation.lineNumber !== null) {
+    parts.push(`${options.sourceLocation.sourceFile}:${options.sourceLocation.lineNumber}`);
+  }
+  if (options.hostComponent) {
+    parts.push(`in <${options.hostComponent}>`);
+  }
+  if (options.a2ui) {
+    const surface = options.a2ui.surfaceId ?? 'surface';
+    const comp = options.a2ui.a2uiComponentId ?? options.a2ui.a2uiComponentType ?? 'component';
+    parts.push(`a2ui: ${surface}/${comp}`);
+  }
+  if (options.suggestedToken) {
+    parts.push(`-> ${options.suggestedToken}`);
+  }
+  if (options.hint) {
+    parts.push(`hint: ${options.hint}`);
+  }
+  return parts.length > 0 ? ` [${paint(parts.join(' | '), 'cyan')}]` : '';
+}
+
 export function formatSpotCheckSummary(report: ISpotCheckReport): string {
   const formatCountBadge = (count: number): string =>
     count > 0 ? paint(`${count} FAIL`, 'bold', 'red') : paint('0 PASS', 'bold', 'green');
@@ -109,13 +169,11 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
 
   const domViolations = report.lightMode.domViolations ?? [];
   const darkModeViolations = report.darkMode.darkModeViolations ?? [];
-  const a2uiMatchedCount = Object.values(
-    report.v030Diagnostics?.a2uiAttributions ?? {}
-  ).filter(Boolean).length;
-  const sourceMappedCount = Object.values(
-    report.v030Diagnostics?.sourceLocations ?? {}
-  ).filter(Boolean).length;
-  const diffCount = report.v030Diagnostics?.generatedUnifiedDiffs.length ?? 0;
+  const a2uiMap = report.v030Diagnostics?.a2uiAttributions ?? {};
+  const sourceMap = report.v030Diagnostics?.sourceLocations ?? {};
+  const diffs = report.v030Diagnostics?.generatedUnifiedDiffs ?? [];
+  const a2uiMatchedCount = Object.values(a2uiMap).filter(Boolean).length;
+  const sourceMappedCount = Object.values(sourceMap).filter(Boolean).length;
 
   const lines: string[] = [
     '',
@@ -125,46 +183,88 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
     `${paint('1. [tokens]', 'bold', 'magenta')}    Design Token Violations : ${formatCountBadge(
       report.lightMode.tokenViolations.length
     )}`,
-    ...report.lightMode.tokenViolations.map(
-      (v) =>
-        `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
-          v.property,
-          'cyan'
-        )}: ${paint(v.actualValue, 'bold', 'red')})${
-          v.inShadowDom ? paint(' [ShadowDOM]', 'magenta') : ''
-        }`
-    ),
+    ...report.lightMode.tokenViolations.map((v) => {
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+      });
+      return `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
+        v.property,
+        'cyan'
+      )}: ${paint(v.actualValue, 'bold', 'red')})${
+        v.inShadowDom ? paint(' [ShadowDOM]', 'magenta') : ''
+      }${ctx}`;
+    }),
     `${paint('2. [contrast]', 'bold', 'cyan')}  Light Mode Violations   : ${formatCountBadge(
       report.lightMode.contrastViolations.length
     )}`,
-    ...report.lightMode.contrastViolations.map(
-      (v) =>
-        `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
-          `${v.contrastRatio}:1 < 4.5:1`,
-          'bold',
-          'red'
-        )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'white')})`
-    ),
+    ...report.lightMode.contrastViolations.map((v) => {
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+        suggestedToken: v.suggestedToken ?? null,
+        hint: 'Increase contrast >= 4.5:1',
+      });
+      return `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
+        `${v.contrastRatio}:1 < 4.5:1`,
+        'bold',
+        'red'
+      )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'white')})${ctx}`;
+    }),
     `${paint('3. [dark-mode]', 'bold', 'cyan')} Dark Mode (${paint(
       report.darkMode.activeThemeAttr ?? 'none',
       'magenta'
     )}) Parity  : ${formatCountBadge(
       report.darkMode.contrastViolations.length + darkModeViolations.length
     )}`,
+    ...report.darkMode.contrastViolations.map((v) => {
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+        suggestedToken: v.suggestedToken ?? null,
+        hint: 'Ensure dark theme token contrast >= 4.5:1',
+      });
+      return `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
+        `${v.contrastRatio}:1 < 4.5:1`,
+        'bold',
+        'red'
+      )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'white')})${ctx}`;
+    }),
+    ...darkModeViolations.map((v) => {
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+        suggestedToken: v.suggestedToken ?? null,
+        hint: 'Bind dark surface to semantic --ag-background-* token',
+      });
+      return `   ${paint('•', 'red')} [${paint(v.violationType, 'cyan')}] ${paint(
+        v.selector,
+        'yellow'
+      )} (${paint(v.backgroundRgb, 'bold', 'red')})${ctx}`;
+    }),
     `${paint('4. [stress]', 'bold', 'yellow')}    Geometric Overflow Hits : ${formatCountBadge(
       report.lightMode.stressViolations.length
     )}`,
-    ...report.lightMode.stressViolations.map(
-      (v) =>
-        `   ${paint('•', 'red')} [${paint(v.violationType, 'cyan')}] ${paint(
-          v.selector,
-          'yellow'
-        )}${v.relatedSelector ? ` -> ${paint(v.relatedSelector, 'yellow')}` : ''} (${paint(
-          `+${v.measuredLeakPixels}px`,
-          'bold',
-          'red'
-        )})`
-    ),
+    ...report.lightMode.stressViolations.map((v) => {
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+        hint: getStressRemediationHint(v.violationType),
+      });
+      return `   ${paint('•', 'red')} [${paint(v.violationType, 'cyan')}] ${paint(
+        v.selector,
+        'yellow'
+      )}${v.relatedSelector ? ` -> ${paint(v.relatedSelector, 'yellow')}` : ''} (${paint(
+        `+${v.measuredLeakPixels}px`,
+        'bold',
+        'red'
+      )})${ctx}`;
+    }),
     `${paint('5. [cls]', 'bold', 'blue')}       Max Session CLS Score   : ${paint(
       String(report.lightMode.clsEvaluation.maxSessionCls),
       'bold',
@@ -177,19 +277,36 @@ export function formatSpotCheckSummary(report: ISpotCheckReport): string {
     `${paint('6. [dom+ax]', 'bold', 'magenta')}    DOM & Computed AX Hits  : ${formatCountBadge(
       domViolations.length
     )}`,
-    ...domViolations.map(
-      (v) =>
-        `   ${paint('•', 'red')} [${paint(v.rule, 'cyan')}] ${paint(v.selector, 'yellow')}: ${
-          v.detail
-        }`
-    ),
+    ...domViolations.map((v) => {
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+        hint: getDomRemediationHint(v.rule),
+      });
+      return `   ${paint('•', 'red')} [${paint(v.rule, 'cyan')}] ${paint(v.selector, 'yellow')}: ${
+        v.detail
+      }${ctx}`;
+    }),
     `${paint('7. [v0.3.0]', 'bold', 'green')}    A2UI / Source-Map / Diff: ${paint(
       `${a2uiMatchedCount} A2UI`,
       'cyan'
     )} | ${paint(`${sourceMappedCount} file:line`, 'cyan')} | ${paint(
-      `${diffCount} unifiedDiff`,
+      `${diffs.length} unifiedDiff`,
       'cyan'
     )}`,
+    ...diffs.flatMap((diff) =>
+      diff.split('\n').map((diffLine) => `     ${paint(diffLine, 'cyan')}`)
+    ),
+    divider,
+    paint(
+      'Try Next (Sections 2 & 3 above are intentional adversarial traps):',
+      'bold',
+      'cyan'
+    ),
+    '  • JSON report + source-map attribution : npx uirig verify http://localhost:5173 --json',
+    '  • Multi-theme light/dark parity matrix : npx uirig matrix http://localhost:5173 --themes light,dark',
+    '  • Preview/apply deterministic auto-fix : npx uirig verify http://localhost:5173 --fix',
     divider,
     '',
   ];
