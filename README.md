@@ -278,7 +278,7 @@ npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-
 Each entry in `violations` includes `engine`, `hostComponent`, `a2ui` (when inside `<a2ui-surface>` or `[data-a2ui-surface]`), `sourceFile` / `lineNumber` / `columnNumber` (when CSS/JS source maps or dev metadata hooks like `data-source-loc` are present; `null` in unmapped production builds), `selector`, `childCount` / `sampleChildren` (when grouped), `suggestedToken`, and `remediationAdvice` so the agent can jump directly to the exact file and line without grepping the repository.
 
 ### 2. Native MCP Server Mode (`uirig mcp`)
-Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Cursor, Windsurf, Codex) by registering `uirig mcp`, which keeps a warm headless Chromium pool alive across edits and exposes `uirig_check`, `uirig_tokens`, `uirig_contrast`, `uirig_dark_mode`, `uirig_stress`, `uirig_cls`, and `uirig_dom` as native MCP tools:
+Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Cursor, Windsurf, Codex) by registering `uirig mcp`, which keeps a warm headless Chromium pool alive across edits and exposes `uirig_check`, `uirig_tokens`, `uirig_contrast`, `uirig_dark_mode`, `uirig_stress`, `uirig_cls`, `uirig_dom`, and `uirig_a2ui_delta` as native MCP tools:
 
 ```json
 {
