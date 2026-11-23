@@ -2,10 +2,10 @@
  * src/index.ts
  * Main system entry point and zero-dependency CLI argument parser/router for `uirig`.
  * Supports:
- * - `uirig <url-or-file> [--only=<tool>] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
+ * - `uirig <url-or-file> [--only=<tool>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
  * - `uirig init`
- * - `uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
- * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
+ * - `uirig check [<url-or-file>] [--only=<tool>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
+ * - `uirig tokens | contrast | dark-mode | stress | cls | dom [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]`
  * - `uirig manifest`
  * - `uirig mcp [--transport=<mode>] [--port=<n>] [--idle-timeout=<ms>]`
  * - `uirig --help` / `uirig <command> --help` / `uirig --version`
@@ -49,6 +49,7 @@ interface ISubcommandHelpSpec {
 }
 
 const SHARED_AUDIT_OPTIONS = [
+  '--tokens-path=<path>   Path to W3C, Style Dictionary, flat JSON, or CSS custom properties token file',
   '--auto-tokens          Auto-discover design tokens from workspace files & live :root CSS vars',
   '--themes=<csv>         Evaluate target across multiple theme skins (e.g. --themes="light,dark,brand")',
   '--changed              Scope audit to components modified in git diff (optional: --base <ref>)',
@@ -82,11 +83,11 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   check: {
     summary: 'Run all 6 verification engines concurrently across configured or direct targets in isolated contexts.',
-    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Launches a single headless Chromium instance and isolates each (url, viewport) pair in a fresh BrowserContext.',
       'Automatically serves local .html files on an ephemeral 127.0.0.1 HTTP server when given a file path.',
-      'Ranks violations from highest impact to lowest and supports --changed, --group-by-root, --top, and --max-tokens.',
+      'Ranks violations from highest impact to lowest and supports --tokens-path, --auto-tokens, --changed, --group-by-root, --top, and --max-tokens.',
     ],
     options: [
       '--only=<tool>          Filter execution to one engine: tokens | contrast | dark-mode | stress | cls | dom',
@@ -99,18 +100,18 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     ],
     examples: [
       'npx @rlevin/uirig check',
+      'npx @rlevin/uirig check http://localhost:5173 --tokens-path=./design.tokens.json --verbose',
       'npx @rlevin/uirig check --changed --base=main --json',
       'npx @rlevin/uirig check ./dist/index.html --selectors="#hero, .card" --verbose',
-      'npx @rlevin/uirig check ./dist/index.html --group-by-root --top=5 --json',
       'npx @rlevin/uirig check --only=dark-mode --json',
     ],
   },
   tokens: {
     summary: 'Audit Light DOM and open ShadowRoot computed styles against your design token scale.',
-    usage: 'uirig tokens [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig tokens [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Climbs Light DOM and nested Web Component ShadowRoot trees to inspect rendered colors, spacing, font sizes, and radii.',
-      'Attributes violations to the nearest custom element hostComponent and respects data-uirig-ignore="tokens".',
+      'Accepts W3C ($value), Style Dictionary (value), flat JSON, or CSS custom property token files via tokensPath / --tokens-path.',
     ],
     options: SHARED_AUDIT_OPTIONS,
     exitCodes: [
@@ -118,16 +119,17 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       '1                   Hardcoded off-scale values detected or config error',
     ],
     examples: [
+      'npx @rlevin/uirig tokens http://localhost:5173 --tokens-path=./tokens.css --verbose',
       'npx @rlevin/uirig tokens http://localhost:5173 --selectors="ag-button" --verbose',
       'npx @rlevin/uirig tokens --config=./uirig.config.json --json',
     ],
   },
   contrast: {
     summary: 'Verify WCAG 2.1 AA rendered luminance contrast (>= 4.5:1) using Porter-Duff alpha compositing.',
-    usage: 'uirig contrast [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig contrast [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Walks Light DOM and ShadowRoot.host ancestors to composite translucent backgrounds before computing luminance contrast.',
-      'Computes the nearest passing design system color token (suggestedToken) when tokensPath is configured.',
+      'Computes the nearest passing design system color token (suggestedToken) when tokensPath / --tokens-path or --auto-tokens is set.',
     ],
     options: SHARED_AUDIT_OPTIONS,
     exitCodes: [
@@ -139,9 +141,10 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       'npx @rlevin/uirig contrast http://localhost:5173 --json',
     ],
   },
-  'dark-mode': {
+
+    'dark-mode': {
     summary: 'Emulate dark color scheme / [data-theme="dark"] and audit dark contrast & un-inverted bright surfaces.',
-    usage: 'uirig dark-mode [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig dark-mode [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Forces prefers-color-scheme: dark and toggles data-theme="dark" on <html> inside an isolated browser context.',
       'Re-runs Porter-Duff contrast checks and flags large surfaces stranded above 0.85 relative luminance.',
@@ -262,6 +265,9 @@ ${paint('COMMANDS:', 'bold')}
   mcp                             Start persistent MCP server with warm Chromium (stdio or SSE)
 
 ${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / cls / dom):', 'bold')}
+  --tokens-path=<path>            Path to W3C, Style Dictionary, flat JSON, or CSS token file
+  --auto-tokens                   Auto-discover design tokens from workspace files & live :root CSS vars
+  --themes=<csv>                  Evaluate target across multiple theme skins (e.g. --themes="light,dark")
   --changed                       Scope audit to components modified in git diff (optional: --base <ref>)
   --base=<ref>                    Git base ref for --changed diff comparison (e.g. --base=main)
   -s, --selectors=<csv>           Filter element checks to matching CSS selectors (repeatable)
@@ -342,6 +348,7 @@ export type ParsedCliCommand =
       command: 'check';
       target?: string;
       only?: AuditToolName;
+      tokensPath?: string;
       autoTokens?: boolean;
       themes?: Array<string>;
       changed?: boolean;
@@ -362,6 +369,7 @@ export type ParsedCliCommand =
       rawCommand: string;
       reason: string;
     };
+
 export function isDirectTargetArg(arg: string): boolean {
   const trimmed = arg.trim();
   if (!trimmed || trimmed.startsWith('-')) {
@@ -489,6 +497,7 @@ function parseAuditCommandArgs(
 ): ParsedCliCommand {
   let target: string | undefined = initialTarget;
   let configPath: string | undefined;
+  let tokensPath: string | undefined;
   let only: AuditToolName | undefined = presetOnly;
   let autoTokens = false;
   let changed = false;
@@ -509,6 +518,21 @@ function parseAuditCommandArgs(
 
     if (token === '--json') {
       json = true;
+    } else if (token.startsWith('--tokens-path=') || token.startsWith('--token-path=')) {
+      const value = token.startsWith('--tokens-path=')
+        ? token.slice('--tokens-path='.length).trim()
+        : token.slice('--token-path='.length).trim();
+      if (value.length === 0) {
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing file path after --tokens-path=' };
+      }
+      tokensPath = value;
+    } else if (token === '--tokens-path' || token === '--token-path') {
+      const nextToken = restArgs.at(i + 1);
+      if (!nextToken || nextToken.startsWith('-')) {
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing file path after ' + token };
+      }
+      tokensPath = nextToken.trim();
+      i++;
     } else if (token === '--auto-tokens') {
       autoTokens = true;
     } else if (token === '--changed') {
@@ -516,21 +540,13 @@ function parseAuditCommandArgs(
     } else if (token.startsWith('--base=')) {
       const val = token.slice('--base='.length).trim();
       if (val.length === 0) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Missing Git ref after --base=',
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing Git ref after --base=' };
       }
       baseRef = val;
     } else if (token === '--base') {
       const nextToken = restArgs.at(i + 1);
       if (!nextToken || nextToken.startsWith('-')) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Missing Git ref after --base',
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing Git ref after --base' };
       }
       baseRef = nextToken.trim();
       i++;
@@ -539,29 +555,17 @@ function parseAuditCommandArgs(
     } else if (token.startsWith('--themes=')) {
       const parsedThemes = parseSelectorList(token.slice('--themes='.length));
       if (parsedThemes.length === 0) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Missing theme name after --themes=',
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing theme name after --themes=' };
       }
       collectedThemes.push(...parsedThemes);
     } else if (token === '--themes') {
       const nextToken = restArgs.at(i + 1);
       if (!nextToken || nextToken.startsWith('-')) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Missing theme name after --themes',
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing theme name after --themes' };
       }
       const parsedThemes = parseSelectorList(nextToken);
       if (parsedThemes.length === 0) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Empty theme name after --themes',
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Empty theme name after --themes' };
       }
       collectedThemes.push(...parsedThemes);
       i++;
@@ -576,121 +580,65 @@ function parseAuditCommandArgs(
     } else if (token.startsWith('--top=')) {
       const parsedTop = parsePositiveIntegerFlag(token.slice('--top='.length));
       if (parsedTop === null) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: "Invalid --top value '" + token.slice('--top='.length) + "'. Expected a positive integer (e.g. --top=5).",
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: "Invalid --top value '" + token.slice('--top='.length) + "'. Expected a positive integer (e.g. --top=5)." };
       }
       top = parsedTop;
     } else if (token === '--top') {
       const nextToken = restArgs.at(i + 1);
-      if (!nextToken) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Missing positive integer after --top (e.g. --top 5).',
-        };
-      }
-      const parsedTop = parsePositiveIntegerFlag(nextToken);
+      const parsedTop = nextToken ? parsePositiveIntegerFlag(nextToken) : null;
       if (parsedTop === null) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: "Invalid --top value '" + nextToken + "'. Expected a positive integer (e.g. --top 5).",
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: "Invalid --top value '" + (nextToken ?? '') + "'. Expected a positive integer (e.g. --top 5)." };
       }
       top = parsedTop;
       i++;
     } else if (token.startsWith('--max-tokens=')) {
       const parsedTokens = parsePositiveIntegerFlag(token.slice('--max-tokens='.length));
       if (parsedTokens === null) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: "Invalid --max-tokens value '" + token.slice('--max-tokens='.length) + "'. Expected a positive integer (e.g. --max-tokens=1200).",
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: "Invalid --max-tokens value '" + token.slice('--max-tokens='.length) + "'. Expected a positive integer (e.g. --max-tokens=1200)." };
       }
       maxTokens = parsedTokens;
     } else if (token === '--max-tokens') {
       const nextToken = restArgs.at(i + 1);
-      if (!nextToken) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Missing positive integer after --max-tokens (e.g. --max-tokens 1200).',
-        };
-      }
-      const parsedTokens = parsePositiveIntegerFlag(nextToken);
+      const parsedTokens = nextToken ? parsePositiveIntegerFlag(nextToken) : null;
       if (parsedTokens === null) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: "Invalid --max-tokens value '" + nextToken + "'. Expected a positive integer (e.g. --max-tokens 1200).",
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: "Invalid --max-tokens value '" + (nextToken ?? '') + "'. Expected a positive integer (e.g. --max-tokens 1200)." };
       }
       maxTokens = parsedTokens;
       i++;
     } else if (token.startsWith('--selectors=') || token.startsWith('-s=')) {
-      const rawVal = token.startsWith('--selectors=')
-        ? token.slice('--selectors='.length)
-        : token.slice('-s='.length);
+      const rawVal = token.startsWith('--selectors=') ? token.slice('--selectors='.length) : token.slice('-s='.length);
       const parsed = parseSelectorList(rawVal);
       if (parsed.length === 0) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Missing CSS selector value after --selectors=',
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing CSS selector value after --selectors=' };
       }
       collectedSelectors.push(...parsed);
     } else if (token === '--selectors' || token === '-s') {
       const nextToken = restArgs.at(i + 1);
       if (!nextToken || nextToken.startsWith('-')) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Missing CSS selector value after ' + token,
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing CSS selector value after ' + token };
       }
       const parsed = parseSelectorList(nextToken);
       if (parsed.length === 0) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Empty CSS selector value after ' + token,
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Empty CSS selector value after ' + token };
       }
       collectedSelectors.push(...parsed);
       i++;
     } else if (token.startsWith('--only=')) {
       const toolValue = token.slice('--only='.length).trim() as AuditToolName;
       if (!AUDIT_TOOL_NAMES.has(toolValue)) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: "Invalid --only value '" + toolValue + "'. Expected one of: tokens, contrast, dark-mode, stress, cls, dom.",
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: "Invalid --only value '" + toolValue + "'. Expected one of: tokens, contrast, dark-mode, stress, cls, dom." };
       }
       only = toolValue;
     } else if (token.startsWith('--config=')) {
       const value = token.slice('--config='.length).trim();
       if (value.length === 0) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Missing file path after --config=',
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing file path after --config=' };
       }
       configPath = value;
     } else if (token === '--config') {
       const nextToken = restArgs.at(i + 1);
       if (!nextToken || nextToken.startsWith('-')) {
-        return {
-          command: 'unknown',
-          rawCommand: rawSubcommand,
-          reason: 'Missing file path after --config',
-        };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing file path after --config' };
       }
       configPath = nextToken;
       i++;
@@ -700,23 +648,18 @@ function parseAuditCommandArgs(
     } else if (!token.startsWith('-') && !target && isDirectTargetArg(token)) {
       target = token;
     } else {
-      return {
-        command: 'unknown',
-        rawCommand: rawSubcommand,
-        reason: "Unrecognized option for '" + rawSubcommand + "': " + token,
-      };
+      return { command: 'unknown', rawCommand: rawSubcommand, reason: "Unrecognized option for '" + rawSubcommand + "': " + token };
     }
   }
 
-  const uniqueSelectors =
-    collectedSelectors.length > 0 ? Array.from(new Set(collectedSelectors)) : undefined;
-  const uniqueThemes =
-    collectedThemes.length > 0 ? Array.from(new Set(collectedThemes)) : undefined;
+  const uniqueSelectors = collectedSelectors.length > 0 ? Array.from(new Set(collectedSelectors)) : undefined;
+  const uniqueThemes = collectedThemes.length > 0 ? Array.from(new Set(collectedThemes)) : undefined;
 
   return {
     command: 'check',
     target,
     only,
+    ...(tokensPath ? { tokensPath } : {}),
     ...(autoTokens ? { autoTokens: true } : {}),
     ...(uniqueThemes ? { themes: uniqueThemes } : {}),
     ...(changed ? { changed: true } : {}),
@@ -733,6 +676,7 @@ function parseAuditCommandArgs(
     headless,
   };
 }
+
 export function parseCliArgs(argv: Array<string>): ParsedCliCommand {
   if (argv.length === 0) {
     return { command: 'help' };
@@ -846,6 +790,7 @@ export async function runCli(
     const report = await runCheck({
       target: parsed.target,
       configPath: parsed.configPath,
+      ...(parsed.tokensPath ? { tokensPath: parsed.tokensPath } : {}),
       only: parsed.only,
       ...(parsed.autoTokens ? { autoTokens: true } : {}),
       ...(parsed.themes ? { themes: parsed.themes } : {}),
@@ -868,3 +813,20 @@ export async function runCli(
     return 1;
   }
 }
+
+const isDirectEntrypoint =
+  typeof process.argv[1] === 'string' &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectEntrypoint) {
+  runCli(process.argv.slice(2))
+    .then((code) => {
+      process.exit(code);
+    })
+    .catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(paint('[uirig:fatal] ' + message, 'bold', 'red'));
+      process.exit(1);
+    });
+}
+

@@ -8,111 +8,54 @@
 
 ## Why `uirig`? (And Why It Beats Just Running `axe` or `Lighthouse` First)
 
-`uirig` is not a replacement for comprehensive WCAG audits (`axe-core`) or full performance profiling (`Lighthouse`). Instead, it acts as a fast, deterministic **first line of defense** tailored to modern component architectures and AI-assisted development:
+General-purpose auditors like `axe-core` and Lighthouse are essential for final compliance, **but they are blind to layout breaks, design drift, and Shadow DOM nuances that AI coding agents introduce every day:**
 
-* **Catches Design-System Drift `axe` Misses:** `axe` won't tell you that an AI agent hardcoded `#3b82f6` instead of `--ag-color-primary`, or that `+30%` longer German translation copy overflowed `<ag-card>`.
-* **Pierces Web Component Shadow DOMs & Audits `<slot>` + Computed AX Tree Integrity:** `Lighthouse` won't climb inside a Lit or Stencil `ShadowRoot` to tell a coding agent *which custom element* (`hostComponent`) broke dark-mode contrast, layout bounds, dropped an orphaned `slot="..."` child, or severed its computed accessibility name (`ax_empty_name` / `ax_hidden_focus`).
-* **Renderer-Agnostic A2UI Surface Attribution (`<a2ui-surface>` / `[data-a2ui-surface]`):** Automatically resolves composed ancestors across Lit, React, Vue, Angular, and Flutter Web A2UI v1.0 surfaces into an out-of-band `a2ui` diagnostic block (`surfaceId`, `a2uiComponentId`, `a2uiComponentType`, `catalogId`, `wirePath`, `suggestedPatch`) and catalog-neutral `updateComponents` `remediationAdvice` with zero changes to A2UI wire schemas.
-* **Zero Screenshot Diff Flakiness & Zero Vision-Token Bloat:** Measures deterministic Euclidean bounding boxes, Porter-Duff alpha-composited luminance contrast (including CSS `background-clip: text` gradient color stops), and W3C session-window CLS scores—plus `--spatial-brief` delivers macro-layout coordinates in ~40 plain-text tokens instead of 1,500–3,000+ vision tokens.
-* **Root-Cause Grouped, Priority-Ranked & Token-Budgeted for AI Agents:** Collapse cascading child failures under their shared parent container with `--group-by-root`, automatically sort violations from highest page impact (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`), and cap output with `--top=<n>` and `--max-tokens=<budget>`.
-* **Zero-Config & Component-Scoped First Runs:** Point `npx @rlevin/uirig` directly at a localhost URL or a standalone `.html` file with zero configuration files required, pass `--auto-tokens` to auto-discover `:root` CSS variables, Tailwind v4 `@theme`, and W3C `.tokens.json` scales, evaluate multiple theme skins with `--themes`, or scope audits to specific components with `--selectors` or `--changed`.
-* **Built as an Agentic Guardrail for AI Design System Harnesses:** Drop `uirig` into your AI design system harness (`AGENTS.md` or `.uirig/SKILL.md`) so agents like Claude Code, Cursor, and Codex can self-heal UI regressions before a human ever opens a browser. Running `--json` streams deduplicated violations with Shadow host attribution, `suggestedToken` fixes, and POSIX exit codes (`0`, `1`, `2`) to `stdout` while keeping colored telemetry on `stderr`.
-
-### Works Alongside Google Modern Web Guidance
-
-`uirig` and **Google's Modern Web Guidance** solve complementary halves of the AI UI engineering loop without overlapping:
-
-| Layer | Tool | Role in the Agent Loop |
-| :--- | :--- | :--- |
-| **1. Static Authoring & Refactoring** | **Google Modern Web Guidance** *(Agent Skill + CLI)* | Injects Baseline web-platform patterns (native `<dialog>`, Popover API, modern CSS layout) before code is generated—and scans source files (`legacy-scan`) to modernize outdated patterns. |
-| **2. Live Runtime Verification** | **`uirig`** *(MCP Server + CLI)* | Audits the live rendered DOM and Shadow DOM in headless Chromium to catch design-system token drift, Porter-Duff contrast drops, `<slot>` mismatches, CLS, and geometric overflow that static guidance and source scanners cannot observe. |
-
-Pairing Modern Web Guidance's skill with the `uirig` MCP server gives coding agents a complete **"Author with Modern Web Guidance → Verify with `uirig`"** closed loop (documented automatically in `.uirig/SKILL.md` when you run `uirig init`).
+1. **Structural Layout & Overflow Fuzzing (`stress`):** `axe` and Lighthouse never test what happens when copy grows by +30% or when a long unbreakable email/URL hits a flex container. `uirig` mutates text nodes inside an isolated browser context to catch clipped buttons, overlapping siblings, horizontal scrollbar bleed (`100vw`), squished avatars, stuck `opacity: 0` elements, and `< 24x24px` tap-target collisions.
+2. **Dark-Mode Theme Parity (`dark-mode`):** `axe` only checks whatever theme is currently rendered. `uirig` automatically emulates `prefers-color-scheme: dark` and `data-theme="dark"` in an isolated context—re-running Porter-Duff composited contrast checks and catching large surfaces stranded in blinding light mode (`luminance > 0.85`).
+3. **Design System Token Drift (`tokens`):** `axe` does not know your design system's spacing, color, typography, or border-radius scale. `uirig` crawls rendered computed styles across both Light DOM and open `ShadowRoot` trees, flags off-scale hardcoded values, and suggests the nearest passing token (`suggestedToken`).
+4. **Session-Window CLS & Runtime Crash Capture (`cls` + `runtime`):** Measures Google's W3C 1s/5s session-window Cumulative Layout Shift (`hadRecentInput: false`) and captures uncaught `pageerror` / `console.error` exceptions during navigation.
+5. **Markup & Prompt-Injection Hygiene (`dom`):** Verifies `aria-labelledby` / `label[for]` ID resolution across Light + Shadow DOM, detects broken `<img>` elements (`naturalWidth === 0`), blocks unsafe `javascript:` URIs and missing `rel="noopener"`, and flags invisible AI prompt-injection traps.
+6. **Renderer-Agnostic A2UI Surface Attribution (`a2ui`):** When auditing generative UIs rendered inside `<a2ui-surface>` or `[data-a2ui-surface]` (across Lit, React, Vue, Angular, or Flutter Web), `uirig` climbs composed `ShadowRoot.host` boundaries to resolve the exact `surfaceId`, `a2uiComponentId`, `a2uiComponentType`, `catalogId`, `wirePath`, and a ready-to-apply `suggestedPatch` into an out-of-band `a2ui` diagnostic block—and generates catalog-neutral `updateComponents` `remediationAdvice` without ever mutating A2UI wire schemas.
 
 ---
 
-## Quick Start (Zero Config)
+## Installation & Quick Start
 
-Run `uirig` immediately against any running URL or local `.html` file (no installation or `uirig.config.json` required):
+### Zero-Config Instant Audit (No Config File Required)
+Run `uirig` directly against any running dev server URL or standalone `.html` file:
 
 ```bash
-# Audit a live dev server
-npx @rlevin/uirig http://localhost:5173
+# Audit a live local dev server (auto-discovers tokens & scrapes live :root CSS vars)
+npx @rlevin/uirig http://localhost:5173 --auto-tokens
 
-# Audit a standalone AI-generated HTML file (auto-served on an ephemeral local port)
+# Audit a standalone local HTML file (starts an ephemeral 127.0.0.1 server automatically)
 npx @rlevin/uirig ./dist/index.html
 
-# Auto-discover :root CSS variables, Tailwind v4 @theme, and W3C .tokens.json with zero config
-npx @rlevin/uirig ./dist/index.html --auto-tokens --verbose
-
-# Apply deterministic 1-to-1 fixes on disk and re-verify automatically
-npx @rlevin/uirig ./dist/index.html --auto-tokens --fix
-
-# Evaluate across multiple theme skins (Light, Dark, compound brand skins) in one pass
-npx @rlevin/uirig http://localhost:5173 --themes="light, dark, enterprise-dark" --json
-
-# Scope checks incrementally to components modified in git diff (or against --base=main)
-npx @rlevin/uirig http://localhost:5173 --changed --base=main --json
-
-# Scope checks to specific components or CSS selectors (Light DOM + Shadow DOM)
-npx @rlevin/uirig http://localhost:5173 --selectors="#hero, ag-button, .pricing-card"
-
-# Use repeated flags if you prefer
-npx @rlevin/uirig <URL> -s="#hero" -s="ag-button" -s=".pricing-card"
-
-# Group cascading child failures by parent + emit ~40-token layout coordinates + top 5 issues
-npx @rlevin/uirig http://localhost:5173 --group-by-root --spatial-brief --top=5 --json
+# Inspect with a visible Chromium window
+npx @rlevin/uirig http://localhost:5173 --headed
 ```
 
-*(If `@rlevin/uirig` is already installed in your repository's `node_modules`, you can run `npx uirig ...` directly.)*
-
----
-
-## The 6-Tool Verification Suite
-
-| Engine | CLI Gate | What It Audits | Failure Exit Code |
-| :--- | :--- | :--- | :---: |
-| **1. Design Tokens** | `tokens` | Walks Light DOM and open `ShadowRoot` trees to flag hardcoded colors, spacing, font sizes, or radii outside your configured or `--auto-tokens` scale. | `1` |
-| **2. WCAG Contrast** | `contrast` | Composites ancestor alpha/opacity layers (Porter-Duff Source-Over), evaluates worst-case CSS `background-clip: text` gradient color stops, verifies WCAG 2.1 AA contrast (`>= 4.5:1`), and suggests nearest passing tokens. | `1` |
-| **3. Dark-Mode Parity** | `dark-mode` | Emulates dark color scheme / `[data-theme="dark"]`, re-audits contrast, and flags surfaces stranded at bright light luminance (`> 0.85`). | `1` |
-| **4. Geometric Stress** | `stress` | Injects `+30%` longer text and long space-free strings (like emails and URLs) to check container overflow, `100vw` bleed, avatar squishing, and `24x24px` tap targets. | `2` |
-| **5. Layout Shift** | `cls` | Enforces W3C 1s/5s session-window `clsMaxLimit` budgets across live page loads, catching unexpected layout jumps before users see them. | `2` |
-| **6. DOM & AX Integrity** | `dom` | Inspects Chromium's computed accessibility tree (`ax_empty_name`, `ax_hidden_focus`) plus dangling `aria-labelledby`/`for` IDs, unlabeled controls, broken `<img>` loads, `javascript:` URIs, orphaned Web Component `<slot>` children, and hidden AI prompt-injection traps. | `1` |
-
-*(Full suite runs also automatically fail with exit code `1` if the page throws uncaught runtime JavaScript errors during load.)*
-
----
-
-## Installation & Workspace Setup
-
-### Prerequisites
-* **Node.js 22+**
-* **Playwright Chromium browser binary**
-
-```bash
-npm install -D @rlevin/uirig
-npx playwright install chromium
-```
-
-### Optional Workspace Initialization (`uirig init`)
-When you are ready to enforce custom design tokens, multi-viewport budgets, or AI agent skills in a repository, run `init` to scaffold `uirig.config.json`, `.uirig/session.json`, and `.uirig/SKILL.md`:
+### Project Setup (`uirig init`)
+Scaffold `uirig.config.json`, `.uirig/session.json`, and an AI coding agent skill file (`.uirig/SKILL.md`):
 
 ```bash
 npx @rlevin/uirig init
+npx @rlevin/uirig check
 ```
 
-### Configuration (`uirig.config.json`)
+---
+
+## Configuration (`uirig.config.json`)
 
 ```json
 {
-  "$schema": "https://json-schema.org",
+  "$schema": "./node_modules/@rlevin/uirig/schema/uirig.config.schema.json",
   "targetUrls": ["http://localhost:5173"],
-  "tokensPath": "./config/default_tokens.json",
-  "autoTokens": false,
+  "tokensPath": "./tokens/design.tokens.json",
   "themes": ["light", "dark"],
   "changedPaths": {
-    "include": ["src/components/**", "src/app/**/_components/**", "app/views/**"],
-    "exclude": ["src/toys/**", "src/experimental/**"]
+    "include": ["src/components/**", "src/styles/**"],
+    "exclude": ["**/*.test.ts", "**/*.spec.ts"]
   },
   "thresholdBudgets": {
     "clsMaxLimit": 0.1,
@@ -125,17 +68,15 @@ npx @rlevin/uirig init
     { "name": "desktop", "width": 1440, "height": 900 }
   ],
   "ignore": [
-    { "rule": "tokens", "selector": ".legacy-embed" }
+    { "rule": "tokens", "selector": ".legacy-widget" },
+    { "rule": "all", "url": "http://localhost:5173/storybook/*" }
   ]
 }
 ```
 
-*(When `tokensPath` is omitted and `--auto-tokens` or `"autoTokens": true` is active, `uirig` automatically discovers design tokens from W3C `*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS blocks, and live `:root` CSS custom properties. Explicit `tokensPath` always takes precedence. When `changedPaths` is omitted, `--changed` automatically detects standard frontend component extensions as well as server-rendered templates like `.erb`, `.jinja2`, `.heex`, `.twig`, and `.cshtml` across any folder layout.)*
+### Ignoring Intentional Exceptions (`data-uirig-ignore` & `ignore` Rules)
 
-### Bundler-Proof Rule Escape Hatches
-Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comments, you can exempt intentional one-off overrides in two ways:
-
-1. **In Markup (`data-uirig-ignore`):** Add `data-uirig-ignore` to an element, ancestor container, or Web Component host. Exemptions cascade down to child elements and across open `ShadowRoot` boundaries:
+1. **In HTML / Web Component Markup (`data-uirig-ignore`):** Add `data-uirig-ignore` on any element (or container) to exempt it and its subtree—including nested `ShadowRoot` nodes—from specific engines or all rules:
 
 ```html
 <!-- Exempt a single rule -->
@@ -160,6 +101,300 @@ Because `uirig` evaluates live computed DOM styles after bundlers strip CSS comm
 
 ---
 
+## Design Token Setup (`tokensPath`, `--tokens-path`, & `--auto-tokens`)
+
+`uirig`'s `tokens` engine audits rendered Light DOM and Web Component `ShadowRoot` styles (`color`, `backgroundColor`, `padding*`, `margin*`, `fontSize`, and `borderRadius`) against your design system's valid values—and feeds your color palette into `contrast` / `dark-mode` so violations include an actionable `suggestedToken`.
+
+You never have to manually flatten nested token dictionaries or copy CSS variables into arrays. You can supply tokens in any of three ways (ordered from highest to lowest precedence):
+
+1. **CLI Override (`--tokens-path=<path>` / `--token-path=<path>`):** Point directly at a token file on the command line (overrides `config.tokensPath` when both are set):
+
+```bash
+npx @rlevin/uirig check http://localhost:5173 --tokens-path=./design.tokens.json --verbose
+```
+
+2. **Config File (`tokensPath` in `uirig.config.json`):** Set a relative path to your project's token file (resolved relative to `uirig.config.json`):
+
+```json
+{
+  "targetUrls": ["http://localhost:5173"],
+  "tokensPath": "./tokens/design.tokens.json"
+}
+```
+
+3. **Zero-Config Auto-Discovery (`--auto-tokens` or `"autoTokens": true`):** When neither `--tokens-path` nor `tokensPath` is set, `uirig` scans workspace token files (`*.tokens.json`, `*token*.json`, and Tailwind v4 `@theme` CSS blocks) **and** scrapes live `:root` / `html` CSS custom properties (`--*`) directly from the rendered page in Chromium:
+
+```bash
+npx @rlevin/uirig http://localhost:5173 --auto-tokens --verbose
+```
+
+### Supported Token File Formats
+
+Files referenced by `tokensPath` or `--tokens-path` may use **any** of these four formats—`uirig` automatically normalizes hex, `hsl()`, `oklch()`, and `rgb()`/`rgba()` colors to computed `rgb(...)` strings and converts `rem`/`em` lengths to `px`:
+
+1. **W3C Design Tokens Format (`$value` leaves):**
+
+```json
+{
+  "color": {
+    "brand": { "primary": { "$value": "#2563eb", "$type": "color" } },
+    "surface": { "canvas": { "$value": "#ffffff", "$type": "color" } }
+  },
+  "spacing": { "md": { "$value": "1rem", "$type": "dimension" } },
+  "font": { "size": { "body": { "$value": "16px", "$type": "dimension" } } },
+  "radius": { "card": { "$value": "0.5rem", "$type": "dimension" } }
+}
+```
+
+2. **Style Dictionary Format (`value` leaves):**
+
+```json
+{
+  "color": { "text": { "primary": { "value": "#0f172a" } } },
+  "size": { "padding": { "base": { "value": "12px" } } }
+}
+```
+
+3. **CSS Custom Properties Stylesheet (`.css` with `:root`, `[data-theme]`, or `@theme`):**
+
+```css
+:root {
+  --brand-primary: #2563eb;
+  --color-action: var(--brand-primary);
+  --space-4: 1rem;
+  --font-size-md: 16px;
+  --radius-md: 0.5rem;
+}
+```
+
+4. **Flat Scale JSON (`colors`, `spacing`, `fontSizes`, `radii` string arrays — e.g. `config/default_tokens.json`):**
+
+```json
+{
+  "colors": ["rgb(255, 255, 255)", "rgb(17, 24, 39)", "rgb(37, 99, 235)"],
+  "spacing": ["0px", "4px", "8px", "16px", "24px", "32px"],
+  "fontSizes": ["12px", "14px", "16px", "20px", "24px"],
+  "radii": ["0px", "4px", "8px", "9999px"]
+}
+```
+
+*(If a file cannot be parsed or contains no recognized color/length tokens, `uirig` exits with `ERR_TOKENS_SCHEMA` and prints the supported formats and `--auto-tokens` fallback guidance.)*
+
+### Ignoring Intentional One-Off Exceptions
+You can silence known exceptions without weakening global budgets:
+
+1. **In HTML / Web Component Markup (`data-uirig-ignore`):**
+
+```html
+<!-- Exempt a single rule -->
+<div data-uirig-ignore="tokens">Intentional one-off hero gradient</div>
+
+<!-- Exempt multiple comma-separated rules -->
+<ag-card data-uirig-ignore="tokens, dark-mode">Custom promotional card</ag-card>
+
+<!-- Exempt all engines on a third-party widget -->
+<section data-uirig-ignore="all">Legacy third-party embed</section>
+```
+
+2. **In `uirig.config.json` (`ignore`):** Exempt specific selectors or route URLs (including trailing `*` wildcards) centrally without touching markup:
+
+```json
+"ignore": [
+  { "rule": "tokens", "selector": ".legacy-embed" },
+  { "rule": "contrast", "url": "http://localhost:5173/admin/*" },
+  { "rule": "all", "selector": "#third-party-chat" }
+]
+```
+
+---
+
+## Design Token Setup (`tokensPath`, `--tokens-path`, & `--auto-tokens`)
+
+`uirig`'s `tokens` engine audits rendered Light DOM and Web Component `ShadowRoot` styles (`color`, `backgroundColor`, `padding*`, `margin*`, `fontSize`, and `borderRadius`) against your design system's valid values—and feeds your color palette into `contrast` / `dark-mode` so violations include an actionable `suggestedToken`.
+
+You never have to manually flatten nested token dictionaries or copy CSS variables into arrays. You can supply tokens in any of three ways (ordered from highest to lowest precedence):
+
+1. **CLI Override (`--tokens-path=<path>` / `--token-path=<path>`):** Point directly at a token file on the command line (overrides `config.tokensPath` when both are set):
+
+```bash
+npx @rlevin/uirig check http://localhost:5173 --tokens-path=./design.tokens.json --verbose
+```
+
+2. **Config File (`tokensPath` in `uirig.config.json`):** Set a relative path to your project's token file (resolved relative to `uirig.config.json`):
+
+```json
+{
+  "targetUrls": ["http://localhost:5173"],
+  "tokensPath": "./tokens/design.tokens.json"
+}
+```
+
+3. **Zero-Config Auto-Discovery (`--auto-tokens` or `"autoTokens": true`):** When neither `--tokens-path` nor `tokensPath` is set, `uirig` scans workspace token files (`*.tokens.json`, `*token*.json`, and Tailwind v4 `@theme` CSS blocks) **and** scrapes live `:root` / `html` CSS custom properties (`--*`) directly from the rendered page in Chromium:
+
+```bash
+npx @rlevin/uirig http://localhost:5173 --auto-tokens --verbose
+```
+
+### Supported Token File Formats
+
+Files referenced by `tokensPath` or `--tokens-path` may use **any** of these four formats—`uirig` automatically normalizes hex, `hsl()`, `oklch()`, and `rgb()`/`rgba()` colors to computed `rgb(...)` strings and converts `rem`/`em` lengths to `px`:
+
+1. **W3C Design Tokens Format (`$value` leaves):**
+
+```json
+{
+  "color": {
+    "brand": { "primary": { "$value": "#2563eb", "$type": "color" } },
+    "surface": { "canvas": { "$value": "#ffffff", "$type": "color" } }
+  },
+  "spacing": { "md": { "$value": "1rem", "$type": "dimension" } },
+  "font": { "size": { "body": { "$value": "16px", "$type": "dimension" } } },
+  "radius": { "card": { "$value": "0.5rem", "$type": "dimension" } }
+}
+```
+
+2. **Style Dictionary Format (`value` leaves):**
+
+```json
+{
+  "color": { "text": { "primary": { "value": "#0f172a" } } },
+  "size": { "padding": { "base": { "value": "12px" } } }
+}
+```
+
+3. **CSS Custom Properties Stylesheet (`.css` with `:root`, `[data-theme]`, or `@theme`):**
+
+```css
+:root {
+  --brand-primary: #2563eb;
+  --color-action: var(--brand-primary);
+  --space-4: 1rem;
+  --font-size-md: 16px;
+  --radius-md: 0.5rem;
+}
+```
+
+4. **Flat Scale JSON (`colors`, `spacing`, `fontSizes`, `radii` string arrays — e.g. `config/default_tokens.json`):**
+
+```json
+{
+  "colors": ["rgb(255, 255, 255)", "rgb(17, 24, 39)", "rgb(37, 99, 235)"],
+  "spacing": ["0px", "4px", "8px", "16px", "24px", "32px"],
+  "fontSizes": ["12px", "14px", "16px", "20px", "24px"],
+  "radii": ["0px", "4px", "8px", "9999px"]
+}
+```
+
+*(If a file cannot be parsed or contains no recognized color/length tokens, `uirig` exits with `ERR_TOKENS_SCHEMA` and prints the supported formats and `--auto-tokens` fallback guidance.)*
+
+### Ignoring Intentional Exceptions
+
+1. **Inline in HTML / Web Components (`data-uirig-ignore`):**
+
+```html
+<!-- Exempt a single rule -->
+<div data-uirig-ignore="tokens">Intentional one-off hero gradient</div>
+
+<!-- Exempt multiple comma-separated rules -->
+<ag-card data-uirig-ignore="tokens, dark-mode">Custom promotional card</ag-card>
+
+<!-- Exempt all engines on a third-party widget -->
+<section data-uirig-ignore="all">Legacy third-party embed</section>
+```
+
+2. **In `uirig.config.json` (`ignore`):** Exempt specific selectors or route URLs (including trailing `*` wildcards) centrally without touching markup:
+
+```json
+"ignore": [
+  { "rule": "tokens", "selector": ".legacy-embed" },
+  { "rule": "contrast", "url": "http://localhost:5173/admin/*" },
+  { "rule": "all", "selector": "#third-party-chat" }
+]
+```
+
+---
+
+## Design Token Setup (`tokensPath`, `--tokens-path`, & `--auto-tokens`)
+
+`uirig`'s `tokens` engine audits rendered Light DOM and Web Component `ShadowRoot` styles (`color`, `backgroundColor`, `padding*`, `margin*`, `fontSize`, and `borderRadius`) against your design system's valid values—and feeds your color palette into `contrast` / `dark-mode` so violations include an actionable `suggestedToken`.
+
+You never have to manually flatten nested token dictionaries or copy CSS variables into arrays. You can supply tokens in any of three ways (ordered from highest to lowest precedence):
+
+1. **CLI Override (`--tokens-path=<path>` / `--token-path=<path>`):** Point directly at a token file on the command line (overrides `config.tokensPath` when both are set):
+
+   ```bash
+   npx @rlevin/uirig check http://localhost:5173 --tokens-path=./design.tokens.json --verbose
+   ```
+
+2. **Config File (`tokensPath` in `uirig.config.json`):** Set a relative path to your project's token file (resolved relative to `uirig.config.json`):
+
+   ```json
+   {
+     "targetUrls": ["http://localhost:5173"],
+     "tokensPath": "./tokens/design.tokens.json"
+   }
+   ```
+
+3. **Zero-Config Auto-Discovery (`--auto-tokens` or `"autoTokens": true`):** When neither `--tokens-path` nor `tokensPath` is set, `uirig` scans workspace token files (`*.tokens.json`, `*token*.json`, and Tailwind v4 `@theme` CSS blocks) **and** scrapes live `:root` / `html` CSS custom properties (`--*`) directly from the rendered page in Chromium:
+
+   ```bash
+   npx @rlevin/uirig http://localhost:5173 --auto-tokens --verbose
+   ```
+
+### Supported Token File Formats
+
+Files referenced by `tokensPath` or `--tokens-path` may use **any** of these four formats—`uirig` automatically normalizes hex, `hsl()`, `oklch()`, and `rgb()`/`rgba()` colors to computed `rgb(...)` strings and converts `rem`/`em` lengths to `px`:
+
+1. **W3C Design Tokens Format (`$value` leaves):**
+
+   ```json
+   {
+     "color": {
+       "brand": { "primary": { "$value": "#2563eb", "$type": "color" } },
+       "surface": { "canvas": { "$value": "#ffffff", "$type": "color" } }
+     },
+     "spacing": { "md": { "$value": "1rem", "$type": "dimension" } },
+     "font": { "size": { "body": { "$value": "16px", "$type": "dimension" } } },
+     "radius": { "card": { "$value": "0.5rem", "$type": "dimension" } }
+   }
+   ```
+
+2. **Style Dictionary Format (`value` leaves):**
+
+   ```json
+   {
+     "color": { "text": { "primary": { "value": "#0f172a" } } },
+     "size": { "padding": { "base": { "value": "12px" } } }
+   }
+   ```
+
+3. **CSS Custom Properties Stylesheet (`.css` with `:root`, `[data-theme]`, or `@theme`):**
+
+   ```css
+   :root {
+     --brand-primary: #2563eb;
+     --color-action: var(--brand-primary);
+     --space-4: 1rem;
+     --font-size-md: 16px;
+     --radius-md: 0.5rem;
+   }
+   ```
+
+4. **Flat Scale JSON (`colors`, `spacing`, `fontSizes`, `radii` string arrays — e.g. `config/default_tokens.json`):**
+
+   ```json
+   {
+     "colors": ["rgb(255, 255, 255)", "rgb(17, 24, 39)", "rgb(37, 99, 235)"],
+     "spacing": ["0px", "4px", "8px", "16px", "24px", "32px"],
+     "fontSizes": ["12px", "14px", "16px", "20px", "24px"],
+     "radii": ["0px", "4px", "8px", "9999px"]
+   }
+   ```
+
+*(If a file cannot be parsed or contains no recognized color/length tokens, `uirig` exits with `ERR_TOKENS_SCHEMA` and prints the supported formats and `--auto-tokens` fallback guidance.)*
+
+---
+
 ## CLI Command Reference
 
 *(If `@rlevin/uirig` is installed locally in `node_modules`, `npx uirig` can be used interchangeably with `npx @rlevin/uirig`.)*
@@ -174,16 +409,17 @@ Launches a single Chromium instance and executes all 6 verification engines acro
 Run any individual verification engine in isolation for rapid inner-loop debugging or targeted AI agent re-checks:
 
 ```bash
-npx @rlevin/uirig tokens [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig contrast [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig dark-mode [<url-or-file>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig tokens [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig contrast [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig dark-mode [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
 npx @rlevin/uirig stress [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
-npx @rlevin/uirig cls [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig cls [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
 npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
 ```
 
 ### Shared Options
-* `--auto-tokens`: Auto-discover design tokens from workspace files (`*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS) and live `:root` CSS custom properties when `tokensPath` is not set.
+* `--tokens-path=<path>` (alias: `--token-path=<path>`): Path to a W3C Design Tokens JSON (`$value`), Style Dictionary JSON (`value`), flat scale JSON, or CSS custom properties (`.css`) file; overrides `tokensPath` in `uirig.config.json`.
+* `--auto-tokens`: Auto-discover design tokens from workspace files (`*.tokens.json`, Style Dictionary JSON, Tailwind v4 `@theme` CSS) and live `:root` CSS custom properties when `tokensPath` / `--tokens-path` is not set.
 * `--themes=<csv>`: Evaluate the target across multiple theme skins (e.g. `--themes="light, dark, enterprise-dark"`) via `data-theme` and color-scheme emulation in a single session.
 * `--changed`: Inspect `git diff` (filtered by optional `changedPaths` globs) to infer modified custom element tags/selectors and skip browser execution cleanly (`exitCode: 0`) when no UI/component/template files changed.
 * `--base=<ref>`: Git base ref for `--changed` diff comparison (e.g. `--base=main` or `--base=origin/main` in CI/CD pull requests).
@@ -193,7 +429,7 @@ npx @rlevin/uirig dom [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>
 * `--top=<n>`: Keep only the top `N` highest-priority violations (`cls` / `runtime` > `stress` > `contrast` / `dark-mode` > `tokens` > `dom`) and include `totalViolations` + `truncatedCount` metadata when trimmed.
 * `--max-tokens=<budget>`: Cap serialized JSON output to approximately `N` LLM tokens without ever cutting off valid JSON object boundaries.
 * `--spatial-brief`: Emit an ultra-compact, plain-text bounding-box summary (`header[0,0 1440x64] | aside[0,64 260x836] | main[260,64 1180x836]`) of semantic landmarks, top-level custom elements, and target selectors (~40 tokens, zero vision screenshots required).
-* `--verbose`: Print every individual failing selector path, Shadow DOM host, measured delta, and suggested token beneath each engine summary.
+* `--verbose`: Print every individual failing selector path, source-map `file:line`, Shadow DOM host, A2UI component ID, measured delta, and suggested token beneath each engine summary.
 * `--config=<path>`: Use a custom configuration file path.
 * `--only=<tool>`: Filter `check` to a single engine (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, or `dom`).
 * `--json`: Route colored diagnostic logs to `stderr` and write a single deduplicated JSON report (including `sourceFile`, `lineNumber`, `columnNumber`, and `unifiedDiff`) to `stdout`.
@@ -329,26 +565,27 @@ npx @rlevin/uirig check --changed --config=uirig.config.json
    ```
 
    Vite serves the sandbox at `http://localhost:5173` and automatically runs all 6 core `uirig` validation engines + v0.3.0 diagnostics (`file:line`, `<ag-*>` Shadow DOM host, `a2ui` component IDs, `suggestedToken`, remediation hints, and `unifiedDiff` previews) in headless Chromium on boot.
+
 2. **Inspect terminal `file:line` attribution, structured JSON, multi-theme parity, and auto-fix patches (Terminal 2):**
 
-   > **Note:** When running `uirig` from within the cloned `uirig` repository, use `npm run uirig -- <command>` (which wraps `node ./bin/uirig`) rather than `npx uirig`. Because the local `package.json` declares `"name": "@rlevin/uirig"`, `npx` resolves against the local workspace (where `node_modules/.bin/uirig` is not self-linked) instead of downloading from npm, resulting in `uirig: command not found`. Include `--` after `npm run uirig` so npm forwards flags like `--verbose`, `--json`, `--themes`, and `--fix` directly to the CLI (run `npm run build` first if `dist/` has not been compiled yet). Also note that if you modify the `uirig` library source code itself, you must re-run `npm run build` so `./bin/uirig` reflects those changes.
+   > **Note:** When running `uirig` from within the cloned `uirig` repository, use `npm run uirig -- <command>` (which wraps `node ./bin/uirig`) rather than `npx uirig`. Because the local `package.json` declares `"name": "@rlevin/uirig"`, `npx` resolves against the local workspace (where `node_modules/.bin/uirig` is not self-linked) instead of downloading from npm, resulting in `uirig: command not found`. Include `--` after `npm run uirig` so npm forwards flags like `--auto-tokens`, `--verbose`, `--json`, `--themes`, and `--fix` directly to the CLI (run `npm run build` first if `dist/` has not been compiled yet). Also note that if you modify the `uirig` library source code itself, you must re-run `npm run build` so `./bin/uirig` reflects those changes.
 
-   With `http://localhost:5173` running in Terminal 1, run `npm run uirig -- check` against the live sandbox in a second terminal (pass `--config=playground/agnosticui.config.json` to match the playground's AgnosticUI `--ag-*` token scale, or `--auto-tokens` in external repos without a config file):
+   With `http://localhost:5173` running in Terminal 1, run `npm run uirig -- check` against the live sandbox in a second terminal (pass `--auto-tokens` to scrape the playground's live `--ag-*` CSS variables, or `--tokens-path=<path>` to point at a custom token file):
 
    ```bash
    # 1. Human-readable terminal report with inline [file:line], Shadow DOM host, and A2UI attribution
-   npm run uirig -- check http://localhost:5173 --config=playground/agnosticui.config.json --verbose
+   npm run uirig -- check http://localhost:5173 --auto-tokens --verbose
 
    # 2. Structured JSON report with source-map file:line, A2UI attribution, and unifiedDiff
-   npm run uirig -- check http://localhost:5173 --config=playground/agnosticui.config.json --json
+   npm run uirig -- check http://localhost:5173 --json
 
    # 3. Multi-theme Light & Dark contrast parity matrix
-   npm run uirig -- check http://localhost:5173 --config=playground/agnosticui.config.json --themes light,dark
+   npm run uirig -- check http://localhost:5173 --themes light,dark
 
    # 4. Preview and apply deterministic auto-fixes (e.g., replacing href="javascript:void(0)")
    #    Note: Applying --fix edits playground/index.html on disk (triggering Vite live-reload in Terminal 1);
    #    run `git checkout -- playground/index.html` afterward to restore the deliberate trap.
-   npm run uirig -- check http://localhost:5173 --config=playground/agnosticui.config.json --fix
+   npm run uirig -- check http://localhost:5173 --fix
    ```
 
 3. **Edit & watch Vite live-reload self-heal down to `0 PASS`:**
