@@ -438,7 +438,6 @@ export function evaluatePosixExitCode(results: Array<IViewportAuditReport>): Pos
   return 0;
 }
 
-
 export async function auditViewportInParallel(
   browser: Browser,
   url: string,
@@ -509,6 +508,80 @@ export async function auditViewportInParallel(
 
   const runTokens = (!only || only === 'tokens') && effectiveTokenScale !== null;
 
+  const runDarkModeTrack = async (): Promise<Array<IDarkModeViolation>> => {
+    if (!runDarkMode) {
+      return new Array<IDarkModeViolation>();
+    }
+    const context = await browser.newContext(contextOptions);
+    try {
+      const page = await context.newPage();
+      await page.goto(url, { waitUntil: 'networkidle' });
+      if (themeName) {
+        await page.evaluate((t: string) => {
+          document.documentElement.setAttribute('data-theme', t);
+        }, themeName);
+      }
+      return await runDarkModeAudit(page, {
+        maxSurfaceLuminance:
+          budgets.darkModeMaxSurfaceLuminance ?? DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
+        ignoreRules,
+        allowedColors: effectiveTokenScale?.colors ?? new Array<string>(),
+        selectors,
+      });
+    } finally {
+      await context.close();
+    }
+  };
+
+  const runStressTrack = async (): Promise<Array<IGeometricViolation>> => {
+    if (!runStress) {
+      return new Array<IGeometricViolation>();
+    }
+    const context = await browser.newContext(contextOptions);
+    try {
+      const page = await context.newPage();
+      await page.goto(url, { waitUntil: 'networkidle' });
+      if (themeName) {
+        await page.evaluate((t: string) => {
+          document.documentElement.setAttribute('data-theme', t);
+        }, themeName);
+      }
+      return await runGeometricStressAudit(page, {
+        overflowPixelTolerance: budgets.overflowPixelTolerance,
+        touchTargetMinSpacingPx: budgets.touchTargetMinSpacingPx,
+        ignoreRules,
+        selectors,
+      });
+    } finally {
+      await context.close();
+    }
+  };
+  const runClsTrack = async (): Promise<IClsEvaluationResult> => {
+    if (!runCls) {
+      return { maxSessionCls: 0, violation: null };
+    }
+    const context = await browser.newContext(contextOptions);
+    try {
+      const page = await context.newPage();
+      await prepareClsObserver(page);
+      await page.goto(url, { waitUntil: 'networkidle' });
+      if (themeName) {
+        await page.evaluate((t: string) => {
+          document.documentElement.setAttribute('data-theme', t);
+        }, themeName);
+      }
+      return await collectPageCls(page, budgets.clsMaxLimit);
+    } finally {
+      await context.close();
+    }
+  };
+
+  const [darkModeViolations, stressViolations, clsEvaluation] = await Promise.all([
+    runDarkModeTrack(),
+    runStressTrack(),
+    runClsTrack(),
+  ]);
+
   const runReadOnlyTrack = async (): Promise<{
     matchedSelectorCount?: number;
     spatialBrief?: string;
@@ -519,13 +592,16 @@ export async function auditViewportInParallel(
     domViolations: Array<IDomIntegrityViolation>;
     runtimeErrors: Array<IRuntimeErrorViolation>;
   }> => {
+    const hasMutatingViolations =
+      darkModeViolations.length > 0 || stressViolations.length > 0;
     if (
       !runTokens &&
       !runContrast &&
       !runDom &&
       !runRuntimeCapture &&
       !hasSelectors &&
-      !includeSpatialBrief
+      !includeSpatialBrief &&
+      !hasMutatingViolations
     ) {
       return {
         tokenViolations: new Array<ITokenViolation>(),
@@ -590,6 +666,7 @@ export async function auditViewportInParallel(
             (spatialBrief || '(none)')
         );
       }
+
       const tokenViolations =
         runTokens && effectiveTokenScale !== null
           ? await crawlPageTokens(page, effectiveTokenScale, ignoreRules, selectors)
@@ -616,6 +693,8 @@ export async function auditViewportInParallel(
       const candidateSelectors = [
         ...tokenViolations.map((v) => v.selector),
         ...contrastViolations.map((v) => v.selector),
+        ...darkModeViolations.map((v) => v.selector),
+        ...stressViolations.map((v) => v.selector),
         ...domViolations.map((v) => v.selector),
       ];
       let a2uiAttributions: Record<string, IA2uiAttribution | null> | undefined;
@@ -644,81 +723,7 @@ export async function auditViewportInParallel(
     }
   };
 
-  const runDarkModeTrack = async (): Promise<Array<IDarkModeViolation>> => {
-    if (!runDarkMode) {
-      return new Array<IDarkModeViolation>();
-    }
-    const context = await browser.newContext(contextOptions);
-    try {
-      const page = await context.newPage();
-      await page.goto(url, { waitUntil: 'networkidle' });
-      if (themeName) {
-        await page.evaluate((t: string) => {
-          document.documentElement.setAttribute('data-theme', t);
-        }, themeName);
-      }
-      return await runDarkModeAudit(page, {
-        maxSurfaceLuminance:
-          budgets.darkModeMaxSurfaceLuminance ?? DEFAULT_DARK_MODE_MAX_SURFACE_LUMINANCE,
-        ignoreRules,
-        allowedColors: effectiveTokenScale?.colors ?? new Array<string>(),
-        selectors,
-      });
-    } finally {
-      await context.close();
-    }
-  };
-
-  const runStressTrack = async (): Promise<Array<IGeometricViolation>> => {
-    if (!runStress) {
-      return new Array<IGeometricViolation>();
-    }
-    const context = await browser.newContext(contextOptions);
-    try {
-      const page = await context.newPage();
-      await page.goto(url, { waitUntil: 'networkidle' });
-      if (themeName) {
-        await page.evaluate((t: string) => {
-          document.documentElement.setAttribute('data-theme', t);
-        }, themeName);
-      }
-      return await runGeometricStressAudit(page, {
-        overflowPixelTolerance: budgets.overflowPixelTolerance,
-        touchTargetMinSpacingPx: budgets.touchTargetMinSpacingPx,
-        ignoreRules,
-        selectors,
-      });
-    } finally {
-      await context.close();
-    }
-  };
-
-  const runClsTrack = async (): Promise<IClsEvaluationResult> => {
-    if (!runCls) {
-      return { maxSessionCls: 0, violation: null };
-    }
-    const context = await browser.newContext(contextOptions);
-    try {
-      const page = await context.newPage();
-      await prepareClsObserver(page);
-      await page.goto(url, { waitUntil: 'networkidle' });
-      if (themeName) {
-        await page.evaluate((t: string) => {
-          document.documentElement.setAttribute('data-theme', t);
-        }, themeName);
-      }
-      return await collectPageCls(page, budgets.clsMaxLimit);
-    } finally {
-      await context.close();
-    }
-  };
-
-  const [readOnlyResult, darkModeViolations, stressViolations, clsEvaluation] = await Promise.all([
-    runReadOnlyTrack(),
-    runDarkModeTrack(),
-    runStressTrack(),
-    runClsTrack(),
-  ]);
+  const readOnlyResult = await runReadOnlyTrack();
 
   return {
     url,
@@ -748,6 +753,7 @@ export async function auditViewportInParallel(
     runtimeErrors: readOnlyResult.runtimeErrors,
   };
 }
+
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
 ): Promise<ICheckExecutionReport> {

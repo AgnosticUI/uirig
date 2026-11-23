@@ -3,10 +3,12 @@
  * Human-readable terminal audit report formatter for `uirig`.
  * Ports and generalizes the playground's structured multi-engine check report
  * into core CLI runs so developers can inspect matched selector counts, exact failing
- * selectors, Shadow DOM hosts, measured deltas, and suggested tokens directly in the terminal.
+ * selectors, source-map `file:line` locations, Shadow DOM hosts, A2UI component IDs,
+ * measured deltas, and suggested tokens directly in the terminal.
  */
 
 import type { ICheckExecutionReport, IViewportAuditReport } from '../commands/check.js';
+import type { IA2uiAttribution, ISourceLocation } from '../interfaces/locator.js';
 import { paint } from './formatter.js';
 
 export interface IConsoleReportOptions {
@@ -16,6 +18,26 @@ export interface IConsoleReportOptions {
 
 function formatCountBadge(count: number): string {
   return count > 0 ? paint(`${count} FAIL`, 'bold', 'red') : paint('0 PASS', 'bold', 'green');
+}
+
+function formatViolationContext(options: {
+  sourceLocation?: ISourceLocation | null;
+  hostComponent?: string | null;
+  a2ui?: IA2uiAttribution | null;
+}): string {
+  const parts: string[] = [];
+  if (options.sourceLocation?.sourceFile && options.sourceLocation.lineNumber !== null) {
+    parts.push(`${options.sourceLocation.sourceFile}:${options.sourceLocation.lineNumber}`);
+  }
+  if (options.hostComponent) {
+    parts.push(`in <${options.hostComponent}>`);
+  }
+  if (options.a2ui) {
+    const surface = options.a2ui.surfaceId ?? 'surface';
+    const comp = options.a2ui.a2uiComponentId ?? options.a2ui.a2uiComponentType ?? 'component';
+    parts.push(`a2ui: ${surface}/${comp}`);
+  }
+  return parts.length > 0 ? ` [${paint(parts.join(' | '), 'cyan')}]` : '';
 }
 
 /**
@@ -30,6 +52,8 @@ export function formatViewportConsoleSection(
   const darkViolations = vpReport.darkModeViolations ?? [];
   const domViolations = vpReport.domViolations ?? [];
   const runtimeErrors = vpReport.runtimeErrors ?? [];
+  const sourceMap = vpReport.sourceLocations ?? {};
+  const a2uiMap = vpReport.a2uiAttributions ?? {};
 
   const themeTag = vpReport.theme ? ` [theme: ${vpReport.theme}]` : '';
   const viewportHeader = paint(
@@ -62,15 +86,19 @@ export function formatViewportConsoleSection(
   if (verbose) {
     for (const v of vpReport.tokenViolations) {
       const shadowTag = v.inShadowDom ? paint(' [ShadowDOM]', 'magenta') : '';
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+      });
       lines.push(
         `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
           v.property,
           'cyan'
-        )}: ${paint(v.actualValue, 'bold', 'red')})${shadowTag}`
+        )}: ${paint(v.actualValue, 'bold', 'red')})${shadowTag}${ctx}`
       );
     }
   }
-
   // 2. Rendered Luminance Contrast (`contrast`)
   lines.push(
     `${paint('2. [contrast]', 'bold', 'cyan')}  Contrast Violations     : ${formatCountBadge(
@@ -82,12 +110,17 @@ export function formatViewportConsoleSection(
       const tokenHint = v.suggestedToken
         ? paint(` -> try ${v.suggestedToken}`, 'green')
         : '';
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+      });
       lines.push(
         `   ${paint('•', 'red')} ${paint(v.selector, 'yellow')} (${paint(
           `${v.contrastRatio.toFixed(2)}:1 < 4.5:1`,
           'bold',
           'red'
-        )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'white')})${tokenHint}`
+        )} | ${paint(`${v.foregroundRgb} on ${v.backgroundRgb}`, 'white')})${tokenHint}${ctx}`
       );
     }
   }
@@ -104,11 +137,16 @@ export function formatViewportConsoleSection(
         v.violationType === 'stranded_light_surface'
           ? `luminance ${v.relativeLuminance?.toFixed(2) ?? 'high'} (${v.backgroundRgb})`
           : `${v.contrastRatio?.toFixed(2) ?? '0.00'}:1 < 4.5:1 (${v.foregroundRgb ?? 'text'} on ${v.backgroundRgb})`;
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+      });
       lines.push(
         `   ${paint('•', 'red')} [${paint(v.violationType, 'cyan')}] ${paint(
           v.selector,
           'yellow'
-        )} (${paint(detail, 'bold', 'red')})`
+        )} (${paint(detail, 'bold', 'red')})${ctx}`
       );
     }
   }
@@ -122,11 +160,16 @@ export function formatViewportConsoleSection(
   if (verbose) {
     for (const v of vpReport.stressViolations) {
       const related = v.relatedSelector ? ` -> ${paint(v.relatedSelector, 'yellow')}` : '';
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+      });
       lines.push(
         `   ${paint('•', 'red')} [${paint(v.violationType, 'cyan')}] ${paint(
           v.selector,
           'yellow'
-        )}${related} (${paint(`+${v.measuredLeakPixels}`, 'bold', 'red')})`
+        )}${related} (${paint(`+${v.measuredLeakPixels}`, 'bold', 'red')})${ctx}`
       );
     }
   }
@@ -157,11 +200,16 @@ export function formatViewportConsoleSection(
   );
   if (verbose) {
     for (const v of domViolations) {
+      const ctx = formatViolationContext({
+        sourceLocation: sourceMap[v.selector] ?? null,
+        hostComponent: v.hostComponent,
+        a2ui: a2uiMap[v.selector] ?? null,
+      });
       lines.push(
         `   ${paint('•', 'red')} [${paint(v.rule, 'cyan')}] ${paint(
           v.selector,
           'yellow'
-        )} (${paint(v.detail, 'white')})`
+        )} (${paint(v.detail, 'white')})${ctx}`
       );
     }
   }

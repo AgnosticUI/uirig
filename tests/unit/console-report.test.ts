@@ -5,7 +5,8 @@
  * 1. Compact summary rendering (`verbose: false`) shows per-engine pass/fail counts
  *    and the `--verbose` hint without flooding the terminal with individual selectors.
  * 2. Verbose rendering (`verbose: true`) prints every failing selector, ShadowDOM tag,
- *    contrast ratio, suggested token, stress leak, CLS element, DOM rule, and runtime error.
+ *    source-map `file:line` location, host component, A2UI attribution, contrast ratio,
+ *    suggested token, stress leak, CLS element, DOM rule, and runtime error.
  * 3. Clean passing reports (`exitCode: 0`) omit the `--verbose` tip.
  * 4. Scoped `--selectors` runs display `Selectors matched on page: <N>` before the
  *    pass/fail summary and warn clearly when `0` elements match.
@@ -35,6 +36,19 @@ function createSampleFailingReport(): ICheckExecutionReport {
       {
         url: 'http://localhost:5173',
         viewport: { name: 'desktop', width: 1440, height: 900 },
+        sourceLocations: {
+          'p.muted-note': { sourceFile: 'src/styles/card.css', lineNumber: 42, columnNumber: 3 },
+          'input#email-field': { sourceFile: 'src/components/Form.tsx', lineNumber: 18, columnNumber: 7 },
+        },
+        a2uiAttributions: {
+          'input#email-field': {
+            surfaceId: 'support-ticket',
+            a2uiComponentId: 'email_input',
+            a2uiComponentType: 'TextField',
+            catalogId: 'agnosticui-v1',
+            wirePath: '/components/2',
+          },
+        },
         tokenViolations: [
           {
             selector: 'ag-button#cta >> shadow-root >> button',
@@ -104,7 +118,6 @@ function createSampleFailingReport(): ICheckExecutionReport {
     ],
   };
 }
-
 describe('console-report.ts — Structured Multi-Engine Console Report Formatter', () => {
   const originalNoColor = process.env.NO_COLOR;
 
@@ -135,20 +148,22 @@ describe('console-report.ts — Structured Multi-Engine Console Report Formatter
     expect(output).not.toContain('span#overflow-label');
   });
 
-  it('renders full selector paths, ShadowDOM tags, and token hints when verbose is true', () => {
+  it('renders full selector paths, ShadowDOM tags, source locations, A2UI IDs, and token hints when verbose is true', () => {
     process.env.NO_COLOR = '1';
 
     const output = formatConsoleAuditReport(createSampleFailingReport(), { verbose: true });
 
     expect(output).toContain('ag-button#cta >> shadow-root >> button');
-    expect(output).toContain('[ShadowDOM]');
+    expect(output).toContain('[ShadowDOM] [in <ag-button>]');
     expect(output).toContain('p.muted-note (2.54:1 < 4.5:1');
-    expect(output).toContain('-> try rgb(17, 24, 39)');
+    expect(output).toContain('-> try rgb(17, 24, 39) [src/styles/card.css:42]');
     expect(output).toContain('[stranded_light_surface] div.white-card');
     expect(output).toContain('[container_overflow] span#overflow-label -> div#overflow-box (+42)');
     expect(output).toContain('Shifting elements: img.hero-banner');
     expect(output).toContain('[pageerror] ReferenceError: missingFn is not defined');
-    expect(output).toContain('[unlabeled_control] input#email-field');
+    expect(output).toContain(
+      '[unlabeled_control] input#email-field (Input uses placeholder without an accessible label) [src/components/Form.tsx:18 | a2ui: support-ticket/email_input]'
+    );
     expect(output).not.toContain('Re-run with --verbose');
   });
 
@@ -191,7 +206,6 @@ describe('console-report.ts — Structured Multi-Engine Console Report Formatter
     expect(output).toContain('5. [cls]       Max Session CLS Score   : 0.01 -> PASS');
     expect(output).not.toContain('Re-run with --verbose');
   });
-
   it('prints matched selector count before engine summary and warns when 0 elements match', () => {
     process.env.NO_COLOR = '1';
 

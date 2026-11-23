@@ -971,5 +971,65 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       }
     }
   });
+  it('resolves sourceLocations for dark-mode and stress violations in --verbose console output', async () => {
+    const originalNoColor = process.env.NO_COLOR;
+    process.env.NO_COLOR = '1';
+
+    const htmlPath = join(tempDir, 'source-loc-stress-dark.html');
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background: #0f172a; color: #f8fafc; }
+            .stranded-card { width: 320px; height: 120px; padding: 16px; background: #ffffff; color: #111827; }
+            .cramped-box { width: 100px; padding: 8px; background: #1e293b; color: #f8fafc; }
+            .nowrap-label { display: inline-block; white-space: nowrap; }
+          </style>
+        </head>
+        <body>
+          <div class="stranded-card" data-source-loc="src/components/Card.tsx:14">Stranded light card</div>
+          <div class="cramped-box">
+            <span class="nowrap-label" data-source-loc="src/components/Badge.tsx:27">Expanding Label</span>
+          </div>
+        </body>
+      </html>`,
+      'utf8'
+    );
+
+    const capturedChunks: string[] = [];
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array): boolean => {
+        capturedChunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
+        return true;
+      });
+
+    try {
+      const report = await executeCheckCommand({
+        target: './source-loc-stress-dark.html',
+        cwd: tempDir,
+        verbose: true,
+        viewportsOverride: [{ name: 'desktop', width: 1280, height: 800 }],
+        headless: true,
+        reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+      });
+
+      expect(report.exitCode).toBe(2);
+      const consoleOut = capturedChunks.join('');
+      expect(consoleOut).toContain('[stranded_light_surface] div.stranded-card');
+      expect(consoleOut).toContain('[src/components/Card.tsx:14]');
+      expect(consoleOut).toContain('[container_overflow] span.nowrap-label -> div.cramped-box');
+      expect(consoleOut).toContain('[src/components/Badge.tsx:27]');
+    } finally {
+      stdoutSpy.mockRestore();
+      if (originalNoColor === undefined) {
+        delete process.env.NO_COLOR;
+      } else {
+        process.env.NO_COLOR = originalNoColor;
+      }
+    }
+  });
 
 });
