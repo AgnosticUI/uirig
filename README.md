@@ -314,20 +314,54 @@ npx @rlevin/uirig check --changed --config=uirig.config.json
 
 ### 5. Local Development & Playground
 
+`uirig` ships with a self-contained **Vite + Lit + AgnosticUI** spot-checking sandbox in `playground/` that renders live open-`ShadowRoot` Web Components (`<ag-card>`, `<ag-input>`, `<ag-button>`) alongside deliberate adversarial traps and an `<a2ui-surface>` fixture:
+
+- **Section 1 (`#baseline-card`)** — Compliant AgnosticUI Lit Web Components bound to `--ag-*` light/dark semantic tokens (`0 PASS`).
+- **Section 2 (`#adversarial-traps`)** — Deliberate token-drift and contrast trap styled in source-mapped `playground/src/traps.css` (`2.54:1` contrast) plus a cramped `120px` geometric overflow trap (`#overflow-trap-box`).
+- **Section 3 (`#a2ui-ax-traps`)** — `<a2ui-surface id="playground-support-ticket">` generative ticket drawer containing an unlabeled icon button (`unlabeled_control` + `ax_empty_name`), a `data-source-loc`-attributed `javascript:void(0)` link (`unsafe_uri`), and a post-paint un-sized banner (`#cls-trap-slot`) that triggers measurable CLS (`> 0.1`).
+
+#### 3-Step Hands-On Walkthrough
+
+1. **Start the live playground & spot-check runner (Terminal 1):**
+
+   ```bash
+   npm run playground:dev
+   ```
+
+   Vite serves the sandbox at `http://localhost:5173` and automatically runs all 6 core `uirig` validation engines + v0.3.0 diagnostics (`file:line`, `<ag-*>` Shadow DOM host, `a2ui` component IDs, `suggestedToken`, remediation hints, and `unifiedDiff` previews) in headless Chromium on boot.
+
+2. **Inspect structured JSON attribution, multi-theme parity, and auto-fix patches (Terminal 2):**
+
+   With `http://localhost:5173` running in Terminal 1, run `uirig` directly against the live sandbox in a second terminal:
+
+   ```bash
+   # 1. Structured JSON report with CSS source-map file:line, A2UI attribution, and unifiedDiff
+   npx uirig verify http://localhost:5173 --json
+
+   # 2. Multi-theme Light & Dark contrast parity matrix
+   npx uirig matrix http://localhost:5173 --themes light,dark
+
+   # 3. Preview and apply deterministic auto-fixes (e.g., replacing href="javascript:void(0)")
+   npx uirig verify http://localhost:5173 --fix
+   ```
+
+3. **Edit & watch Vite live-reload self-heal down to `0 PASS`:**
+
+   Open `playground/src/traps.css` or `playground/index.html` and fix any trap (for example, bind `#contrast-token-trap` to `--ag-background-secondary` / `--ag-text-primary`, add `aria-label="Close ticket"` to `#a2ui-unlabeled-close-btn`, or widen `#overflow-trap-box`). Every file save triggers Vite HMR (Hot Module Replacement) and automatically re-runs the spot-check report in Terminal 1 so you can watch each engine flip from `FAIL` to `0 PASS`.
+
+#### Playground Scripts Reference
+
 ```bash
-# Build, typecheck, and run the full unit & MCP integration test suite
-npm run typecheck:all && npm test
+# Run core library unit tests (no Chromium required)
+npm test
 
-# Build and launch the interactive MCP Inspector UI against local dist/index.js
-npm run build && npx @modelcontextprotocol/inspector node dist/index.js mcp
-# Tip: When auditing external URLs in MCP Inspector from the uirig repo root, pass
-# `"cwd": "/tmp"` in tool arguments to bypass the repo's local uirig.config.json.
-
-# Start the interactive Vite + Lit playground
+# Start the local Vite + AgnosticUI playground with automatic live 6-engine + v0.3.0 spot-checking on boot and file save
 npm run playground:dev
 
-# Run end-to-end playground verification (headless or headed)
+# Run the end-to-end 6-engine + v0.3.0 playground integration test in headless Chromium
 npm run playground:test
+
+# Run the live 6-engine + v0.3.0 playground verification in a visible (headed) Chromium browser window
 npm run playground:test:headed
 ```
 

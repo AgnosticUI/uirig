@@ -53,6 +53,19 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
     expect(htmlSource).not.toMatch(/#contrast-token-trap\s*\{/);
   });
 
+  it('==> Should document the 3-step hands-on playground walkthrough in README.md', () => {
+    const readmePath = resolve(process.cwd(), 'README.md');
+    const readmeSource = readFileSync(readmePath, 'utf8');
+
+    expect(readmeSource).toContain('### 5. Local Development & Playground');
+    expect(readmeSource).toContain('npm run playground:dev');
+    expect(readmeSource).toContain('http://localhost:5173');
+    expect(readmeSource).toContain('playground/src/traps.css');
+    expect(readmeSource).toContain('npx uirig verify http://localhost:5173 --json');
+    expect(readmeSource).toContain('npx uirig matrix http://localhost:5173 --themes light,dark');
+    expect(readmeSource).toContain('npx uirig verify http://localhost:5173 --fix');
+  });
+
   it('==> Should import ag-tokens.css and ag-tokens-dark.css in playground/src/main.ts', () => {
     const mainPath = resolve(process.cwd(), 'playground/src/main.ts');
     const mainSource = readFileSync(mainPath, 'utf8');
