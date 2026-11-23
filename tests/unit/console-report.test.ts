@@ -47,6 +47,7 @@ function createSampleFailingReport(): ICheckExecutionReport {
             a2uiComponentType: 'TextField',
             catalogId: 'agnosticui-v1',
             wirePath: '/components/2',
+            suggestedPatch: null,
           },
         },
         tokenViolations: [
