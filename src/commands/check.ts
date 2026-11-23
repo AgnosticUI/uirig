@@ -325,7 +325,6 @@ export function loadUirigConfig(
     ignore: ignoreRules,
   };
 }
-
 export function resolveExecutionConfig(
   options: ICheckCommandOptions,
   cwd: string
@@ -438,6 +437,7 @@ export function evaluatePosixExitCode(results: Array<IViewportAuditReport>): Pos
   }
   return 0;
 }
+
 
 export async function auditViewportInParallel(
   browser: Browser,
@@ -590,7 +590,6 @@ export async function auditViewportInParallel(
             (spatialBrief || '(none)')
         );
       }
-
       const tokenViolations =
         runTokens && effectiveTokenScale !== null
           ? await crawlPageTokens(page, effectiveTokenScale, ignoreRules, selectors)
@@ -852,7 +851,6 @@ export async function executeCheckCommand(
     const softTokenEngines = new Set<AuditToolName>(['contrast', 'dark-mode']);
     let tokenScale: ITokenScaleConfig | null = null;
     let shouldAutoDiscoverRootTokens = false;
-
     if (options.tokenScaleOverride) {
       tokenScale = options.tokenScaleOverride;
     } else if (options.only && tokenAgnosticEngines.has(options.only)) {
@@ -970,7 +968,6 @@ export async function executeCheckCommand(
 
     let results = await runMatrixSweep();
     let appliedFixes = new Array<IDeterministicAutoFix>();
-
     if (options.fix && evaluatePosixExitCode(results) !== 0) {
       const candidateFixes = new Array<IDeterministicAutoFix>();
       for (const vpReport of results) {
@@ -1110,13 +1107,15 @@ export async function executeCheckCommand(
         if (options.spatialBrief) {
           for (const vpReport of executionReport.results) {
             if (vpReport.spatialBrief !== undefined) {
+              const themeTag = vpReport.theme ? ' [theme: ' + vpReport.theme + ']' : '';
               const vpTag = paint(
                 vpReport.viewport.name +
                   ' (' +
                   vpReport.viewport.width +
                   'x' +
                   vpReport.viewport.height +
-                  ')',
+                  ')' +
+                  themeTag,
                 'bold',
                 'cyan'
               );

@@ -12,8 +12,8 @@
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { formatConsoleAuditReport } from '../../src/utils/console-report.js';
-import type { ICheckExecutionReport } from '../../src/commands/check.js';
+import { formatViewportConsoleSection, formatConsoleAuditReport } from '../../src/utils/console-report.js';
+import type { ICheckExecutionReport, IViewportAuditReport } from '../../src/commands/check.js';
 
 function createSampleFailingReport(): ICheckExecutionReport {
   return {
@@ -253,5 +253,28 @@ describe('console-report.ts — Structured Multi-Engine Console Report Formatter
     expect(zeroOut).toContain(
       'Selectors matched on page (.nonexistent-selector): 0 (Warning: no elements matched selector)'
     );
+  });
+});
+
+describe('formatViewportConsoleSection theme label', () => {
+  it('appends [theme: <name>] to the Target header when theme is provided and omits it when undefined', () => {
+    const baseReport: IViewportAuditReport = {
+      url: 'http://localhost:5173',
+      viewport: { name: 'mobile', width: 375, height: 812 },
+      tokenViolations: [],
+      contrastViolations: [],
+      darkModeViolations: [],
+      stressViolations: [],
+      clsEvaluation: { maxSessionCls: 0, violation: null },
+      domViolations: [],
+      runtimeErrors: [],
+    };
+
+    const unthemedHeader = formatViewportConsoleSection(baseReport, false)[0] ?? '';
+    expect(unthemedHeader).toContain('Target: http://localhost:5173 @ mobile (375x812)');
+    expect(unthemedHeader).not.toContain('[theme:');
+
+    const darkHeader = formatViewportConsoleSection({ ...baseReport, theme: 'dark' }, false)[0] ?? '';
+    expect(darkHeader).toContain('Target: http://localhost:5173 @ mobile (375x812) [theme: dark]');
   });
 });

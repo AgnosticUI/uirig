@@ -3,7 +3,7 @@
  * 1-to-1 unit & integration tests for `src/commands/check.ts`.
  * Covers configuration loading, token scale validation, POSIX exit code resolution,
  * zero-config local `.html` file execution, `--selectors` component scoping & matched
- * element counts, and concurrent Playwright runs.
+ * element counts, multi-theme labels, and concurrent Playwright runs.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -110,7 +110,6 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(scale.colors).toContain('rgb(255, 255, 255)');
     expect(scale.spacing).toEqual(['0px', '8px', '16px']);
   });
-
   it('throws descriptive ERR_CONFIG_MISSING and ERR_CONFIG_SCHEMA errors on invalid configs', () => {
     const missingFile = join(tempDir, 'nonexistent.json');
     expect(() => loadUirigConfig(missingFile)).toThrow(/ERR_CONFIG_MISSING/);
@@ -179,7 +178,7 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(evaluatePosixExitCode([clsFail])).toBe(2);
   });
 
-    it('runs zero-config mode against a standalone local .html file with no uirig.config.json', async () => {
+  it('runs zero-config mode against a standalone local .html file with no uirig.config.json', async () => {
     const htmlPath = join(tempDir, 'standalone.html');
     writeFileSync(
       htmlPath,
@@ -216,7 +215,7 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.results.at(0)?.url).toBe('./standalone.html');
   });
 
-  it('executes isolated Playwright contexts concurrently and returns exitCode 0 for a compliant page', async () => {
+    it('executes isolated Playwright contexts concurrently and returns exitCode 0 for a compliant page', async () => {
     const compliantHtml = `<!DOCTYPE html>
       <html>
         <head>
@@ -311,7 +310,6 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalDarkModeViolations).toBeGreaterThan(0);
     expect(report.summary.totalContrastViolations).toBe(0);
   });
-
   it('detects structural overflow in stress track without polluting read-only audits and returns exitCode 2', async () => {
     const overflowHtml = `<!DOCTYPE html>
       <html>
@@ -516,7 +514,7 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalTokenViolations).toBe(0);
   });
 
-    it('catches structural DOM hallucinations via --only=dom and returns exitCode 1', async () => {
+  it('catches structural DOM hallucinations via --only=dom and returns exitCode 1', async () => {
     const brokenDomHtml = `<!DOCTYPE html>
       <html>
         <body>
@@ -575,7 +573,6 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       'Cannot read properties of undefined'
     );
   });
-
   it('scopes element-level audits to options.selectors, reports matchedSelectorCount, and rejects malformed selectors', async () => {
     const mixedPageHtml = `<!DOCTYPE html>
       <html>
@@ -694,12 +691,6 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       await pool.dispose();
     }
   });
-
-  /**
-   * GIVEN a uirig.config.json whose tokensPath does not exist on disk
-   * WHEN executeCheckCommand runs with only: 'dom' (or 'stress' / 'cls')
-   * THEN it skips loading tokensPath completely and succeeds without throwing ERR_TOKENS_MISSING
-   */
   it('skips loading tokensPath when only is stress, cls, or dom', async () => {
     const htmlPath = join(tempDir, 'page.html');
     writeFileSync(
@@ -736,11 +727,6 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     }
   });
 
-  /**
-   * GIVEN a uirig.config.json whose tokensPath does not exist on disk
-   * WHEN executeCheckCommand runs with only: 'contrast' (or 'dark-mode') and an explicit target
-   * THEN it logs a warning to stderr and gracefully degrades with tokenScale = null
-   */
   it('warns to stderr and falls back to null when tokensPath is missing for contrast or dark-mode with explicit target', async () => {
     const htmlPath = join(tempDir, 'card.html');
     writeFileSync(
@@ -795,11 +781,6 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     }
   });
 
-  /**
-   * GIVEN a uirig.config.json whose tokensPath does not exist on disk
-   * WHEN executeCheckCommand runs with tokens-dependent or un-targeted workspace modes
-   * THEN it still rejects with ERR_TOKENS_MISSING
-   */
   it.each([
     { label: 'only is tokens with explicit target', options: { only: 'tokens' as const, target: 'http://localhost:3000' } },
     { label: 'full check (only is undefined)', options: { only: undefined, target: 'http://localhost:3000' } },
@@ -831,7 +812,6 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       })
     ).rejects.toThrow(/ERR_TOKENS_MISSING/);
   });
-
   it('populates suggestedToken from live :root CSS variables when autoTokens is enabled with zero config files', async () => {
     const htmlPath = join(tempDir, 'auto-tokens-hero.html');
     writeFileSync(
@@ -925,104 +905,71 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
     });
 
-    // Explicit tokensPath does NOT include rgb(37, 99, 235), so tokens engine flags drift
     expect(report.exitCode).toBe(1);
     expect(report.summary.totalTokenViolations).toBeGreaterThan(0);
   });
-  it('auto-discovers :root CSS variables when autoTokens is true and populates suggestedToken with zero config', async () => {
-    const htmlPath = join(tempDir, 'auto-tokens-hero.html');
+  
+  it('labels each viewport stanza with its active theme when options.themes is provided', async () => {
+    const originalNoColor = process.env.NO_COLOR;
+    process.env.NO_COLOR = '1';
+
+    const htmlPath = join(tempDir, 'multi-theme.html');
     writeFileSync(
       htmlPath,
       `<!DOCTYPE html>
       <html>
         <head>
           <style>
-            :root {
-              --color-ink-strong: #0f172a;
-              --color-surface: #ffffff;
-              --space-md: 16px;
-              --text-base: 16px;
-            }
-            body { margin: 0; padding: 16px; background: #ffffff; color: #0f172a; font-size: 16px; }
-            p.muted { margin: 0; font-size: 16px; color: rgb(156, 163, 175); }
+            :root { --bg: #ffffff; --fg: #111827; }
+            :root[data-theme="dark"] { --bg: #0f172a; --fg: #f8fafc; }
+            body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); }
+            main { padding: 16px; }
           </style>
         </head>
-        <body>
-          <p class="muted">Low contrast subtitle</p>
-        </body>
+        <body><main><h1>Multi-Theme Check</h1></main></body>
       </html>`,
       'utf8'
     );
 
-    const report = await executeCheckCommand({
-      target: './auto-tokens-hero.html',
-      cwd: tempDir,
-      only: 'contrast',
-      autoTokens: true,
-      headless: true,
-      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
-    });
+    const capturedChunks: string[] = [];
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array): boolean => {
+        capturedChunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
+        return true;
+      });
 
-    expect(report.exitCode).toBe(1);
-    const violation = report.results.at(0)?.contrastViolations.at(0);
-    expect(violation).toBeDefined();
-    expect(violation?.suggestedToken).toBe('rgb(15, 23, 42)');
-  });
+    try {
+      const report = await executeCheckCommand({
+        target: './multi-theme.html',
+        cwd: tempDir,
+        themes: ['light', 'dark'],
+        spatialBrief: true,
+        headless: true,
+        reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+      });
 
-  it('gives explicit tokensPath precedence over autoTokens when both are configured', async () => {
-    const htmlPath = join(tempDir, 'precedence.html');
-    writeFileSync(
-      htmlPath,
-      `<!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            :root { --color-auto: #16a34a; }
-            body { margin: 0; padding: 16px; background: #ffffff; color: #000000; font-size: 16px; }
-          </style>
-        </head>
-        <body><p>Explicit tokensPath wins</p></body>
-      </html>`,
-      'utf8'
-    );
+      expect(report.exitCode).toBe(0);
+      expect(report.results.map((r) => `${r.viewport.name}:${r.theme}`)).toEqual([
+        'mobile:light',
+        'mobile:dark',
+        'desktop:light',
+        'desktop:dark',
+      ]);
 
-    writeFileSync(
-      join(tempDir, 'explicit-tokens.json'),
-      JSON.stringify({
-        colors: ['rgb(255, 255, 255)', 'rgb(0, 0, 0)'],
-        spacing: ['0px', '16px'],
-        fontSizes: ['16px'],
-        radii: ['0px'],
-      }),
-      'utf8'
-    );
-
-    writeFileSync(
-      join(tempDir, 'uirig.config.json'),
-      JSON.stringify({
-        targetUrls: ['./precedence.html'],
-        tokensPath: './explicit-tokens.json',
-        autoTokens: true,
-        thresholdBudgets: {
-          clsMaxLimit: 0.1,
-          overflowPixelTolerance: 2,
-          touchTargetMinSpacingPx: 24,
-        },
-        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
-      }),
-      'utf8'
-    );
-
-    const report = await executeCheckCommand({
-      cwd: tempDir,
-      autoTokens: true,
-      only: 'tokens',
-      headless: true,
-      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
-    });
-
-    expect(report.exitCode).toBe(0);
-    expect(report.summary.totalTokenViolations).toBe(0);
+      const consoleOut = capturedChunks.join('');
+      expect(consoleOut).toContain('Target: ./multi-theme.html @ mobile (375x812) [theme: light]');
+      expect(consoleOut).toContain('Target: ./multi-theme.html @ mobile (375x812) [theme: dark]');
+      expect(consoleOut).toContain('Spatial Brief [mobile (375x812) [theme: light]]:');
+      expect(consoleOut).toContain('Spatial Brief [mobile (375x812) [theme: dark]]:');
+    } finally {
+      stdoutSpy.mockRestore();
+      if (originalNoColor === undefined) {
+        delete process.env.NO_COLOR;
+      } else {
+        process.env.NO_COLOR = originalNoColor;
+      }
+    }
   });
 
 });

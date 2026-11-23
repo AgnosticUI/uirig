@@ -19,7 +19,7 @@ function formatCountBadge(count: number): string {
 }
 
 /**
- * Formats a single `(url, viewport)` audit report into a color-coded terminal breakdown
+ * Formats a single `(url, viewport, theme)` audit report into a color-coded terminal breakdown
  * covering matched selector scope counts and all core verification engines
  * (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`, and `runtime`).
  */
@@ -31,8 +31,9 @@ export function formatViewportConsoleSection(
   const domViolations = vpReport.domViolations ?? [];
   const runtimeErrors = vpReport.runtimeErrors ?? [];
 
+  const themeTag = vpReport.theme ? ` [theme: ${vpReport.theme}]` : '';
   const viewportHeader = paint(
-    `Target: ${vpReport.url} @ ${vpReport.viewport.name} (${vpReport.viewport.width}x${vpReport.viewport.height})`,
+    `Target: ${vpReport.url} @ ${vpReport.viewport.name} (${vpReport.viewport.width}x${vpReport.viewport.height})${themeTag}`,
     'bold',
     'white'
   );

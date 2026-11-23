@@ -158,4 +158,27 @@ describe('fs.ts — Markdown PR Comment Reporter', () => {
     expect(diskContent).toContain('## 🛡️ `uirig` UI Verification Gate Report');
     expect(diskContent).toContain('POSIX Exit Code 2');
   });
+
+  it('includes [theme: <name>] in Spatial Brief and Viewport Breakdown headings when theme is set', () => {
+    const base = buildSampleReport(false);
+    const firstResult = base.results[0];
+    if (!firstResult) {
+      throw new Error('Expected firstResult to exist');
+    }
+
+    const themedReport: ICheckExecutionReport = {
+      ...base,
+      results: [
+        {
+          ...firstResult,
+          theme: 'dark',
+          spatialBrief: 'main[0,0 375x812]',
+        },
+      ],
+    };
+
+    const md = formatGithubPrCommentMarkdown(themedReport);
+    expect(md).toContain('- **mobile (375x812) [theme: dark]:** `main[0,0 375x812]`');
+    expect(md).toContain('#### `http://localhost:3000`: **mobile** (375x812) [theme: dark]');
+  });
 });

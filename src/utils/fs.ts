@@ -91,10 +91,11 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
   if (spatialReports.length > 0) {
     lines.push('### 📐 Semantic Spatial Brief', '');
     for (const sr of spatialReports) {
+      const themeTag = sr.theme ? ` [theme: ${escapeMarkdownCell(sr.theme)}]` : '';
       lines.push(
         `- **${escapeMarkdownCell(sr.viewport.name)} (${sr.viewport.width}x${
           sr.viewport.height
-        }):** \`${escapeMarkdownCell(sr.spatialBrief || '(no visible landmarks)')}\``
+        })${themeTag}:** \`${escapeMarkdownCell(sr.spatialBrief || '(no visible landmarks)')}\``
       );
     }
     lines.push('');
@@ -116,10 +117,11 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
     lines.push('### 🔍 Violation Breakdown by Viewport', '');
 
     for (const vpReport of failingViewports) {
+      const themeTag = vpReport.theme ? ` [theme: ${escapeMarkdownCell(vpReport.theme)}]` : '';
       lines.push(
         `#### \`${escapeMarkdownCell(vpReport.url)}\`: **${escapeMarkdownCell(
           vpReport.viewport.name
-        )}** (${vpReport.viewport.width}x${vpReport.viewport.height})`,
+        )}** (${vpReport.viewport.width}x${vpReport.viewport.height})${themeTag}`,
         ''
       );
 
@@ -156,6 +158,7 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
         }
         lines.push('');
       }
+
       if ((vpReport.darkModeViolations?.length ?? 0) > 0) {
         lines.push(
           '**Dark-Mode Theme Parity Failures (`dark-mode`):**',
@@ -199,7 +202,7 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
         lines.push('');
       }
 
-            if (vpReport.clsEvaluation.violation !== null) {
+      if (vpReport.clsEvaluation.violation !== null) {
         const clsV = vpReport.clsEvaluation.violation;
         const selectorsText =
           clsV.offendingSelectors.length > 0
