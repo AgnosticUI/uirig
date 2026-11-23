@@ -19,7 +19,13 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
     expect(htmlSource).toContain('var(--ag-text-primary)');
     expect(htmlSource).toContain('var(--ag-space-4)');
     expect(htmlSource).toContain('var(--ag-space-6)');
+    expect(htmlSource).toContain('var(--ag-space-8)');
     expect(htmlSource).toContain('var(--ag-radius-md)');
+    expect(htmlSource).toMatch(/\.fixture-stack\s*\{[^}]*gap:\s*var\(--ag-space-8\)/s);
+    expect(htmlSource).toMatch(/#a2ui-unlabeled-close-btn\s*\{[^}]*var\(--ag-background-tertiary\)/s);
+    expect(htmlSource).toMatch(/#a2ui-unlabeled-close-btn\s*\{[^}]*var\(--ag-font-size-sm\)/s);
+    expect(htmlSource).toMatch(/#a2ui-source-mapped-link\s*\{[^}]*var\(--ag-primary-text\)/s);
+    expect(htmlSource).toMatch(/#a2ui-source-mapped-link\s*\{[^}]*var\(--ag-font-size-sm\)/s);
     expect(htmlSource).toContain('id="theme-toggle"');
     expect(htmlSource).toContain('<ag-card');
     expect(htmlSource).toContain('<ag-input');
@@ -28,6 +34,25 @@ describe('::: PHASE 4 TASK 4.3: PLAYGROUND BASELINE & ADVERSARIAL FIXTURES :::',
     expect(htmlSource).toContain('id="overflow-trap-box"');
     expect(htmlSource).toContain('id="cls-trap-slot"');
   });
+
+  it('==> Should serve #contrast-token-trap from source-mapped playground/src/traps.css', () => {
+    const trapsCssPath = resolve(process.cwd(), 'playground/src/traps.css');
+    const trapsCssSource = readFileSync(trapsCssPath, 'utf8');
+    const mainTsPath = resolve(process.cwd(), 'playground/src/main.ts');
+    const mainTsSource = readFileSync(mainTsPath, 'utf8');
+    const viteConfigPath = resolve(process.cwd(), 'playground/vite.config.ts');
+    const viteConfigSource = readFileSync(viteConfigPath, 'utf8');
+    const htmlPath = resolve(process.cwd(), 'playground/index.html');
+    const htmlSource = readFileSync(htmlPath, 'utf8');
+
+    expect(trapsCssSource).toContain('#contrast-token-trap');
+    expect(trapsCssSource).toContain('#f3f4f6');
+    expect(trapsCssSource).toContain('#9ca3af');
+    expect(mainTsSource).toContain("import './traps.css';");
+    expect(viteConfigSource).toContain('devSourcemap: true');
+    expect(htmlSource).not.toMatch(/#contrast-token-trap\s*\{/);
+  });
+
 
   it('==> Should import ag-tokens.css and ag-tokens-dark.css in playground/src/main.ts', () => {
     const mainPath = resolve(process.cwd(), 'playground/src/main.ts');

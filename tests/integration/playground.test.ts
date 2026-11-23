@@ -73,7 +73,6 @@ describe('::: PHASE 4 + v0.3.0: LIVE 6-TOOL AGNOSTICUI PLAYGROUND VERIFICATION :
       expect(report.lightMode.clsEvaluation.violation).not.toBeNull();
 
       // 5. v0.3.0 `<a2ui-surface>` attribution, DOM/AX defects, source-map `file:line`, and `unifiedDiff`
-      // 5. v0.3.0 `<a2ui-surface>` attribution, DOM/AX defects, source-map `file:line`, and `unifiedDiff`
       const domViolations = report.lightMode.domViolations ?? [];
       const closeBtnDom = domViolations.find((v) =>
         v.selector.includes('a2ui-unlabeled-close-btn')
@@ -92,12 +91,14 @@ describe('::: PHASE 4 + v0.3.0: LIVE 6-TOOL AGNOSTICUI PLAYGROUND VERIFICATION :
       expect(unsafeLinkDom).toBeDefined();
       expect(report.v030Diagnostics?.sourceLocations[unsafeLinkDom!.selector]).toMatchObject({
         sourceFile: 'playground/index.html',
-        lineNumber: 200,
+        lineNumber: 225,
       });
       expect((report.v030Diagnostics?.generatedUnifiedDiffs.length ?? 0)).toBeGreaterThanOrEqual(1);
       expect(report.v030Diagnostics?.generatedUnifiedDiffs.at(0)).toContain('href="#"');
 
-      console.log('[+] Verified all 6 engines + v0.3.0 A2UI/source-map/unifiedDiff end-to-end against live AgnosticUI Web Components!');
+      console.log(
+        '[+] Verified all 6 engines + v0.3.0 A2UI/source-map/unifiedDiff end-to-end against live AgnosticUI Web Components!'
+      );
     },
     60000
   );

@@ -1,0 +1,9 @@
+/* Intentional adversarial token & contrast trap for live CSS source-map attribution */
+#contrast-token-trap {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  padding: 11px;
+  font-size: 13px;
+  border-radius: 3px;
+  border: var(--ag-border-width-1) solid var(--ag-border);
+}
