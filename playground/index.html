@@ -65,7 +65,7 @@
       .fixture-stack {
         display: flex;
         flex-direction: column;
-        gap: var(--ag-space-4);
+        gap: var(--ag-space-8);
         padding: var(--ag-space-4);
       }
 
@@ -85,12 +85,13 @@
         gap: var(--ag-space-8);
       }
 
-      /* Deliberate geometric overflow trap: cramped 90px box with visible overflow */
+      /* Deliberate geometric overflow trap: cramped 120px box with visible overflow */
       #overflow-trap-box {
-        width: 90px;
-        padding: var(--ag-space-2);
-        border: var(--ag-border-width-1) solid var(--ag-border);
-        overflow: visible;
+        width: 120px;
+        padding: var(--ag-space-3);
+        border: var(--ag-border-width-1) solid var(--ag-danger);
+        border-radius: var(--ag-radius-sm);
+        background-color: var(--ag-background-secondary);
       }
 
       #overflow-trap-label {
@@ -104,6 +105,40 @@
         padding: var(--ag-space-4);
         border: var(--ag-border-width-1) solid var(--ag-border);
         border-radius: var(--ag-radius-md);
+      }
+
+      .a2ui-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--ag-space-6);
+      }
+
+      #a2ui-unlabeled-close-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: var(--ag-space-8);
+        min-height: var(--ag-space-8);
+        padding: var(--ag-space-2);
+        background-color: var(--ag-background-tertiary);
+        color: var(--ag-text-primary);
+        border: var(--ag-border-width-1) solid var(--ag-border-subtle);
+        border-radius: var(--ag-radius-md);
+        font-size: var(--ag-font-size-sm);
+        line-height: var(--ag-line-height-sm);
+        cursor: pointer;
+      }
+
+      #a2ui-source-mapped-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--ag-space-6);
+        padding: var(--ag-space-1) var(--ag-space-2);
+        color: var(--ag-primary-text);
+        font-size: var(--ag-font-size-sm);
+        line-height: var(--ag-line-height-sm);
+        border-radius: var(--ag-radius-sm);
+        text-decoration: underline;
       }
     </style>
   </head>
@@ -153,18 +188,8 @@
           2. Deliberate Adversarial Traps
         </h2>
 
-        <!-- Trap A: Token Drift + Low-Contrast Inline Override (< 4.5:1 WCAG AA) -->
-        <div
-          id="contrast-token-trap"
-          style="
-            background-color: #f3f4f6;
-            color: #9ca3af;
-            font-size: 13px;
-            border-radius: 3px;
-            padding: 11px;
-            margin-bottom: var(--ag-space-4);
-          "
-        >
+        <!-- Trap A: Token Drift + Low-Contrast Source-Mapped Rule (< 4.5:1 WCAG AA) -->
+        <div id="contrast-token-trap">
           Trap A: Off-scale font/padding/radius tokens and low-contrast muted gray text (2.54:1).
         </div>
 
@@ -183,27 +208,27 @@
           <p class="card-body" style="margin-bottom: var(--ag-space-2);">
             A2UI Generative Ticket Drawer (unlabeled close icon + source-located unsafe link):
           </p>
-          <button
-            id="a2ui-unlabeled-close-btn"
-            type="button"
-            data-a2ui-id="close-ticket-btn"
-            data-a2ui-component="IconButton"
-            style="min-width: 32px; min-height: 32px; margin-right: var(--ag-space-2);"
-          >
-            <svg width="16" height="16" aria-hidden="true"></svg>
-          </button>
-          <a
-            id="a2ui-source-mapped-link"
-            data-a2ui-id="reset-ticket-link"
-            data-a2ui-component="Link"
-            data-source-loc="playground/index.html:200:13"
-            href="javascript:void(0)"
-          >
-            Reset Ticket
-          </a>
+          <div class="a2ui-actions">
+            <button
+              id="a2ui-unlabeled-close-btn"
+              type="button"
+              data-a2ui-id="close-ticket-btn"
+              data-a2ui-component="IconButton"
+            >
+              <svg width="16" height="16" aria-hidden="true"></svg>
+            </button>
+            <a
+              id="a2ui-source-mapped-link"
+              data-a2ui-id="reset-ticket-link"
+              data-a2ui-component="Link"
+              data-source-loc="playground/index.html:225:15"
+              href="javascript:void(0)"
+            >
+              Reset Ticket
+            </a>
+          </div>
         </a2ui-surface>
       </section>
-
     </main>
 
     <script type="module" src="./src/main.ts"></script>
