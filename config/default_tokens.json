@@ -1,41 +1,20 @@
 {
-  "colors": {
-    "background-primary": "#ffffff",
-    "background-secondary": "#f9fafb",
-    "background-tertiary": "#f3f4f6",
-    "text-primary": "#111827",
-    "text-secondary": "#4b5563",
-    "primary": "#2563eb",
-    "primary-text": "#1d4ed8",
-    "border": "#e5e7eb",
-    "border-subtle": "#d1d5db",
-    "danger": "#dc2626",
-    "warning-background": "#fef3c7",
-    "warning-text": "#92400e",
-    "transparent": "rgba(0, 0, 0, 0)"
-  },
-  "spacing": {
-    "space-0": "0px",
-    "space-1": "4px",
-    "space-2": "8px",
-    "space-3": "12px",
-    "space-4": "16px",
-    "space-6": "24px",
-    "space-8": "32px"
-  },
-  "fontSizes": {
-    "font-size-xs": "12px",
-    "font-size-sm": "14px",
-    "font-size-base": "16px",
-    "font-size-md": "18px",
-    "font-size-lg": "20px",
-    "font-size-xl": "24px"
-  },
-  "radii": {
-    "radius-none": "0px",
-    "radius-sm": "4px",
-    "radius-md": "6px",
-    "radius-lg": "8px",
-    "radius-full": "9999px"
-  }
+  "colors": [
+    "#ffffff",
+    "#f9fafb",
+    "#f3f4f6",
+    "#111827",
+    "#4b5563",
+    "#2563eb",
+    "#1d4ed8",
+    "#e5e7eb",
+    "#d1d5db",
+    "#dc2626",
+    "#fef3c7",
+    "#92400e",
+    "rgba(0, 0, 0, 0)"
+  ],
+  "spacing": ["0px", "4px", "8px", "12px", "16px", "24px", "32px"],
+  "fontSizes": ["12px", "14px", "16px", "18px", "20px", "24px"],
+  "radii": ["0px", "4px", "6px", "8px", "9999px"]
 }

@@ -320,6 +320,13 @@ npx @rlevin/uirig check --changed --config=uirig.config.json
 - **Section 2 (`#adversarial-traps`)** — Deliberate token-drift and contrast trap styled in source-mapped `playground/src/traps.css` (`2.54:1` contrast) plus a cramped `120px` geometric overflow trap (`#overflow-trap-box`).
 - **Section 3 (`#a2ui-ax-traps`)** — `<a2ui-surface id="playground-support-ticket">` generative ticket drawer containing an unlabeled icon button (`unlabeled_control` + `ax_empty_name`), a `data-source-loc`-attributed `javascript:void(0)` link (`unsafe_uri`), and a post-paint un-sized banner (`#cls-trap-slot`) that triggers measurable CLS (`> 0.1`).
 
+TODO FIX THIS
+# 3. Preview and apply deterministic auto-fixes (e.g., replacing href="javascript:void(0)")
+#    Note: Applying --fix edits playground/index.html on disk (triggering Vite live-reload in Terminal 1);
+#    run `git checkout -- playground/index.html` afterward to restore the deliberate trap.
+npm run uirig -- check http://localhost:5173 --fix
+
+
 #### 3-Step Hands-On Walkthrough
 
 1. **Start the live playground & spot-check runner (Terminal 1):**
