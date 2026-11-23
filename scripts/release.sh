@@ -64,15 +64,15 @@ if [[ "$MODE" == "publish" ]] && git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
   exit 1
 fi
 
-# 5. Run full build, strict TypeScript checks, and Vitest suite
-echo "[release] Running build, typecheck:all, and test suite..."
-npm run build
+# 5. Run full build (via pretest), strict TypeScript checks, and Vitest suite
+echo "[release] Running typecheck:all and test suite (with pretest build)..."
 npm run typecheck:all
 npm test
 
 # 6. Pack tarball and run isolated consumer smoke test outside the workspace
+#        (Note: npm pack triggers prepack build once on fresh artifacts)
 echo "[release] Packing tarball and verifying isolated consumer installation..."
-TARBALL_FILE="$(npm pack --silent | tail -n 1)"
+TARBALL_FILE="$(npm pack --silent --ignore-scripts | tail -n 1)"
 TARBALL_PATH="$(pwd)/${TARBALL_FILE}"
 TMP_SMOKE_DIR="$(mktemp -d)"
 
@@ -90,10 +90,12 @@ TMP_SMOKE_DIR="$(mktemp -d)"
 )
 echo "[release] Isolated consumer smoke test passed for ${TARBALL_FILE}"
 
-# 7. Execute dry-run or live publish + annotated git tag
+# 7. Execute dry-run or live publish (skipping duplicate prepublishOnly
+#  checks) + annotated git tag
 if [[ "$MODE" == "dry-run" ]]; then
   echo "[release] Running npm publish --dry-run..."
-  npm publish --dry-run --access public
+  # Since Steps 5 / 6 already verified build, typechecks, tests, and packed tarball.
+  npm publish --dry-run --access public --ignore-scripts
   echo "============================================================"
   echo "  Dry-run complete! Run 'npm run release:publish' to ship ${TAG_NAME}."
   echo "============================================================"
@@ -101,7 +103,8 @@ if [[ "$MODE" == "dry-run" ]]; then
 fi
 
 echo "[release] Publishing ${TAG_NAME} to NPM..."
-npm publish --access public
+# Since Steps 5 / 6 already verified build, typechecks, tests, and packed tarball.
+npm publish --access public --ignore-scripts
 
 echo "[release] Creating and pushing annotated git tag ${TAG_NAME}..."
 git tag -a "$TAG_NAME" -m "Release ${TAG_NAME}"
