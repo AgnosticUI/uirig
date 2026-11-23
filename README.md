@@ -329,24 +329,26 @@ npx @rlevin/uirig check --changed --config=uirig.config.json
    ```
 
    Vite serves the sandbox at `http://localhost:5173` and automatically runs all 6 core `uirig` validation engines + v0.3.0 diagnostics (`file:line`, `<ag-*>` Shadow DOM host, `a2ui` component IDs, `suggestedToken`, remediation hints, and `unifiedDiff` previews) in headless Chromium on boot.
+2. **Inspect terminal `file:line` attribution, structured JSON, multi-theme parity, and auto-fix patches (Terminal 2):**
 
-2. **Inspect structured JSON attribution, multi-theme parity, and auto-fix patches (Terminal 2):**
+   > **Note:** When running `uirig` from within the cloned `uirig` repository, use `npm run uirig -- <command>` (which wraps `node ./bin/uirig`) rather than `npx uirig`. Because the local `package.json` declares `"name": "@rlevin/uirig"`, `npx` resolves against the local workspace (where `node_modules/.bin/uirig` is not self-linked) instead of downloading from npm, resulting in `uirig: command not found`. Include `--` after `npm run uirig` so npm forwards flags like `--verbose`, `--json`, `--themes`, and `--fix` directly to the CLI (run `npm run build` first if `dist/` has not been compiled yet). Also note that if you modify the `uirig` library source code itself, you must re-run `npm run build` so `./bin/uirig` reflects those changes.
 
-   > **Note:** When running `uirig` from within the cloned `uirig` repository, use `npm run uirig -- <command>` (which wraps `node ./bin/uirig`) rather than `npx uirig`. Because the local `package.json` declares `"name": "@rlevin/uirig"`, `npx` resolves against the local workspace (where `node_modules/.bin/uirig` is not self-linked) instead of downloading from npm, resulting in `uirig: command not found`. Include `--` after `npm run uirig` so npm forwards flags like `--json`, `--themes`, and `--fix` directly to the CLI (run `npm run build` first if `dist/` has not been compiled yet). Also note, that if you've changed the uirig lib code itself, you will need to run npm run build so `./bin/uirig` reflects those changes.
-
-   With `http://localhost:5173` running in Terminal 1, run `npm run uirig -- check` directly against the live sandbox in a second terminal (pass `--auto-tokens` in external repos without `config/default_tokens.json` to auto-harvest all CSS custom properties from the live page):
+   With `http://localhost:5173` running in Terminal 1, run `npm run uirig -- check` against the live sandbox in a second terminal (pass `--config=playground/agnosticui.config.json` to match the playground's AgnosticUI `--ag-*` token scale, or `--auto-tokens` in external repos without a config file):
 
    ```bash
-   # 1. Structured JSON report with source-map file:line, A2UI attribution, and unifiedDiff
-   npm run uirig -- check http://localhost:5173 --json
+   # 1. Human-readable terminal report with inline [file:line], Shadow DOM host, and A2UI attribution
+   npm run uirig -- check http://localhost:5173 --config=playground/agnosticui.config.json --verbose
 
-   # 2. Multi-theme Light & Dark contrast parity matrix
-   npm run uirig -- check http://localhost:5173 --themes light,dark
+   # 2. Structured JSON report with source-map file:line, A2UI attribution, and unifiedDiff
+   npm run uirig -- check http://localhost:5173 --config=playground/agnosticui.config.json --json
 
-   # 3. Preview and apply deterministic auto-fixes (e.g., replacing href="javascript:void(0)")
-    #    Note: Applying --fix edits playground/index.html on disk (triggering Vite live-reload in Terminal 1);
-    #    run `git checkout -- playground/index.html` afterward to restore the deliberate trap.
-    npm run uirig -- check http://localhost:5173 --fix
+   # 3. Multi-theme Light & Dark contrast parity matrix
+   npm run uirig -- check http://localhost:5173 --config=playground/agnosticui.config.json --themes light,dark
+
+   # 4. Preview and apply deterministic auto-fixes (e.g., replacing href="javascript:void(0)")
+   #    Note: Applying --fix edits playground/index.html on disk (triggering Vite live-reload in Terminal 1);
+   #    run `git checkout -- playground/index.html` afterward to restore the deliberate trap.
+   npm run uirig -- check http://localhost:5173 --config=playground/agnosticui.config.json --fix
    ```
 
 3. **Edit & watch Vite live-reload self-heal down to `0 PASS`:**
