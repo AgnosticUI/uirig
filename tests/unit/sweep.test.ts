@@ -15,6 +15,8 @@ import {
   parseSweepRange,
   runBreakpointSweepAudit,
 } from '../../src/core/sweep.js';
+import { formatAgenticJsonStream } from '../../src/utils/agent-stream.js';
+import { formatConsoleAuditReport } from '../../src/utils/console-report.js';
 
 describe('sweep.ts — Responsive Breakpoint Sweep Engine (Issue #18)', () => {
   let browser: Browser | undefined;
@@ -134,4 +136,64 @@ describe('sweep.ts — Responsive Breakpoint Sweep Engine (Issue #18)', () => {
     expect(violations).toEqual([]);
     expect(elapsedMs).toBeLessThan(1500);
   });
+
+  it('normalizes sweepViolations into agentic JSON stream with failedWidths ranges and renders console output', () => {
+    const mockReport = {
+      timestamp: new Date().toISOString(),
+      configPath: 'zero-config (built-in defaults)',
+      reportPath: '.uirig/github_pr_comment.md',
+      exitCode: 2 as const,
+      results: Array.of({
+        url: 'http://127.0.0.1:4173',
+        viewport: { name: 'sweep', width: 320, height: 800 },
+        tokenViolations: new Array(),
+        contrastViolations: new Array(),
+        stressViolations: new Array(),
+        sweepViolations: Array.of({
+          violationType: 'horizontal_scrollbar' as const,
+          selector: 'document.documentElement',
+          hostComponent: null,
+          failedWidths: '760px-880px',
+          failedWidthSteps: Array.of(760, 800, 840, 880),
+          measuredLeakPixels: 60,
+          inShadowDom: false,
+        }),
+        clsEvaluation: { maxSessionCls: 0, violation: null },
+      }),
+      summary: {
+        totalViewportsAudited: 1,
+        totalTokenViolations: 0,
+        totalContrastViolations: 0,
+        totalStressViolations: 0,
+        totalSweepViolations: 1,
+        totalClsViolations: 0,
+      },
+    };
+
+    const jsonStream = JSON.parse(formatAgenticJsonStream(mockReport)) as {
+      exitCode: number;
+      passed: boolean;
+      violations: Array<{
+        engine: string;
+        violationType: string;
+        failedWidths?: string;
+        measuredDelta: string;
+      }>;
+    };
+
+    expect(jsonStream.exitCode).toBe(2);
+    expect(jsonStream.passed).toBe(false);
+    expect(jsonStream.violations).toHaveLength(1);
+    expect(jsonStream.violations.at(0)).toMatchObject({
+      engine: 'sweep',
+      violationType: 'horizontal_scrollbar',
+      failedWidths: '760px-880px',
+      measuredDelta: '+60px across 760px-880px',
+    });
+
+    const consoleOutput = formatConsoleAuditReport(mockReport, { verbose: true });
+    expect(consoleOutput).toContain('Breakpoint Sweep Hits');
+    expect(consoleOutput).toContain('760px-880px');
+  });
+
 });

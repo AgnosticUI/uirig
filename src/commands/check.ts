@@ -12,6 +12,11 @@ import { resolve, dirname } from 'path';
 import { chromium, type Browser } from 'playwright';
 import { crawlPageTokens, type ITokenScaleConfig, type ITokenViolation } from '../core/tokens.js';
 import {
+  runBreakpointSweepAudit,
+  DEFAULT_SWEEP_SPEC,
+  type IBreakpointSweepViolation,
+} from '../core/sweep.js';
+import {
   discoverWorkspaceTokens,
   extractRootCssVariables,
   mergeTokenScales,
@@ -161,6 +166,7 @@ export interface IViewportAuditReport {
   contrastViolations: Array<IContrastViolation>;
   darkModeViolations?: Array<IDarkModeViolation>;
   stressViolations: Array<IGeometricViolation>;
+  sweepViolations?: Array<IBreakpointSweepViolation>;
   clsEvaluation: IClsEvaluationResult;
   domViolations?: Array<IDomIntegrityViolation>;
   runtimeErrors?: Array<IRuntimeErrorViolation>;
@@ -178,6 +184,7 @@ export interface ICheckExecutionReport {
     totalContrastViolations: number;
     totalDarkModeViolations?: number;
     totalStressViolations: number;
+    totalSweepViolations?: number;
     totalClsViolations: number;
     totalDomViolations?: number;
     totalRuntimeErrors?: number;
