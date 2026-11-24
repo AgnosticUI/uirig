@@ -10,7 +10,6 @@
  * - `uirig mcp [--transport=<mode>] [--port=<n>] [--idle-timeout=<ms>]`
  * - `uirig --help` / `uirig <command> --help` / `uirig --version`
  */
-
 import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 import { executeInitCommand } from './commands/init.js';
@@ -25,6 +24,7 @@ import { parseSelectorList } from './utils/scope.js';
 import { readFileSync } from 'fs';
 import { executeMcpCommand } from './commands/mcp.js';
 import { validateHttpTargetUrl } from './utils/static-server.js';
+import { DEFAULT_SWEEP_SPEC, parseSweepRange } from './core/sweep.js';
 export { validateHttpTargetUrl };
 
 const pkg = JSON.parse(
@@ -39,6 +39,7 @@ const AUDIT_TOOL_NAMES = new Set<AuditToolName>([
   'stress',
   'cls',
   'dom',
+  'sweep',
 ]);
 
 interface ISubcommandHelpSpec {
@@ -54,6 +55,7 @@ const SHARED_AUDIT_OPTIONS = [
   '--tokens-path=<path>   Path to W3C, Style Dictionary, flat JSON, or CSS custom properties token file',
   '--auto-tokens          Auto-discover design tokens from workspace files & live :root CSS vars',
   '--themes=<csv>         Evaluate target across multiple theme skins (e.g. --themes="light,dark,brand")',
+  '--sweep[=<range>]      Step viewport across <min>:<max>:<step> widths (default: 320:1440:40)',
   '--changed              Scope audit to components modified in git diff (optional: --base <ref>)',
   '--base=<ref>           Git base ref for --changed diff comparison (e.g. --base=main)',
   '-s, --selectors=<csv>  Filter element checks to matching CSS selectors (repeatable)',
@@ -68,6 +70,7 @@ const SHARED_AUDIT_OPTIONS = [
   '--headed               Launch Chromium with a visible browser window for local inspection',
   '-h, --help             Show this command help page',
 ];
+
 const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   init: {
     summary: 'Scaffold uirig.config.json, .uirig/session.json, and .uirig/SKILL.md in the current workspace.',
@@ -84,28 +87,45 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     examples: ['npx @rlevin/uirig init'],
   },
   check: {
-    summary: 'Run all 6 verification engines concurrently across configured or direct targets in isolated contexts.',
-    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    summary: 'Run all verification engines concurrently across configured or direct targets in isolated contexts.',
+    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--sweep[=<min:max:step>]] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Launches a single headless Chromium instance and isolates each (url, viewport) pair in a fresh BrowserContext.',
       'Automatically serves local .html files on an ephemeral 127.0.0.1 HTTP server when given a file path.',
-      'Ranks violations from highest impact to lowest and supports --tokens-path, --auto-tokens, --changed, --group-by-root, --top, and --max-tokens.',
+      'Ranks violations from highest impact to lowest and supports --sweep, --tokens-path, --auto-tokens, --changed, --group-by-root, --top, and --max-tokens.',
     ],
     options: [
-      '--only=<tool>          Filter execution to one engine: tokens | contrast | dark-mode | stress | cls | dom',
+      '--only=<tool>          Filter execution to one engine: tokens | contrast | dark-mode | stress | cls | dom | sweep',
       ...SHARED_AUDIT_OPTIONS,
     ],
     exitCodes: [
-      '0                   All token, contrast, dark-mode, stress, CLS, DOM, and runtime checks passed',
+      '0                   All token, contrast, dark-mode, stress, sweep, CLS, DOM, and runtime checks passed',
       '1                   Token drift, contrast/dark-mode failure, DOM violation, uncaught JS error, or config error',
-      '2                   Structural layout overflow/collision or CLS budget breach',
+      '2                   Structural layout overflow/collision, breakpoint sweep failure, or CLS budget breach',
     ],
     examples: [
       'npx @rlevin/uirig check',
+      'npx @rlevin/uirig check http://localhost:5173 --sweep=320:1440:40 --json',
       'npx @rlevin/uirig check http://localhost:5173 --tokens-path=./design.tokens.json --verbose',
       'npx @rlevin/uirig check --changed --base=main --json',
       'npx @rlevin/uirig check ./dist/index.html --selectors="#hero, .card" --verbose',
-      'npx @rlevin/uirig check --only=dark-mode --json',
+    ],
+  },
+  sweep: {
+    summary: 'Step an active Chromium viewport across [min, max, step] widths and report failing width ranges.',
+    usage: 'uirig sweep [<url-or-file>] [--sweep=<min:max:step>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    mechanics: [
+      'Resizes a single open Chromium page across the configured width range (default 320:1440:40) without extra browser launches.',
+      'Evaluates horizontal overflow and sibling touch-target collisions at each width and collapses contiguous hits into failedWidths ranges.',
+    ],
+    options: SHARED_AUDIT_OPTIONS,
+    exitCodes: [
+      '0                   No responsive overflow or touch-target collisions across swept widths',
+      '2                   Structural overflow or touch-target collision detected across one or more width ranges',
+    ],
+    examples: [
+      'npx @rlevin/uirig sweep http://localhost:5173 --verbose',
+      'npx @rlevin/uirig check ./dist/index.html --sweep=320:1440:40 --json',
     ],
   },
   tokens: {
@@ -247,6 +267,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     ],
   },
 };
+
 export const CLI_HELP_TEXT = `
 ${paint('uirig', 'bold', 'cyan')} v${UIRIG_VERSION}: The first line of defense for AI-generated UIs and Web Components
 
@@ -256,25 +277,27 @@ ${paint('USAGE:', 'bold')}
 
 ${paint('COMMANDS:', 'bold')}
   init                            Scaffold uirig.config.json, .uirig/session.json, and .uirig/SKILL.md
-  check [<url-or-file>]           Run all 6 verification engines concurrently in isolated contexts
+  check [<url-or-file>]           Run all verification engines concurrently in isolated contexts
   tokens [<url-or-file>]          Run only the shadow-piercing design token drift auditor
   contrast [<url-or-file>]        Run only the WCAG 2.1 rendered luminance contrast gate
   dark-mode [<url-or-file>]       Run only the dark-mode theme parity & surface luminance gate
   stress [<url-or-file>]          Run only the +30% text-expansion geometric overflow fuzzer
+  sweep [<url-or-file>]           Step viewport across [min, max, step] widths and report failing ranges
   cls [<url-or-file>]             Run only the W3C session-window Cumulative Layout Shift monitor
   dom [<url-or-file>]             Run only the structural DOM, ARIA, media & prompt-injection gate
   manifest                        Print ASCII repository tree blueprint (excluding blocklisted dirs)
   mcp                             Start persistent MCP server with warm Chromium (stdio or SSE)
 
-${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / cls / dom):', 'bold')}
+${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / sweep / cls / dom):', 'bold')}
   --tokens-path=<path>            Path to W3C, Style Dictionary, flat JSON, or CSS token file
   --auto-tokens                   Auto-discover design tokens from workspace files & live :root CSS vars
   --themes=<csv>                  Evaluate target across multiple theme skins (e.g. --themes="light,dark")
+  --sweep[=<min:max:step>]        Step viewport across responsive widths (default: 320:1440:40)
   --changed                       Scope audit to components modified in git diff (optional: --base <ref>)
   --base=<ref>                    Git base ref for --changed diff comparison (e.g. --base=main)
   -s, --selectors=<csv>           Filter element checks to matching CSS selectors (repeatable)
   --config=<path>                 Path to uirig.config.json (also supports: --config <path>)
-  --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls | dom
+  --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls | dom | sweep
   --group-by-root                 Collapse child failures under their shared parent container or host
   --top=<n>                       Keep only the top N highest-priority violations (e.g. --top=5)
   --max-tokens=<budget>           Cap JSON output to approximately N LLM tokens (e.g. --max-tokens=1200)
@@ -290,7 +313,7 @@ ${paint('GLOBAL OPTIONS:', 'bold')}
 ${paint('POSIX EXIT CODES:', 'bold')}
   0                               All geometric bounds, contrast ratios, token, and DOM checks passed
   1                               Config error, token drift, contrast failure, DOM violation, or runtime JS error
-  2                               Structural layout break (overflow/collision) or CLS budget breach
+  2                               Structural layout break (overflow/collision/sweep) or CLS budget breach
 `;
 
 export function renderHelpText(topic?: string): string {
@@ -353,6 +376,7 @@ export type ParsedCliCommand =
       tokensPath?: string | Array<string>;
       autoTokens?: boolean;
       themes?: Array<string>;
+      sweep?: string;
       changed?: boolean;
       baseRef?: string;
       fix?: boolean;
@@ -502,6 +526,7 @@ function parseAuditCommandArgs(
   const collectedTokensPaths = new Array<string>();
   let only: AuditToolName | undefined = presetOnly;
   let autoTokens = false;
+  let sweep: string | undefined;
   let changed = false;
   let baseRef: string | undefined;
   let fix = false;
@@ -548,6 +573,29 @@ function parseAuditCommandArgs(
       i++;
     } else if (token === '--auto-tokens') {
       autoTokens = true;
+    } else if (token.startsWith('--sweep=')) {
+      const rawSpec = token.slice('--sweep='.length).trim();
+      try {
+        parseSweepRange(rawSpec);
+      } catch (err: unknown) {
+        const reason = err instanceof Error ? err.message : String(err);
+        return { command: 'unknown', rawCommand: rawSubcommand, reason };
+      }
+      sweep = rawSpec;
+    } else if (token === '--sweep') {
+      const nextToken = restArgs.at(i + 1);
+      if (nextToken && !nextToken.startsWith('-') && !isDirectTargetArg(nextToken)) {
+        try {
+          parseSweepRange(nextToken);
+        } catch (err: unknown) {
+          const reason = err instanceof Error ? err.message : String(err);
+          return { command: 'unknown', rawCommand: rawSubcommand, reason };
+        }
+        sweep = nextToken.trim();
+        i++;
+      } else {
+        sweep = DEFAULT_SWEEP_SPEC;
+      }
     } else if (token === '--changed') {
       changed = true;
     } else if (token.startsWith('--base=')) {
@@ -639,7 +687,7 @@ function parseAuditCommandArgs(
     } else if (token.startsWith('--only=')) {
       const toolValue = token.slice('--only='.length).trim() as AuditToolName;
       if (!AUDIT_TOOL_NAMES.has(toolValue)) {
-        return { command: 'unknown', rawCommand: rawSubcommand, reason: "Invalid --only value '" + toolValue + "'. Expected one of: tokens, contrast, dark-mode, stress, cls, dom." };
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: "Invalid --only value '" + toolValue + "'. Expected one of: tokens, contrast, dark-mode, stress, cls, dom, sweep." };
       }
       only = toolValue;
     } else if (token.startsWith('--config=')) {
@@ -694,6 +742,7 @@ function parseAuditCommandArgs(
     ...(resolvedTokensPath !== undefined ? { tokensPath: resolvedTokensPath } : {}),
     ...(autoTokens ? { autoTokens: true } : {}),
     ...(uniqueThemes ? { themes: uniqueThemes } : {}),
+    ...(sweep !== undefined ? { sweep } : {}),
     ...(changed ? { changed: true } : {}),
     ...(baseRef ? { baseRef } : {}),
     ...(fix ? { fix: true } : {}),
