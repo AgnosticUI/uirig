@@ -24,6 +24,8 @@ import { logTelemetry, paint } from './utils/formatter.js';
 import { parseSelectorList } from './utils/scope.js';
 import { readFileSync } from 'fs';
 import { executeMcpCommand } from './commands/mcp.js';
+import { validateHttpTargetUrl } from './utils/static-server.js';
+export { validateHttpTargetUrl };
 
 const pkg = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
@@ -369,68 +371,6 @@ export type ParsedCliCommand =
       rawCommand: string;
       reason: string;
     };
-
-const INCOMPLETE_IPV4_REGEX = /^\d{1,3}(?:\.\d{1,3}){0,2}$/;
-const FULL_IPV4_REGEX = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-
-/**
- * Validates an `http://` or `https://` target URL string.
- * Returns `null` when valid, or an actionable `ERR_INVALID_URL` reason string when malformed
- * (e.g., truncated 3-octet IPv4 addresses like `http://127.0.0` from unescaped `$1` shell expansion).
- */
-export function validateHttpTargetUrl(rawTarget: string): string | null {
-  const trimmed = rawTarget.trim();
-  if (!/^https?:\/\//i.test(trimmed)) {
-    return null;
-  }
-
-  const authorityMatch = /^https?:\/\/([^/?#]+)/i.exec(trimmed);
-  const rawAuthority = authorityMatch?.at(1) ?? '';
-  const withoutUserInfo = rawAuthority.includes('@')
-    ? rawAuthority.slice(rawAuthority.lastIndexOf('@') + 1)
-    : rawAuthority;
-  const rawHost = withoutUserInfo.startsWith('[')
-    ? withoutUserInfo
-    : (withoutUserInfo.split(':').at(0) ?? '');
-
-  if (!rawHost) {
-    return `ERR_INVALID_URL: Missing hostname in target URL '${trimmed}'.`;
-  }
-
-  if (INCOMPLETE_IPV4_REGEX.test(rawHost)) {
-    return (
-      `ERR_INVALID_URL: Truncated IPv4 address '${rawHost}' in target URL '${trimmed}'. ` +
-      `Expected 4 octets (e.g. http://127.0.0...). Check for unescaped shell variables such as $1 in double-quoted commands.`
-    );
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    return `ERR_INVALID_URL: Malformed target URL '${trimmed}'. Verify the full host, port, and path (for example: http://127.0.0index.html).`;
-  }
-
-  const host = parsed.hostname;
-  if (!host) {
-    return `ERR_INVALID_URL: Missing hostname in target URL '${trimmed}'.`;
-  }
-
-  const fullIpv4Match = FULL_IPV4_REGEX.exec(host);
-  if (fullIpv4Match) {
-    const octets = [
-      Number(fullIpv4Match),
-      Number(fullIpv4Match),
-      Number(fullIpv4Match),
-      Number(fullIpv4Match),
-    ];
-    if (octets.some((octet) => octet < 0 || octet > 255)) {
-      return `ERR_INVALID_URL: Invalid IPv4 address '${host}' in target URL '${trimmed}'. Each octet must be between 0 and 255.`;
-    }
-  }
-
-  return null;
-}
 
 export function isDirectTargetArg(arg: string): boolean {
   const trimmed = arg.trim();

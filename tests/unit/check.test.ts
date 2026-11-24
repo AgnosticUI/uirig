@@ -1267,4 +1267,45 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalTokenViolations).toBe(0);
   });
 
+  it('audits full dotted IPv4 loopback URLs with subpaths intact and fails fast on truncated IPv4 URLs (Issue #53)', async () => {
+    const html = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root { --bg: #ffffff; --fg: #111827; }
+            :root[data-theme="dark"] { --bg: #0f172a; --fg: #f8fafc; }
+            body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font-family: sans-serif; }
+          </style>
+        </head>
+        <body><button type="button">Loopback Button</button></body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(html);
+    activeServer = server;
+
+    const fullLoopbackUrl = `${url}/tests/uirig/poc-button.html`;
+    const report = await executeCheckCommand({
+      target: fullLoopbackUrl,
+      cwd: tempDir,
+      only: 'dom',
+      viewportsOverride: [{ name: 'desktop', width: 1280, height: 800 }],
+      headless: true,
+      silentStdout: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    expect(report.exitCode).toBe(0);
+    expect(report.results.at(0)?.url).toBe(fullLoopbackUrl);
+
+    await expect(
+      executeCheckCommand({
+        target: 'http://127.0.0',
+        cwd: tempDir,
+        headless: true,
+        silentStdout: true,
+        reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+      })
+    ).rejects.toThrow(/ERR_INVALID_URL/);
+  });
+
 });
