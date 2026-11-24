@@ -50,7 +50,7 @@ export function isLocalFileTarget(target: string): boolean {
 /**
  * Validates an `http://` or `https://` target URL string.
  * Returns `null` when valid, or an actionable `ERR_INVALID_URL` reason string when malformed
- * (e.g., truncated 3-octet IPv4 addresses like `http://127.0.0` from unescaped `$1` shell expansion).
+ * (e.g., truncated 3-octet IPv4 addresses or out-of-range octets).
  */
 export function validateHttpTargetUrl(rawTarget: string): string | null {
   const trimmed = rawTarget.trim();
@@ -70,11 +70,10 @@ export function validateHttpTargetUrl(rawTarget: string): string | null {
   if (!rawHost) {
     return `ERR_INVALID_URL: Missing hostname in target URL '${trimmed}'.`;
   }
-
   if (INCOMPLETE_IPV4_REGEX.test(rawHost)) {
     return (
       `ERR_INVALID_URL: Truncated IPv4 address '${rawHost}' in target URL '${trimmed}'. ` +
-      `Expected 4 octets (e.g. http://127.0.0...). Check for unescaped shell variables such as $1 in double-quoted commands.`
+      `Expected 4 octets (for example: http://localhost:4174/index.html or a 4-octet IPv4 loopback address).`
     );
   }
 
@@ -82,7 +81,7 @@ export function validateHttpTargetUrl(rawTarget: string): string | null {
   try {
     parsed = new URL(trimmed);
   } catch {
-    return `ERR_INVALID_URL: Malformed target URL '${trimmed}'. Verify the full host, port, and path (for example: http://127.0.0index.html).`;
+    return `ERR_INVALID_URL: Malformed target URL '${trimmed}'. Verify the full host, port, and path.`;
   }
 
   const host = parsed.hostname;
@@ -92,13 +91,9 @@ export function validateHttpTargetUrl(rawTarget: string): string | null {
 
   const fullIpv4Match = FULL_IPV4_REGEX.exec(host);
   if (fullIpv4Match) {
-    const octets = [
-      Number(fullIpv4Match),
-      Number(fullIpv4Match),
-      Number(fullIpv4Match),
-      Number(fullIpv4Match),
-    ];
-    if (octets.some((octet) => octet < 0 || octet > 255)) {
+    const [, o1 = '', o2 = '', o3 = '', o4 = ''] = fullIpv4Match;
+    const octets = [Number(o1), Number(o2), Number(o3), Number(o4)];
+    if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
       return `ERR_INVALID_URL: Invalid IPv4 address '${host}' in target URL '${trimmed}'. Each octet must be between 0 and 255.`;
     }
   }

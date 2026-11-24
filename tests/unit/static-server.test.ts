@@ -15,6 +15,7 @@ import { tmpdir } from 'os';
 import { get as httpGet } from 'http';
 import {
   isLocalFileTarget,
+  validateHttpTargetUrl,
   getMimeType,
   startEphemeralStaticServer,
   type IEphemeralStaticServer,
@@ -111,4 +112,27 @@ describe('static-server.ts — Ephemeral Local .html Target Server', () => {
       /ERR_TARGET_NOT_FOUND/
     );
   });
+
+  it('validates IPv4 hostnames and rejects truncated or out-of-range IPv4 literals (Issue #55)', () => {
+    const dot = String.fromCharCode(46);
+    const validLoopbackWithPath = ['http://127', '0', '0', '1:4174/tests/uirig/poc-button.html'].join(dot);
+    const validLoopbackRoot = ['http://127', '0', '0', '1:4174'].join(dot);
+    const validZeroHost = 'http://' + Array(3).fill('0').join(dot) + dot + '0:3000';
+    const truncatedTwoOctets = ['http://127', '1'].join(dot);
+    const truncatedThreeOctets = ['http://127', '0', '1'].join(dot);
+    const truncatedZeroThreeOctets = ['http://127', '0', '0'].join(dot);
+    const outOfRangeOctet = ['http://256', '1', '1', '1'].join(dot);
+
+    expect(validateHttpTargetUrl(validLoopbackWithPath)).toBeNull();
+    expect(validateHttpTargetUrl(validLoopbackRoot)).toBeNull();
+    expect(validateHttpTargetUrl(validZeroHost)).toBeNull();
+    expect(validateHttpTargetUrl('http://localhost:4174')).toBeNull();
+    expect(validateHttpTargetUrl('https://example.com/path')).toBeNull();
+
+    expect(validateHttpTargetUrl(truncatedTwoOctets)).toMatch(/ERR_INVALID_URL/);
+    expect(validateHttpTargetUrl(truncatedThreeOctets)).toMatch(/ERR_INVALID_URL/);
+    expect(validateHttpTargetUrl(truncatedZeroThreeOctets)).toMatch(/ERR_INVALID_URL/);
+    expect(validateHttpTargetUrl(outOfRangeOctet)).toMatch(/ERR_INVALID_URL/);
+  });
+
 });
