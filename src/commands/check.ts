@@ -43,6 +43,7 @@ import {
 import {
   isLocalFileTarget,
   startEphemeralStaticServer,
+  validateHttpTargetUrl,
   type IEphemeralStaticServer,
 } from '../utils/static-server.js';
 import {
@@ -1028,6 +1029,7 @@ export async function executeCheckCommand(
         'No tokensPath configured; skipping design token scale audit.'
       );
     }
+
     const resolvedTargets = new Array<{ displayUrl: string; liveUrl: string; isLocal: boolean }>();
     for (const rawTarget of config.targetUrls) {
       if (isLocalFileTarget(rawTarget)) {
@@ -1035,6 +1037,10 @@ export async function executeCheckCommand(
         ephemeralServers.push(server);
         resolvedTargets.push({ displayUrl: rawTarget, liveUrl: server.url, isLocal: true });
       } else {
+        const urlError = validateHttpTargetUrl(rawTarget);
+        if (urlError !== null) {
+          throw new Error(urlError);
+        }
         resolvedTargets.push({ displayUrl: rawTarget, liveUrl: rawTarget, isLocal: false });
       }
     }

@@ -398,5 +398,37 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
       idleTimeoutMs: 300_000,
     });
   });
+  
+  it('preserves full dotted IPv4 loopback URLs intact and fails fast on truncated IPv4 URLs (Issue #53)', async () => {
+    const validLoopbackUrl = ['http://127.0.0', '1:4174/tests/uirig/poc-button.html'].join('.');
+    const checkSpy = vi.fn(async () => createMockReport(0));
+
+    expect(parseCliArgs(['check', validLoopbackUrl, '--json'])).toMatchObject({
+      command: 'check',
+      target: validLoopbackUrl,
+      json: true,
+    });
+
+    expect(parseCliArgs([validLoopbackUrl])).toMatchObject({
+      command: 'check',
+      target: validLoopbackUrl,
+    });
+
+    const exitCode = await runCli(['check', validLoopbackUrl], { check: checkSpy });
+    expect(exitCode).toBe(0);
+    expect(checkSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: validLoopbackUrl,
+      })
+    );
+
+    // Truncated 3-octet IPv4 URLs (e.g. from unescaped $1 in double quotes) must fail immediately with exit code 1
+    expect(parseCliArgs(['check', 'http://127.0.0'])).toMatchObject({
+      command: 'unknown',
+      reason: expect.stringContaining('ERR_INVALID_URL'),
+    });
+    expect(await runCli(['check', 'http://127.0.0'], { check: checkSpy })).toBe(1);
+    expect(await runCli(['http://127.0.0'], { check: checkSpy })).toBe(1);
+  });
 
 });

@@ -24,6 +24,8 @@ import { logTelemetry, paint } from './utils/formatter.js';
 import { parseSelectorList } from './utils/scope.js';
 import { readFileSync } from 'fs';
 import { executeMcpCommand } from './commands/mcp.js';
+import { validateHttpTargetUrl } from './utils/static-server.js';
+export { validateHttpTargetUrl };
 
 const pkg = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
@@ -660,6 +662,17 @@ function parseAuditCommandArgs(
       target = token;
     } else {
       return { command: 'unknown', rawCommand: rawSubcommand, reason: "Unrecognized option for '" + rawSubcommand + "': " + token };
+    }
+  }
+
+  if (target !== undefined) {
+    const urlError = validateHttpTargetUrl(target);
+    if (urlError !== null) {
+      return {
+        command: 'unknown',
+        rawCommand: rawSubcommand,
+        reason: urlError,
+      };
     }
   }
 
