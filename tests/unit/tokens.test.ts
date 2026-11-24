@@ -324,4 +324,52 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER 
       },
     ]);
   });
+
+  it('==> Should skip 1x1 clipped and sr-only visually-hidden elements during token crawl (Issue #56)', async () => {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              color: rgb(15, 23, 42);
+              background-color: rgb(255, 255, 255);
+              margin: 0;
+              padding: 0;
+              font-size: 16px;
+            }
+            .clipped-sr {
+              position: absolute;
+              width: 1px;
+              height: 1px;
+              padding: 0;
+              margin: -1px;
+              overflow: hidden;
+              clip: rect(0, 0, 0, 0);
+              white-space: nowrap;
+              border: 0;
+              color: rgb(255, 0, 128);
+              font-size: 13px;
+            }
+          </style>
+        </head>
+        <body>
+          <span class="clipped-sr">Screen-reader-only text</span>
+          <input type="checkbox" class="clipped-sr" aria-label="Hidden native input" />
+        </body>
+      </html>
+    `);
+
+    const violations = await crawlPageTokens(page, approvedScale);
+    await context.close();
+
+    expect(violations).toEqual([]);
+  });
+
 });

@@ -607,6 +607,7 @@ export async function extractTextContrastSnapshots(
         if (
           computed.display !== 'none' &&
           computed.visibility !== 'hidden' &&
+          !walker.isVisuallyHidden(currentNode) &&
           (hasDirectUnassignedVisibleText(currentNode) || hasSlottedDirectText(currentNode)) &&
           !isInactiveUiComponent(currentNode) &&
           !walker.isIgnored(currentNode, activeRule)
