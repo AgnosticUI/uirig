@@ -348,7 +348,7 @@ export type ParsedCliCommand =
       command: 'check';
       target?: string;
       only?: AuditToolName;
-      tokensPath?: string;
+      tokensPath?: string | Array<string>;
       autoTokens?: boolean;
       themes?: Array<string>;
       changed?: boolean;
@@ -497,7 +497,7 @@ function parseAuditCommandArgs(
 ): ParsedCliCommand {
   let target: string | undefined = initialTarget;
   let configPath: string | undefined;
-  let tokensPath: string | undefined;
+  const collectedTokensPaths = new Array<string>();
   let only: AuditToolName | undefined = presetOnly;
   let autoTokens = false;
   let changed = false;
@@ -522,16 +522,27 @@ function parseAuditCommandArgs(
       const value = token.startsWith('--tokens-path=')
         ? token.slice('--tokens-path='.length).trim()
         : token.slice('--token-path='.length).trim();
-      if (value.length === 0) {
+      const splitPaths = value
+        .split(',')
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+      if (splitPaths.length === 0) {
         return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing file path after --tokens-path=' };
       }
-      tokensPath = value;
+      collectedTokensPaths.push(...splitPaths);
     } else if (token === '--tokens-path' || token === '--token-path') {
       const nextToken = restArgs.at(i + 1);
       if (!nextToken || nextToken.startsWith('-')) {
         return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing file path after ' + token };
       }
-      tokensPath = nextToken.trim();
+      const splitPaths = nextToken
+        .split(',')
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+      if (splitPaths.length === 0) {
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing file path after ' + token };
+      }
+      collectedTokensPaths.push(...splitPaths);
       i++;
     } else if (token === '--auto-tokens') {
       autoTokens = true;
@@ -654,12 +665,20 @@ function parseAuditCommandArgs(
 
   const uniqueSelectors = collectedSelectors.length > 0 ? Array.from(new Set(collectedSelectors)) : undefined;
   const uniqueThemes = collectedThemes.length > 0 ? Array.from(new Set(collectedThemes)) : undefined;
+  const uniqueTokensPaths =
+    collectedTokensPaths.length > 0 ? Array.from(new Set(collectedTokensPaths)) : undefined;
+  const resolvedTokensPath: string | Array<string> | undefined =
+    uniqueTokensPaths === undefined
+      ? undefined
+      : uniqueTokensPaths.length === 1
+        ? uniqueTokensPaths.at(0)
+        : uniqueTokensPaths;
 
   return {
     command: 'check',
     target,
     only,
-    ...(tokensPath ? { tokensPath } : {}),
+    ...(resolvedTokensPath !== undefined ? { tokensPath: resolvedTokensPath } : {}),
     ...(autoTokens ? { autoTokens: true } : {}),
     ...(uniqueThemes ? { themes: uniqueThemes } : {}),
     ...(changed ? { changed: true } : {}),

@@ -110,4 +110,76 @@ describe('::: ISSUE #10 (CHUNK 4A): CLI --auto-tokens & --tokens-path PARSER :::
       })
     );
   });
+
+  it('parses comma-separated and repeatable --tokens-path / --token-path flags into deduplicated string[]', () => {
+    expect(
+      parseCliArgs([
+        'check',
+        'http://localhost:5173',
+        '--tokens-path=src/styles/ag-tokens.css,src/styles/ag-tokens-dark.css',
+        '--themes=light,dark',
+      ])
+    ).toMatchObject({
+      command: 'check',
+      target: 'http://localhost:5173',
+      tokensPath: ['src/styles/ag-tokens.css', 'src/styles/ag-tokens-dark.css'],
+      themes: ['light', 'dark'],
+    });
+
+    expect(
+      parseCliArgs([
+        'tokens',
+        './index.html',
+        '--tokens-path',
+        './ag-tokens.css',
+        '--token-path',
+        './ag-tokens-dark.css',
+        '--tokens-path=./ag-tokens.css',
+      ])
+    ).toMatchObject({
+      command: 'check',
+      target: './index.html',
+      only: 'tokens',
+      tokensPath: ['./ag-tokens.css', './ag-tokens-dark.css'],
+    });
+  });
+
+  it('forwards multi-file tokensPath array into executeCheckCommand via runCli', async () => {
+    const mockCheck = vi.fn().mockResolvedValue({
+      timestamp: new Date().toISOString(),
+      configPath: 'zero-config (built-in defaults)',
+      reportPath: '.uirig/github_pr_comment.md',
+      exitCode: 0,
+      results: [],
+      summary: {
+        totalViewportsAudited: 0,
+        totalTokenViolations: 0,
+        totalContrastViolations: 0,
+        totalStressViolations: 0,
+        totalClsViolations: 0,
+      },
+    });
+
+    const exitCode = await runCli(
+      [
+        'check',
+        'http://localhost:5173',
+        '--tokens-path=src/styles/ag-tokens.css,src/styles/ag-tokens-dark.css',
+        '--themes=light,dark',
+        '--json',
+      ],
+      { check: mockCheck }
+    );
+
+    expect(exitCode).toBe(0);
+    expect(mockCheck).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: 'http://localhost:5173',
+        tokensPath: ['src/styles/ag-tokens.css', 'src/styles/ag-tokens-dark.css'],
+        themes: ['light', 'dark'],
+        json: true,
+      })
+    );
+  });
+
 });
