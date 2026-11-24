@@ -463,12 +463,16 @@ export async function extractTextContrastSnapshots(
         return false;
       }
 
-      // When `el` is a <slot>, check whether it projects any direct Light DOM text nodes
+      // When `el` is the innermost <slot> directly receiving Light DOM text nodes
+      // (i.e. not merely forwarding to an inner <slot>), treat `el` as the text carrier.
       function hasSlottedDirectText(el: Element): boolean {
         if (el.tagName !== 'SLOT') {
           return false;
         }
         const slotEl = el as HTMLSlotElement;
+        if (slotEl.assignedSlot !== null) {
+          return false;
+        }
         for (const assigned of slotEl.assignedNodes({ flatten: true })) {
           if (
             assigned.nodeType === Node.TEXT_NODE &&
@@ -522,8 +526,20 @@ export async function extractTextContrastSnapshots(
         return isTransparentCssColor(textFill);
       }
 
-      // Walk upward from `el` through `parentElement` and `ShadowRoot.host` boundaries,
-      // collecting `{ backgroundColor, opacity }` ordered from outermost ancestor down to `el`.
+      // Walk upward across the flattened render tree: if `current` is projected into a
+      // Shadow DOM `<slot>` (`current.assignedSlot`), climb through that `<slot>` and its
+      // enclosing Shadow DOM containers (`<button>`) before exiting via `ShadowRoot.host`.
+      function getFlattenedParentElement(el: Element): Element | null {
+        if (el.assignedSlot) {
+          return el.assignedSlot;
+        }
+        if (el.parentElement) {
+          return el.parentElement;
+        }
+        const rootNode = el.getRootNode();
+        return rootNode instanceof ShadowRoot ? rootNode.host : null;
+      }
+
       function collectAncestorStyleLayers(el: Element): IAncestorStyleLayer[] {
         const bottomUpLayers: IAncestorStyleLayer[] = [];
         let current: Element | null = el;
@@ -535,13 +551,7 @@ export async function extractTextContrastSnapshots(
             backgroundColor: style.backgroundColor || 'rgba(0, 0, 0, 0)',
             opacity: Number.isFinite(parsedOpacity) ? parsedOpacity : 1,
           });
-
-          if (current.parentElement) {
-            current = current.parentElement;
-          } else {
-            const rootNode = current.getRootNode();
-            current = rootNode instanceof ShadowRoot ? rootNode.host : null;
-          }
+          current = getFlattenedParentElement(current);
         }
 
         return bottomUpLayers.reverse();

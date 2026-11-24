@@ -290,4 +290,54 @@ describe('::: PHASE 3 TASK 3.2 + ISSUE #7 (CHUNK 1): COLORJS.IO CONTRAST, ALPHA 
     expect(lightHeroFail?.backgroundRgb).toBe('rgb(255, 255, 255)');
     expect(lightHeroFail?.contrastRatio).toBeLessThan(MIN_WCAG_AA_CONTRAST);
   });
+
+  it('==> Should resolve Shadow DOM <button> background across flattened <slot> projections for both text nodes and slotted elements', async () => {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; background: rgb(1, 4, 9); }
+            ag-button { color: rgb(255, 255, 255); }
+            ag-button span { color: rgb(255, 255, 255); }
+            ag-button[variant="inverse"] { color: rgb(15, 23, 42); }
+            ag-button[variant="inverse"] span { color: rgb(15, 23, 42); }
+          </style>
+        </head>
+        <body>
+          <ag-button variant="primary"><span>Primary Action</span></ag-button>
+          <ag-button variant="inverse"><span>Light Pill Action</span></ag-button>
+          <script>
+            class AgButton extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const variant = this.getAttribute('variant');
+                const bg = variant === 'inverse' ? 'rgb(241, 245, 249)' : 'rgb(37, 99, 235)';
+                shadow.innerHTML =
+                  '<button style="background: ' + bg + '; border: 0; padding: 8px 16px;">' +
+                    '<slot></slot>' +
+                  '</button>';
+              }
+            }
+            customElements.define('ag-button', AgButton);
+          </script>
+        </body>
+      </html>
+    `);
+
+    const violations = await auditPageContrast(page, MIN_WCAG_AA_CONTRAST);
+    await context.close();
+
+    // Without flattened assignedSlot traversal, `ag-button[variant="inverse"] > span`
+    // would have resolved against `body` (rgb(1, 4, 9)) instead of the Shadow DOM <button> (rgb(241, 245, 249))!
+    expect(violations).toEqual([]);
+  });
+
 });
