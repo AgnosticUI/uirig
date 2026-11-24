@@ -214,4 +214,61 @@ describe('::: ISSUE #37: MCP SERVER PARITY (THEMES, SOURCE-MAP, --FIX & A2UI TOO
     }
   });
 
+  it('==> Should expose uirig_sweep and report failedWidths via MCP tool calls (Issue #18)', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'uirig-mcp-sweep-'));
+    try {
+      writeFileSync(
+        join(tempDir, 'sweep.html'),
+        `<!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              * { box-sizing: border-box; }
+              body { margin: 0; padding: 16px; font-family: sans-serif; }
+              .tablet-overflow { display: none; width: 820px; height: 48px; background: #1e293b; color: #fff; }
+              @media (min-width: 720px) {
+                .tablet-overflow { display: block; }
+              }
+            </style>
+          </head>
+          <body><div class="tablet-overflow">Breaks in 720px-800px</div></body>
+        </html>`,
+        'utf8'
+      );
+
+      const server = createUirigMcpServer(pool, '0.3.1');
+      const client = new Client({ name: 'test-client', version: '1.0.0' });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+      await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+
+      const listed = await client.listTools();
+      expect(listed.tools.some((t) => t.name === 'uirig_sweep')).toBe(true);
+
+      const res = await client.callTool({
+        name: 'uirig_sweep',
+        arguments: {
+          target: './sweep.html',
+          cwd: tempDir,
+          sweep: '320:1440:40',
+        },
+      });
+
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>).at(0)?.text ?? '{}';
+      const payload = JSON.parse(text) as {
+        exitCode: number;
+        violations: Array<{ engine: string; failedWidths?: string }>;
+      };
+      expect(payload.exitCode).toBe(2);
+      expect(payload.violations.at(0)?.engine).toBe('sweep');
+      expect(payload.violations.at(0)?.failedWidths).toBe('720px-800px');
+
+      await client.close();
+      await server.close();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
 });

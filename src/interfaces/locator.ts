@@ -10,6 +10,7 @@ export type UirigEngineName =
   | 'contrast'
   | 'dark-mode'
   | 'stress'
+  | 'sweep'
   | 'cls'
   | 'dom'
   | 'runtime';

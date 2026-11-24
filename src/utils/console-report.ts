@@ -4,7 +4,8 @@
  * Ports and generalizes the playground's structured multi-engine check report
  * into core CLI runs so developers can inspect matched selector counts, exact failing
  * selectors, source-map `file:line` locations, Shadow DOM hosts, A2UI component IDs,
- * measured deltas, and suggested tokens directly in the terminal.
+ * measured deltas, breakpoint sweep ranges (`failedWidths`), and suggested tokens
+ * directly in the terminal.
  */
 
 import type { ICheckExecutionReport, IViewportAuditReport } from '../commands/check.js';
@@ -43,13 +44,14 @@ function formatViolationContext(options: {
 /**
  * Formats a single `(url, viewport, theme)` audit report into a color-coded terminal breakdown
  * covering matched selector scope counts and all core verification engines
- * (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`, and `runtime`).
+ * (`tokens`, `contrast`, `dark-mode`, `stress`, `sweep`, `cls`, `dom`, and `runtime`).
  */
 export function formatViewportConsoleSection(
   vpReport: IViewportAuditReport,
   verbose: boolean
 ): string[] {
   const darkViolations = vpReport.darkModeViolations ?? [];
+  const sweepViolations = vpReport.sweepViolations ?? [];
   const domViolations = vpReport.domViolations ?? [];
   const runtimeErrors = vpReport.runtimeErrors ?? [];
   const sourceMap = vpReport.sourceLocations ?? {};
@@ -99,6 +101,7 @@ export function formatViewportConsoleSection(
       );
     }
   }
+
   // 2. Rendered Luminance Contrast (`contrast`)
   lines.push(
     `${paint('2. [contrast]', 'bold', 'cyan')}  Contrast Violations     : ${formatCountBadge(
@@ -192,7 +195,7 @@ export function formatViewportConsoleSection(
     );
   }
 
-  // 6. DOM, ARIA, Media & Security Hygiene (`dom`)
+    // 6. DOM, ARIA, Media & Security Hygiene (`dom`)
   lines.push(
     `${paint('6. [dom]', 'bold', 'red')}       DOM & A11y Violations   : ${formatCountBadge(
       domViolations.length
@@ -229,6 +232,33 @@ export function formatViewportConsoleSection(
             'bold',
             'red'
           )}`
+        );
+      }
+    }
+  }
+
+  // 8. Responsive Breakpoint Sweep (`sweep`)
+  if (sweepViolations.length > 0 || verbose) {
+    lines.push(
+      `${paint('8. [sweep]', 'bold', 'yellow')}     Breakpoint Sweep Hits   : ${formatCountBadge(
+        sweepViolations.length
+      )}`
+    );
+    if (verbose) {
+      for (const v of sweepViolations) {
+        const related = v.relatedSelector ? ` -> ${paint(v.relatedSelector, 'yellow')}` : '';
+        const ctx = formatViolationContext({
+          sourceLocation: sourceMap[v.selector] ?? null,
+          hostComponent: v.hostComponent,
+          a2ui: a2uiMap[v.selector] ?? null,
+        });
+        lines.push(
+          `   ${paint('•', 'red')} [${paint(v.violationType, 'cyan')}] ${paint(
+            v.selector,
+            'yellow'
+          )}${related} (${paint(`failedWidths: ${v.failedWidths}`, 'bold', 'red')} | +${
+            v.measuredLeakPixels
+          }px)${ctx}`
         );
       }
     }
@@ -271,6 +301,7 @@ export function formatConsoleAuditReport(
     report.summary.totalContrastViolations +
     (report.summary.totalDarkModeViolations ?? 0) +
     report.summary.totalStressViolations +
+    (report.summary.totalSweepViolations ?? 0) +
     report.summary.totalClsViolations +
     (report.summary.totalDomViolations ?? 0) +
     (report.summary.totalRuntimeErrors ?? 0);

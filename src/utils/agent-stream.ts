@@ -61,6 +61,8 @@ export interface IAgenticViolation {
   suggestedToken?: string;
   /** Actionable, deterministic fix instruction so the LLM (Large Language Model) can patch the UI immediately. */
   remediationAdvice: string;
+  /** Collapsed contiguous failing viewport width range(s) when `--sweep` is active (e.g. `"760px-880px"`). */
+  failedWidths?: string;
 }
 
 /**
@@ -370,6 +372,73 @@ export function normalizeViewportViolations(
       selector: stressViolation.selector,
       inShadowDom: stressViolation.inShadowDom,
       occurrenceCount: 1,
+      measuredDelta,
+      remediationAdvice,
+    });
+  }
+
+  // 4b. Normalize Responsive Breakpoint Sweep Breaches (`sweep`)
+  for (const sweepViolation of viewportReport.sweepViolations ?? new Array()) {
+    const hostComponent =
+      sweepViolation.hostComponent !== undefined
+        ? sweepViolation.hostComponent
+        : extractHostComponentFromSelector(sweepViolation.selector);
+    const measuredDelta =
+      '+' + sweepViolation.measuredLeakPixels + 'px across ' + sweepViolation.failedWidths;
+    let fallbackAdvice = '';
+
+    if (sweepViolation.violationType === 'container_overflow') {
+      const parentTarget = sweepViolation.relatedSelector ?? 'its parent container';
+      fallbackAdvice =
+        "Constrain width or enable responsive wrapping inside '" +
+        parentTarget +
+        "' so '" +
+        sweepViolation.selector +
+        "' does not overflow by " +
+        sweepViolation.measuredLeakPixels +
+        'px across viewport widths ' +
+        sweepViolation.failedWidths +
+        '.';
+    } else if (sweepViolation.violationType === 'horizontal_scrollbar') {
+      fallbackAdvice =
+        'Eliminate horizontal viewport overflow (' +
+        sweepViolation.measuredLeakPixels +
+        'px bleed) across viewport widths ' +
+        sweepViolation.failedWidths +
+        " by replacing rigid pixel widths with fluid 'max-width: 100%' or responsive layout rules.";
+    } else {
+      const neighborTarget = sweepViolation.relatedSelector ?? 'adjacent interactive element';
+      fallbackAdvice =
+        "Increase gap/margin or stack '" +
+        sweepViolation.selector +
+        "' and '" +
+        neighborTarget +
+        "' across viewport widths " +
+        sweepViolation.failedWidths +
+        ' so edge clearance stays >= 24px (deficit ' +
+        sweepViolation.measuredLeakPixels +
+        'px).';
+    }
+
+    const { a2ui, remediationAdvice } = resolveA2uiForViolation({
+      selector: sweepViolation.selector,
+      engine: 'sweep',
+      violationType: sweepViolation.violationType,
+      measuredDelta,
+      fallbackAdvice,
+    });
+
+    normalized.push({
+      engine: 'sweep',
+      violationType: sweepViolation.violationType,
+      url: viewportReport.url,
+      viewport: viewportLabel,
+      hostComponent,
+      a2ui,
+      selector: sweepViolation.selector,
+      inShadowDom: sweepViolation.inShadowDom,
+      occurrenceCount: 1,
+      failedWidths: sweepViolation.failedWidths,
       measuredDelta,
       remediationAdvice,
     });

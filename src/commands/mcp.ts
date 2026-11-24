@@ -44,6 +44,10 @@ const AUDIT_INPUT_SHAPE = {
     .array(z.string())
     .optional()
     .describe('Optional list of theme skins (e.g. ["light", "dark", "enterprise-dark"]) evaluated via data-theme and color-scheme emulation.'),
+  sweep: z
+    .union([z.string(), z.boolean()])
+    .optional()
+    .describe('Optional responsive breakpoint sweep range "<min>:<max>:<step>" (e.g. "320:1440:40") or true for default "320:1440:40".'),
   changed: z
     .boolean()
     .optional()
@@ -102,6 +106,56 @@ const AUDIT_INPUT_SHAPE = {
     .describe('Optional working directory for resolving relative target, config, git-diff, source-map, and --fix paths.'),
 };
 
+const MCP_TOOL_SPECS: Array<IMcpToolSpec> = [
+  {
+    name: 'uirig_check',
+    description:
+      'Run all UI verification engines (design tokens, WCAG 2.1 contrast, dark-mode parity, +30% text stress, CLS, DOM/ARIA/a11y/security, and optional breakpoint sweep) in isolated contexts using a warm Chromium instance.',
+  },
+  {
+    name: 'uirig_tokens',
+    description:
+      'Audit Light DOM and open ShadowRoot computed CSS values against design tokens from uirig.config.json or --auto-tokens.',
+    only: 'tokens',
+  },
+  {
+    name: 'uirig_contrast',
+    description:
+      'Verify WCAG 2.1 AA rendered luminance contrast (>= 4.5:1) using Porter-Duff alpha compositing across Light + Shadow DOM.',
+    only: 'contrast',
+  },
+  {
+    name: 'uirig_dark_mode',
+    description:
+      'Emulate dark color scheme / [data-theme="dark"] and audit dark contrast plus un-inverted bright surfaces (> 0.85 luminance).',
+    only: 'dark-mode',
+  },
+  {
+    name: 'uirig_stress',
+    description:
+      'Fuzz visible text with +30% expansion and unbreakable strings to detect container overflow, horizontal scrollbars, squished avatars, and <24px touch targets.',
+    only: 'stress',
+  },
+  {
+    name: 'uirig_sweep',
+    description:
+      'Step an active Chromium viewport across [min, max, step] widths (default 320:1440:40) and report contiguous failing width ranges (failedWidths).',
+    only: 'sweep',
+  },
+  {
+    name: 'uirig_cls',
+    description:
+      'Measure W3C 1s/5s session-window Cumulative Layout Shift (CLS) against configured budgets.',
+    only: 'cls',
+  },
+  {
+    name: 'uirig_dom',
+    description:
+      'Audit Light + Shadow DOM for broken ARIA/label IDs, accessible names, broken media, unsafe links, orphaned slots, and prompt-injection traps.',
+    only: 'dom',
+  },
+];
+
 const A2UI_DELTA_INPUT_SHAPE = {
   surfaceId: z
     .string()
@@ -133,50 +187,6 @@ interface IMcpToolSpec {
   description: string;
   only?: AuditToolName;
 }
-
-const MCP_TOOL_SPECS: Array<IMcpToolSpec> = [
-  {
-    name: 'uirig_check',
-    description:
-      'Run all 6 deterministic UI verification engines (tokens, contrast, dark-mode, stress, cls, dom) concurrently in isolated contexts using a warm Chromium browser.',
-  },
-  {
-    name: 'uirig_tokens',
-    description:
-      'Audit Light DOM and open ShadowRoot computed styles against configured design tokens.',
-    only: 'tokens',
-  },
-  {
-    name: 'uirig_contrast',
-    description:
-      'Verify WCAG 2.1 AA rendered luminance contrast (>= 4.5:1) using Porter-Duff alpha compositing across Light and Shadow DOM.',
-    only: 'contrast',
-  },
-  {
-    name: 'uirig_dark_mode',
-    description:
-      'Emulate prefers-color-scheme: dark / [data-theme="dark"] and audit dark contrast and un-inverted bright surfaces.',
-    only: 'dark-mode',
-  },
-  {
-    name: 'uirig_stress',
-    description:
-      'Fuzz text with +30% expansion and space-free strings to detect container overflow, 100vw bleed, and <24px tap targets.',
-    only: 'stress',
-  },
-  {
-    name: 'uirig_cls',
-    description:
-      'Measure W3C 1s/5s session-window Cumulative Layout Shift (CLS) against clsMaxLimit.',
-    only: 'cls',
-  },
-  {
-    name: 'uirig_dom',
-    description:
-      'Audit Light + Shadow DOM and Chromium computed AX tree for broken ARIA/label IDs, ax_empty_name, ax_hidden_focus, orphaned <slot> projections, broken media, unsafe links, and prompt-injection traps.',
-    only: 'dom',
-  },
-];
 
 export function createUirigMcpServer(
   browserPool: WarmBrowserPool,
@@ -211,6 +221,7 @@ export function createUirigMcpServer(
             tokensPath: rawArgs.tokensPath,
             autoTokens: rawArgs.autoTokens,
             themes: rawArgs.themes,
+            sweep: rawArgs.sweep,
             changed: rawArgs.changed,
             baseRef: rawArgs.baseRef,
             fix: rawArgs.fix,
