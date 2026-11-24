@@ -332,6 +332,7 @@ export function parseCssCustomPropertyTokens(rawCss: string): ITokenScaleConfig 
 
 export function discoverWorkspaceTokens(cwd: string, maxDepth: number = 4): ITokenScaleConfig {
   const discoveredScales: ITokenScaleConfig[] = [];
+  const discoveredTokenCssFiles: Array<{ path: string; content: string }> = [];
 
   function scanDir(dirPath: string, depth: number): void {
     if (depth > maxDepth) {
@@ -340,7 +341,7 @@ export function discoverWorkspaceTokens(cwd: string, maxDepth: number = 4): ITok
 
     let entries: string[];
     try {
-      entries = readdirSync(dirPath);
+      entries = readdirSync(dirPath).sort((a, b) => a.localeCompare(b));
     } catch {
       return;
     }
@@ -394,7 +395,9 @@ export function discoverWorkspaceTokens(cwd: string, maxDepth: number = 4): ITok
       } else if (lowerName.endsWith('.css')) {
         try {
           const raw = readFileSync(fullPath, 'utf8');
-          if (raw.includes('@theme')) {
+          if (lowerName.includes('token')) {
+            discoveredTokenCssFiles.push({ path: fullPath, content: raw });
+          } else if (raw.includes('@theme')) {
             const parsedCssScale = parseTailwindThemeCss(raw);
             if (
               parsedCssScale.colors.length > 0 ||
@@ -413,8 +416,24 @@ export function discoverWorkspaceTokens(cwd: string, maxDepth: number = 4): ITok
   }
 
   scanDir(cwd, 0);
+
+  if (discoveredTokenCssFiles.length > 0) {
+    discoveredTokenCssFiles.sort((a, b) => a.path.localeCompare(b.path));
+    const combinedCss = discoveredTokenCssFiles.map((f) => f.content).join('\n');
+    const parsedTokenCssScale = parseCssCustomPropertyTokens(combinedCss);
+    if (
+      parsedTokenCssScale.colors.length > 0 ||
+      parsedTokenCssScale.spacing.length > 0 ||
+      parsedTokenCssScale.fontSizes.length > 0 ||
+      parsedTokenCssScale.radii.length > 0
+    ) {
+      discoveredScales.push(parsedTokenCssScale);
+    }
+  }
+
   return mergeTokenScales(...discoveredScales);
 }
+
 
 /**
  * Scrapes live `:root` / `html` CSS custom properties (`--*`) from a rendered Playwright `Page`,

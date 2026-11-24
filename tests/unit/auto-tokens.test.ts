@@ -280,4 +280,56 @@ describe('::: ISSUE #10 (CHUNKS 1–2): TOKEN CLASSIFIER & WORKSPACE FILE DISCOV
     });
   });
 
+  it('==> Should auto-discover and merge multiple light + dark *tokens*.css stylesheets including cross-file var() aliases', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'uirig-autotokens-multicss-'));
+
+    try {
+      mkdirSync(join(tempDir, 'src', 'styles'), { recursive: true });
+
+      writeFileSync(
+        join(tempDir, 'src', 'styles', 'ag-tokens.css'),
+        [
+          ':where(html) {',
+          '  --ag-neutral-950: #010409;',
+          '  --ag-neutral-50: #f0f6fc;',
+          '  --ag-background-primary: #ffffff;',
+          '  --ag-text-primary: #0f172a;',
+          '  --ag-space-4: 1rem;',
+          '  --ag-font-size-md: 16px;',
+          '  --ag-radius-md: 6px;',
+          '}',
+        ].join('\n'),
+        'utf8'
+      );
+
+      writeFileSync(
+        join(tempDir, 'src', 'styles', 'ag-tokens-dark.css'),
+        [
+          '[data-theme="dark"] {',
+          '  --ag-background-primary: var(--ag-neutral-950);',
+          '  --ag-text-primary: var(--ag-neutral-50);',
+          '  --ag-accent-dark: #38bdf8;',
+          '}',
+        ].join('\n'),
+        'utf8'
+      );
+
+      const discovered = discoverWorkspaceTokens(tempDir);
+
+      // Light tokens
+      expect(discovered.colors).toContain('rgb(255, 255, 255)');
+      expect(discovered.colors).toContain('rgb(15, 23, 42)');
+      // Dark tokens + cross-file var() aliases
+      expect(discovered.colors).toContain('rgb(1, 4, 9)');
+      expect(discovered.colors).toContain('rgb(240, 246, 252)');
+      expect(discovered.colors).toContain('rgb(56, 189, 248)');
+      // Dimensional scales
+      expect(discovered.spacing).toEqual(['16px', '0px']);
+      expect(discovered.fontSizes).toEqual(['16px']);
+      expect(discovered.radii).toEqual(['6px', '0px']);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
 });
