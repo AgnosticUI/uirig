@@ -180,7 +180,7 @@ const MCP_TOOL_SPECS: Array<IMcpToolSpec> = [
 
 export function createUirigMcpServer(
   browserPool: WarmBrowserPool,
-  version: string = '0.3.0'
+  version: string = '0.3.1'
 ): McpServer {
   const server = new McpServer({
     name: 'uirig',
@@ -289,7 +289,7 @@ export async function executeMcpCommand(options: IMcpServerOptions = {}): Promis
   const transportMode = options.transport ?? 'stdio';
   const port = options.port ?? 3333;
   const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_BROWSER_IDLE_TIMEOUT_MS;
-  const version = options.version ?? '0.3.0';
+  const version = options.version ?? '0.3.1';
 
   const browserPool = new WarmBrowserPool({
     headless: true,
