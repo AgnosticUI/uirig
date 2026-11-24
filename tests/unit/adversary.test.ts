@@ -370,5 +370,51 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
       expect(violations).toHaveLength(1);
       expect(violations.at(0)?.selector).toBe('span.scoped-leak');
     });
+
+    it('==> Should skip 1x1 clipped native <input> controls inside custom checkboxes/radios (Issue #56)', async () => {
+      if (!browser) {
+        browser = await chromium.launch({ headless: true });
+      }
+      const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+      const page = await context.newPage();
+
+      await page.setContent(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { margin: 0; padding: 24px; font-family: sans-serif; font-size: 16px; }
+              .clipped-native-input {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+              }
+              .visible-label { display: inline-flex; align-items: center; min-height: 28px; gap: 8px; }
+            </style>
+          </head>
+          <body>
+            <label class="visible-label">
+              <input type="checkbox" class="clipped-native-input" />
+              <span>Accept Terms</span>
+            </label>
+          </body>
+        </html>
+      `);
+
+      const violations = await runGeometricStressAudit(page, {
+        overflowPixelTolerance: 2,
+        touchTargetMinSpacingPx: 24,
+      });
+
+      await context.close();
+
+      expect(violations).toEqual([]);
+    });
   });
 });

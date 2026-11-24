@@ -282,9 +282,8 @@ export async function runGeometricStressAudit(
 
       function isHiddenSubtree(el: Element): boolean {
         if (
-          el.classList.contains('sr-only') ||
-          el.classList.contains('visually-hidden') ||
-          el.closest('.sr-only, .visually-hidden, [aria-hidden="true"], [inert]')
+          walker.isVisuallyHidden(el) ||
+          el.closest('[aria-hidden="true"], [inert]')
         ) {
           return true;
         }
@@ -337,7 +336,6 @@ export async function runGeometricStressAudit(
         },
         { includeBody: false }
       );
-
       // Step 1: Expand visible text nodes and inject unbreakable strings across Light + Shadow DOM
       let injectedUnbreakable = false;
       walker.walkElements((currentEl) => {
@@ -432,7 +430,6 @@ export async function runGeometricStressAudit(
               undersizedTargets.push(currentBox);
             }
           }
-
           const parentEl = currentEl.parentElement;
           if (
             parentEl &&

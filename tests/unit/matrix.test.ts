@@ -386,4 +386,40 @@ describe('::: PHASE 3 TASK 3.2 + ISSUE #7 (CHUNK 1): COLORJS.IO CONTRAST, ALPHA 
     expect(violations).toEqual([]);
   });
 
+  it('==> Should skip 1x1 clipped sr-only spans during contrast and dark-mode audits (Issue #56)', async () => {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 24px; background: rgb(255, 255, 255); color: rgb(15, 23, 42); }
+            .label-sr {
+              position: absolute;
+              width: 1px;
+              height: 1px;
+              overflow: hidden;
+              clip-path: inset(50%);
+              color: rgb(255, 255, 255);
+            }
+          </style>
+        </head>
+        <body>
+          <span class="label-sr">Screen-reader-only low-contrast text</span>
+          <p>Visible high-contrast label</p>
+        </body>
+      </html>
+    `);
+
+    const violations = await auditPageContrast(page, MIN_WCAG_AA_CONTRAST);
+    await context.close();
+
+    expect(violations).toEqual([]);
+  });
+
 });
