@@ -340,4 +340,50 @@ describe('::: PHASE 3 TASK 3.2 + ISSUE #7 (CHUNK 1): COLORJS.IO CONTRAST, ALPHA 
     expect(violations).toEqual([]);
   });
 
+  it('==> Should exempt [disabled] and [aria-disabled="true"] controls (including <ag-button disabled>) per WCAG 1.4.3', async () => {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background: rgb(255, 255, 255); }
+            button[disabled] { background: rgb(243, 244, 246); color: rgb(156, 163, 175); }
+            .aria-disabled-chip { background: rgb(243, 244, 246); color: rgb(156, 163, 175); }
+            ag-button[disabled] { color: rgb(156, 163, 175); }
+          </style>
+        </head>
+        <body>
+          <button disabled>Native Disabled Button</button>
+          <div role="button" aria-disabled="true" class="aria-disabled-chip">ARIA Disabled Button</div>
+          <ag-button disabled>Disabled Custom Element</ag-button>
+          <script>
+            class AgButton extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const isDisabled = this.hasAttribute('disabled');
+                shadow.innerHTML =
+                  '<button ' + (isDisabled ? 'disabled ' : '') + 'style="background: rgb(243, 244, 246); color: rgb(156, 163, 175); border: 0; padding: 8px 16px;">' +
+                    '<slot></slot>' +
+                  '</button>';
+              }
+            }
+            customElements.define('ag-button', AgButton);
+          </script>
+        </body>
+      </html>
+    `);
+
+    const violations = await auditPageContrast(page, MIN_WCAG_AA_CONTRAST);
+    await context.close();
+
+    expect(violations).toEqual([]);
+  });
+
 });

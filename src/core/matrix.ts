@@ -540,6 +540,50 @@ export async function extractTextContrastSnapshots(
         return rootNode instanceof ShadowRoot ? rootNode.host : null;
       }
 
+      // WCAG 2.1 SC 1.4.3 exemption: text that is part of an inactive user interface
+      // component (`[disabled]`, `[aria-disabled="true"]`, or inside a disabled `<fieldset>`)
+      // across either the flattened render tree or Light DOM ancestry is exempt from contrast checks.
+      function isInactiveUiComponent(el: Element): boolean {
+        const checkElementDisabled = (node: Element): boolean => {
+          if (node.hasAttribute('disabled')) {
+            return true;
+          }
+          const ariaDisabled = (node.getAttribute('aria-disabled') ?? '').trim().toLowerCase();
+          if (ariaDisabled === 'true') {
+            return true;
+          }
+          if ('disabled' in node && (node as HTMLButtonElement).disabled === true) {
+            return true;
+          }
+          return false;
+        };
+
+        let current: Element | null = el;
+        while (current) {
+          if (checkElementDisabled(current)) {
+            return true;
+          }
+          current = getFlattenedParentElement(current);
+        }
+
+        // Also check Light DOM host ancestors when `el` is a <slot> inside an open ShadowRoot
+        // whose Light DOM host element carries `[disabled]` or `[aria-disabled="true"]`.
+        let hostCursor: Element | null = el;
+        while (hostCursor) {
+          if (checkElementDisabled(hostCursor)) {
+            return true;
+          }
+          if (hostCursor.parentElement) {
+            hostCursor = hostCursor.parentElement;
+          } else {
+            const rootNode = hostCursor.getRootNode();
+            hostCursor = rootNode instanceof ShadowRoot ? rootNode.host : null;
+          }
+        }
+
+        return false;
+      }
+
       function collectAncestorStyleLayers(el: Element): IAncestorStyleLayer[] {
         const bottomUpLayers: IAncestorStyleLayer[] = [];
         let current: Element | null = el;
@@ -564,6 +608,7 @@ export async function extractTextContrastSnapshots(
           computed.display !== 'none' &&
           computed.visibility !== 'hidden' &&
           (hasDirectUnassignedVisibleText(currentNode) || hasSlottedDirectText(currentNode)) &&
+          !isInactiveUiComponent(currentNode) &&
           !walker.isIgnored(currentNode, activeRule)
         ) {
           const clippedGradient = hasClippedTextGradient(computed);
