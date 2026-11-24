@@ -46,6 +46,7 @@ function escapeMarkdownCell(value: string): string {
 export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): string {
   const passed = report.exitCode === 0;
   const darkModeCount = report.summary.totalDarkModeViolations ?? 0;
+  const sweepCount = report.summary.totalSweepViolations ?? 0;
   const domCount = report.summary.totalDomViolations ?? 0;
   const runtimeCount = report.summary.totalRuntimeErrors ?? 0;
 
@@ -83,6 +84,11 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
     `| **7. Runtime JS Errors** (\`runtime\`) | ${runtimeCount} | ${
       runtimeCount === 0 ? '✅ Pass' : '❌ Fail'
     } |`,
+    ...(sweepCount > 0
+      ? [
+          `| **8. Breakpoint Sweep** (\`sweep\`) | ${sweepCount} | ❌ Fail |`,
+        ]
+      : []),
     '',
   ];
 
@@ -101,13 +107,14 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
     lines.push('');
   }
 
-    // Append per-viewport violation breakdowns only for viewports that recorded issues
+  // Append per-viewport violation breakdowns only for viewports that recorded issues
   const failingViewports = report.results.filter(
     (r) =>
       r.tokenViolations.length > 0 ||
       r.contrastViolations.length > 0 ||
       (r.darkModeViolations?.length ?? 0) > 0 ||
       r.stressViolations.length > 0 ||
+      (r.sweepViolations?.length ?? 0) > 0 ||
       r.clsEvaluation.violation !== null ||
       (r.domViolations?.length ?? 0) > 0 ||
       (r.runtimeErrors?.length ?? 0) > 0
@@ -197,6 +204,23 @@ export function formatGithubPrCommentMarkdown(report: ICheckExecutionReport): st
             `| \`${escapeMarkdownCell(v.violationType)}\` | \`${escapeMarkdownCell(
               v.selector
             )}\` | ${relatedCell} | **+${v.measuredLeakPixels}px** |`
+          );
+        }
+        lines.push('');
+      }
+
+      if ((vpReport.sweepViolations?.length ?? 0) > 0) {
+        lines.push(
+          '**Responsive Breakpoint Sweep Hits (`sweep`):**',
+          '',
+          '| Type | Offending Selector | Failing Widths | Leak / Deficit |',
+          '| :--- | :--- | :---: | :---: |'
+        );
+        for (const v of vpReport.sweepViolations ?? new Array()) {
+          lines.push(
+            `| \`${escapeMarkdownCell(v.violationType)}\` | \`${escapeMarkdownCell(
+              v.selector
+            )}\` | \`${escapeMarkdownCell(v.failedWidths)}\` | **+${v.measuredLeakPixels}px** |`
           );
         }
         lines.push('');

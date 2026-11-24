@@ -3,19 +3,14 @@
  * Isolated Parallel Context Dispatcher (uirig check).
  * Launches a single Playwright Chromium instance (or reuses an injected WarmBrowserPool)
  * and orchestrates isolated BrowserContext sessions concurrently (`Promise.all`) per target
- * URL/viewport so read-only audits (`tokens`, `contrast`, `dom`), dark-mode parity (`dark-mode`),
- * mutated DOM fuzzing (`stress`), and pre-navigation `PerformanceObserver` monitoring (`cls`)
- * execute without cross-tool pollution or multiple browser startup overhead.
+ * URL/viewport so read-only audits (`tokens`, `contrast`, `dom`, `sweep`), dark-mode parity
+ * (`dark-mode`), mutated DOM fuzzing (`stress`), and pre-navigation `PerformanceObserver`
+ * monitoring (`cls`) execute without cross-tool pollution or multiple browser startup overhead.
  */
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { chromium, type Browser } from 'playwright';
 import { crawlPageTokens, type ITokenScaleConfig, type ITokenViolation } from '../core/tokens.js';
-import {
-  runBreakpointSweepAudit,
-  DEFAULT_SWEEP_SPEC,
-  type IBreakpointSweepViolation,
-} from '../core/sweep.js';
 import {
   discoverWorkspaceTokens,
   extractRootCssVariables,
@@ -25,6 +20,12 @@ import {
 } from '../core/auto-tokens.js';
 import { auditPageContrast, type IContrastViolation, MIN_WCAG_AA_CONTRAST } from '../core/matrix.js';
 import { runGeometricStressAudit, type IGeometricViolation } from '../core/adversary.js';
+import {
+  DEFAULT_SWEEP_SPEC,
+  parseSweepRange,
+  runBreakpointSweepAudit,
+  type IBreakpointSweepViolation,
+} from '../core/sweep.js';
 import { prepareClsObserver, collectPageCls, type IClsEvaluationResult } from '../core/cls.js';
 import { type WarmBrowserPool } from '../core/browser-pool.js';
 import {
@@ -84,83 +85,57 @@ export interface IThresholdBudgets {
   touchTargetMinSpacingPx: number;
   darkModeMaxSurfaceLuminance?: number;
 }
-
 export interface IUirigConfig {
   $schema?: string;
   targetUrls: Array<string>;
   tokensPath?: string | Array<string>;
   autoTokens?: boolean;
   themes?: Array<string>;
+  sweep?: string | boolean;
   changedPaths?: IChangedPathsConfig;
   thresholdBudgets: IThresholdBudgets;
   viewports: Array<IViewportConfig>;
   ignore?: Array<IUirigIgnoreRule>;
 }
 
-export type AuditToolName = 'tokens' | 'contrast' | 'dark-mode' | 'stress' | 'cls' | 'dom';
+export type AuditToolName = 'tokens' | 'contrast' | 'dark-mode' | 'stress' | 'cls' | 'dom' | 'sweep';
 
 export interface ICheckCommandOptions {
-  /** Optional positional `<url-or-file>` target for zero-config or single-target overrides. */
   target?: string;
   configPath?: string;
-  /** Optional explicit token scale path(s) override (`--tokens-path` / `--token-path`), resolved relative to `cwd`. */
   tokensPath?: string | Array<string>;
   json?: boolean;
   headless?: boolean;
-  /** When true, prints every individual failing selector beneath each engine section in human output. */
   verbose?: boolean;
-  /** When true, collects and emits a compact viewport-relative landmark bounding-box summary (`--spatial-brief`). */
   spatialBrief?: boolean;
-  /** When true, collapses child failures under their shared parent container or Web Component host (`--group-by-root`). */
   groupByRoot?: boolean;
-  /** Optional cap on the number of highest-priority violations emitted (`--top <n>`). */
   top?: number;
-  /** Optional approximate token budget for serialized JSON output (`--max-tokens <budget>`). */
   maxTokens?: number;
-  /** Optional CSS selectors limiting element-level audits to matching subtrees (`--selectors` / `-s`). */
   selectors?: Array<string>;
-  /** When true, inspects `git diff` to infer modified custom element selectors and exits cleanly (`0`) if no UI files changed (`--changed`). */
   changed?: boolean;
-  /** Optional Git base ref (e.g. `main`, `origin/main`) used with `--changed` (`--base <ref>`). */
   baseRef?: string;
-  /** Optional include/exclude glob overrides for `--changed` file classification. */
   changedPaths?: IChangedPathsConfig;
-  /** Optional single-engine filter. Runs all enabled engines when omitted. */
   only?: AuditToolName;
-  /** When true, auto-discovers design tokens from workspace files and live `:root` CSS variables when `tokensPath` is not set. */
   autoTokens?: boolean;
-  /** Optional theme skins (e.g. `['light', 'dark', 'enterprise-dark']`) evaluated via `data-theme` and color-scheme emulation (`--themes`). */
   themes?: Array<string>;
-  /** When true, applies deterministic 1-to-1 fixes on disk and runs a re-verification pass (`--fix`). */
+  sweep?: string | boolean;
   fix?: boolean;
-  /** Optional inline token scale override (useful for programmatic calls & tests). */
   tokenScaleOverride?: ITokenScaleConfig;
-  /** Optional viewport list override (e.g., single-viewport fast path for MCP tool calls). */
   viewportsOverride?: Array<IViewportConfig>;
-  /** Optional persistent warm browser pool (used by `uirig mcp` to eliminate Chromium cold starts). */
   browserPool?: WarmBrowserPool;
-  /** When true, suppresses writing CLI output to `process.stdout` (used by `uirig mcp` over stdio). */
   silentStdout?: boolean;
-  /** Optional custom output path for the Markdown PR comment report (defaults to `.uirig/github_pr_comment.md`). */
   reportOutputPath?: string;
-  /** Optional working directory override for resolving relative paths in tests. */
   cwd?: string;
 }
 
 export interface IViewportAuditReport {
   url: string;
   viewport: IViewportConfig;
-  /** Active theme skin name when multi-theme evaluation (`--themes`) is enabled. */
   theme?: string;
-  /** Active `--selectors` / `-s` filters when the audit was component-scoped. */
   scopedSelectors?: Array<string>;
-  /** Number of unique elements matched across Light + Shadow DOM (Document Object Model) for `scopedSelectors`. */
   matchedSelectorCount?: number;
-  /** Compact plain-text bounding-box summary emitted when `--spatial-brief` is enabled. */
   spatialBrief?: string;
-  /** Out-of-band `<a2ui-surface>` component attribution keyed by violation selector (`null` outside `<a2ui-surface>`). */
   a2uiAttributions?: Record<string, IA2uiAttribution | null>;
-  /** Resolved source-map / dev-metadata locations (`file:line:column`) keyed by violation selector (`null` when unmapped). */
   sourceLocations?: Record<string, ISourceLocation | null>;
   tokenViolations: Array<ITokenViolation>;
   contrastViolations: Array<IContrastViolation>;
@@ -237,7 +212,7 @@ export function loadUirigConfig(
   }
 
   if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error('ERR_CONFIG_SCHEMA: Configuration at ' + configPath + ' must be a JSON (JavaScript Object Notation) object.');
+    throw new Error('ERR_CONFIG_SCHEMA: Configuration at ' + configPath + ' must be a JSON object.');
   }
 
   const candidate = parsed as Partial<IUirigConfig>;
@@ -285,7 +260,7 @@ export function loadUirigConfig(
     );
   }
 
-  const ignoreRules = new Array<IUirigIgnoreRule>();
+    const ignoreRules = new Array<IUirigIgnoreRule>();
   if (candidate.ignore !== undefined) {
     if (!Array.isArray(candidate.ignore)) {
       throw new Error("ERR_CONFIG_SCHEMA: 'ignore' must be an array of ignore rule objects.");
@@ -310,7 +285,9 @@ export function loadUirigConfig(
   let parsedChangedPaths: IChangedPathsConfig | undefined;
   if (rawChangedPaths !== undefined) {
     if (typeof rawChangedPaths !== 'object' || rawChangedPaths === null) {
-      throw new Error("ERR_CONFIG_SCHEMA: 'changedPaths' must be an object with optional 'include' and 'exclude' string arrays.");
+      throw new Error(
+        "ERR_CONFIG_SCHEMA: 'changedPaths' must be an object with optional 'include' and 'exclude' string arrays."
+      );
     }
     const include = Array.isArray(rawChangedPaths.include)
       ? rawChangedPaths.include.filter((g): g is string => typeof g === 'string' && g.trim().length > 0)
@@ -326,12 +303,20 @@ export function loadUirigConfig(
     }
   }
 
+  const parsedSweep =
+    typeof candidate.sweep === 'string' && candidate.sweep.trim().length > 0
+      ? candidate.sweep.trim()
+      : candidate.sweep === true
+        ? true
+        : undefined;
+
   return {
     $schema: candidate.$schema,
     targetUrls: candidate.targetUrls,
     tokensPath: candidate.tokensPath,
     autoTokens: candidate.autoTokens === true,
     ...(configThemes && configThemes.length > 0 ? { themes: configThemes } : {}),
+    ...(parsedSweep !== undefined ? { sweep: parsedSweep } : {}),
     ...(parsedChangedPaths ? { changedPaths: parsedChangedPaths } : {}),
     thresholdBudgets: {
       clsMaxLimit: budgets.clsMaxLimit,
@@ -384,7 +369,6 @@ export function resolveExecutionConfig(
   loadUirigConfig(defaultConfigPath);
   throw new Error('ERR_CONFIG_MISSING: Configuration file not found at ' + defaultConfigPath + '.');
 }
-
 const TOKEN_FORMAT_REMEDIATION_GUIDE =
   'Supported formats for tokensPath / --tokens-path: ' +
   '(1) W3C Design Tokens JSON (nested objects with "$value" leaves), ' +
@@ -519,7 +503,6 @@ export function loadTokenScale(
     }
     scales.push(dictionaryScale);
   }
-
   if (cssContents.length > 0) {
     const cssScale = parseCssCustomPropertyTokens(cssContents.join('\n'));
     if (!hasAnyNormalizedTokens(cssScale)) {
@@ -544,7 +527,11 @@ export function evaluatePosixExitCode(results: Array<IViewportAuditReport>): Pos
   let hasPolicyOrIntegrityFailure = false;
 
   for (const report of results) {
-    if (report.stressViolations.length > 0 || report.clsEvaluation.violation !== null) {
+    if (
+      report.stressViolations.length > 0 ||
+      (report.sweepViolations?.length ?? 0) > 0 ||
+      report.clsEvaluation.violation !== null
+    ) {
       hasStructuralOrClsFailure = true;
     }
     if (
@@ -580,7 +567,8 @@ export async function auditViewportInParallel(
   includeSpatialBrief: boolean = false,
   autoDiscoverRootTokens: boolean = false,
   themeName?: string,
-  cwd: string = process.cwd()
+  cwd: string = process.cwd(),
+  sweepSpec?: string
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
   const isDarkThemeSkin = themeName ? /(?:^|[-_])dark(?:$|[-_])/i.test(themeName) : false;
@@ -595,13 +583,16 @@ export async function auditViewportInParallel(
   const runStress = !only || only === 'stress';
   const runCls = !only || only === 'cls';
   const runDom = !only || only === 'dom';
+  const runSweep = sweepSpec !== undefined && (!only || only === 'sweep');
   const runRuntimeCapture = !only;
   const hasSelectors = Boolean(selectors && selectors.length > 0);
 
   const activeScope = only ? 'single engine (' + only + ')' : '4 isolated contexts';
   const selectorTag = hasSelectors && selectors ? ' [scope: ' + selectors.join(', ') + ']' : '';
   const themeTag = themeName ? ' [theme: ' + themeName + ']' : '';
-  const vpLabel = viewport.name + ' (' + viewport.width + 'x' + viewport.height + ')' + themeTag;
+  const sweepTag = runSweep && sweepSpec ? ' [sweep: ' + sweepSpec + ']' : '';
+  const vpLabel =
+    viewport.name + ' (' + viewport.width + 'x' + viewport.height + ')' + themeTag + sweepTag;
   logTelemetry(
     'check:dispatch',
     'Running ' +
@@ -613,7 +604,6 @@ export async function auditViewportInParallel(
       paint(vpLabel, 'bold', 'green') +
       '...'
   );
-
   let effectiveTokenScale: ITokenScaleConfig | null = tokenScale;
   if (autoDiscoverRootTokens) {
     const probeContext = await browser.newContext(contextOptions);
@@ -685,6 +675,7 @@ export async function auditViewportInParallel(
       await context.close();
     }
   };
+
   const runClsTrack = async (): Promise<IClsEvaluationResult> => {
     if (!runCls) {
       return { maxSessionCls: 0, violation: null };
@@ -710,7 +701,6 @@ export async function auditViewportInParallel(
     runStressTrack(),
     runClsTrack(),
   ]);
-
   const runReadOnlyTrack = async (): Promise<{
     matchedSelectorCount?: number;
     spatialBrief?: string;
@@ -718,6 +708,7 @@ export async function auditViewportInParallel(
     sourceLocations?: Record<string, ISourceLocation | null>;
     tokenViolations: Array<ITokenViolation>;
     contrastViolations: Array<IContrastViolation>;
+    sweepViolations: Array<IBreakpointSweepViolation>;
     domViolations: Array<IDomIntegrityViolation>;
     runtimeErrors: Array<IRuntimeErrorViolation>;
   }> => {
@@ -727,6 +718,7 @@ export async function auditViewportInParallel(
       !runTokens &&
       !runContrast &&
       !runDom &&
+      !runSweep &&
       !runRuntimeCapture &&
       !hasSelectors &&
       !includeSpatialBrief &&
@@ -735,6 +727,7 @@ export async function auditViewportInParallel(
       return {
         tokenViolations: new Array<ITokenViolation>(),
         contrastViolations: new Array<IContrastViolation>(),
+        sweepViolations: new Array<IBreakpointSweepViolation>(),
         domViolations: new Array<IDomIntegrityViolation>(),
         runtimeErrors: new Array<IRuntimeErrorViolation>(),
       };
@@ -819,11 +812,24 @@ export async function auditViewportInParallel(
           })
         : new Array<IDomIntegrityViolation>();
 
+      const sweepViolations =
+        runSweep && sweepSpec !== undefined
+          ? await runBreakpointSweepAudit(page, {
+              sweepSpec,
+              viewportHeight: viewport.height,
+              overflowPixelTolerance: budgets.overflowPixelTolerance,
+              touchTargetMinSpacingPx: budgets.touchTargetMinSpacingPx,
+              ignoreRules,
+              selectors,
+            })
+          : new Array<IBreakpointSweepViolation>();
+
       const candidateSelectors = [
         ...tokenViolations.map((v) => v.selector),
         ...contrastViolations.map((v) => v.selector),
         ...darkModeViolations.map((v) => v.selector),
         ...stressViolations.map((v) => v.selector),
+        ...sweepViolations.map((v) => v.selector),
         ...domViolations.map((v) => v.selector),
       ];
       let a2uiAttributions: Record<string, IA2uiAttribution | null> | undefined;
@@ -844,6 +850,7 @@ export async function auditViewportInParallel(
         sourceLocations,
         tokenViolations,
         contrastViolations,
+        sweepViolations,
         domViolations,
         runtimeErrors,
       };
@@ -877,12 +884,14 @@ export async function auditViewportInParallel(
     contrastViolations: readOnlyResult.contrastViolations,
     darkModeViolations,
     stressViolations,
+    ...(readOnlyResult.sweepViolations.length > 0
+      ? { sweepViolations: readOnlyResult.sweepViolations }
+      : {}),
     clsEvaluation,
     domViolations: readOnlyResult.domViolations,
     runtimeErrors: readOnlyResult.runtimeErrors,
   };
 }
-
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
 ): Promise<ICheckExecutionReport> {
@@ -899,6 +908,22 @@ export async function executeCheckCommand(
 
   try {
     const { config, configLabel } = resolveExecutionConfig(options, cwd);
+
+    const rawSweep = options.sweep !== undefined ? options.sweep : config.sweep;
+    const effectiveSweepSpec: string | undefined =
+      options.only === 'sweep'
+        ? typeof rawSweep === 'string' && rawSweep.trim().length > 0
+          ? rawSweep.trim()
+          : DEFAULT_SWEEP_SPEC
+        : typeof rawSweep === 'string' && rawSweep.trim().length > 0
+          ? rawSweep.trim()
+          : rawSweep === true
+            ? DEFAULT_SWEEP_SPEC
+            : undefined;
+    if (effectiveSweepSpec !== undefined) {
+      parseSweepRange(effectiveSweepSpec);
+    }
+
     let effectiveSelectors: Array<string> | undefined = options.selectors
       ? [...options.selectors]
       : undefined;
@@ -933,6 +958,7 @@ export async function executeCheckCommand(
             totalContrastViolations: 0,
             totalDarkModeViolations: 0,
             totalStressViolations: 0,
+            totalSweepViolations: 0,
             totalClsViolations: 0,
             totalDomViolations: 0,
             totalRuntimeErrors: 0,
@@ -977,14 +1003,22 @@ export async function executeCheckCommand(
       }
     }
 
-    const activeViewports =
+    const baseViewports =
       options.viewportsOverride && options.viewportsOverride.length > 0
         ? options.viewportsOverride
         : config.viewports;
+    const firstBaseViewport = baseViewports.at(0);
+    const activeViewports =
+      effectiveSweepSpec !== undefined &&
+      !options.viewportsOverride &&
+      baseViewports.length > 1 &&
+      firstBaseViewport !== undefined
+        ? [firstBaseViewport]
+        : baseViewports;
     const autoTokensEnabled = Boolean(options.autoTokens ?? config.autoTokens);
     const effectiveTokensPath = options.tokensPath ?? config.tokensPath;
     const tokensResolutionBase = options.tokensPath ? cwd : configLabel;
-    const tokenAgnosticEngines = new Set<AuditToolName>(['stress', 'cls', 'dom']);
+    const tokenAgnosticEngines = new Set<AuditToolName>(['stress', 'cls', 'dom', 'sweep']);
     const softTokenEngines = new Set<AuditToolName>(['contrast', 'dark-mode']);
     let tokenScale: ITokenScaleConfig | null = null;
     let shouldAutoDiscoverRootTokens = false;
@@ -1099,7 +1133,8 @@ export async function executeCheckCommand(
               Boolean(options.spatialBrief),
               shouldAutoDiscoverRootTokens,
               themeName,
-              cwd
+              cwd,
+              effectiveSweepSpec
             );
             sweepResults.push({
               ...viewportReport,
@@ -1149,6 +1184,10 @@ export async function executeCheckCommand(
         0
       ),
       totalStressViolations: results.reduce((sum, r) => sum + r.stressViolations.length, 0),
+      totalSweepViolations: results.reduce(
+        (sum, r) => sum + (r.sweepViolations?.length ?? 0),
+        0
+      ),
       totalClsViolations: results.reduce(
         (sum, r) => sum + (r.clsEvaluation.violation ? 1 : 0),
         0

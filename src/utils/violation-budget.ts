@@ -72,7 +72,7 @@ export function scoreViolationPriority(violation: IAgenticViolation): number {
 
   if (violation.engine === 'cls' || violation.engine === 'runtime') {
     baseTierScore = 100;
-  } else if (violation.engine === 'stress') {
+  } else if (violation.engine === 'stress' || violation.engine === 'sweep') {
     baseTierScore = 80;
   } else if (
     violation.engine === 'dom' &&
@@ -93,6 +93,7 @@ export function scoreViolationPriority(violation: IAgenticViolation): number {
 
   return baseTierScore + occurrenceBonus;
 }
+
 /**
  * Returns a copy of `violations` sorted from highest priority score to lowest.
  * If two violations tie on score, sorts alphabetically by viewport, selector,

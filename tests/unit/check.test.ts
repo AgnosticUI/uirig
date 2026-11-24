@@ -1308,4 +1308,39 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     ).rejects.toThrow(/ERR_INVALID_URL/);
   });
 
+  it('runs responsive breakpoint sweep (--sweep) without extra browsers and returns exitCode 2 with failedWidths', async () => {
+    const html = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            * { box-sizing: border-box; }
+            body { margin: 0; padding: 16px; font-family: sans-serif; }
+            .tablet-overflow { display: none; width: 820px; height: 48px; background: #1e293b; color: #fff; }
+            @media (min-width: 720px) {
+              .tablet-overflow { display: block; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="tablet-overflow">Breaks in 720px-800px</div>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(html);
+    activeServer = server;
+
+    const report = await executeCheckCommand({
+      target: url,
+      cwd: tempDir,
+      sweep: '320:1440:40',
+      headless: true,
+      silentStdout: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    expect(report.exitCode).toBe(2);
+    expect(report.summary.totalSweepViolations).toBe(1);
+    expect(report.results.at(0)?.sweepViolations?.at(0)?.failedWidths).toBe('720px-800px');
+  });
+
 });
