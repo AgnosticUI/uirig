@@ -56,6 +56,7 @@ export function createBrowserDomWalker(
   resolveHostComponent: (el: Element) => string | null;
   isIgnored: (el: Element, ruleName: string) => boolean;
   isInScope: (el: Element) => boolean;
+  isVisuallyHidden: (el: Element) => boolean;
   walkElements: (
     onElement: (el: Element, meta: IWalkedElementMetadata) => void,
     options?: { includeBody?: boolean }
@@ -118,6 +119,37 @@ export function createBrowserDomWalker(
     return checkInScope(el, activeSelectors);
   }
 
+  function isVisuallyHidden(el: Element): boolean {
+    let cursor: Element | null = el;
+    while (cursor && cursor.tagName !== 'BODY' && cursor.tagName !== 'HTML') {
+      if (
+        cursor.classList.contains('sr-only') ||
+        cursor.classList.contains('visually-hidden')
+      ) {
+        return true;
+      }
+      const style = window.getComputedStyle(cursor);
+      const rect = cursor.getBoundingClientRect();
+      if (rect.width <= 1 && rect.height <= 1) {
+        const clip = (style.clip || '').replace(/\s+/g, '');
+        const clipPath = (style.clipPath || '').trim().toLowerCase();
+        const isClipped =
+          clip === 'rect(0px,0px,0px,0px)' ||
+          clip === 'rect(1px,1px,1px,1px)' ||
+          clipPath.startsWith('inset(50%') ||
+          clipPath.startsWith('inset(100%)') ||
+          style.overflow === 'hidden' ||
+          style.overflowX === 'hidden' ||
+          style.overflowY === 'hidden';
+        if (isClipped) {
+          return true;
+        }
+      }
+      cursor = cursor.parentElement;
+    }
+    return false;
+  }
+
   function walkElements(
     onElement: (el: Element, meta: IWalkedElementMetadata) => void,
     options: { includeBody?: boolean } = {}
@@ -168,6 +200,7 @@ export function createBrowserDomWalker(
     resolveHostComponent,
     isIgnored,
     isInScope,
+    isVisuallyHidden,
     walkElements,
   };
 }

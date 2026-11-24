@@ -205,7 +205,11 @@ export async function extractShadowPiercingStyles(
       walker.walkElements((currentNode, meta) => {
         const computed = window.getComputedStyle(currentNode);
 
-        if (computed.display !== 'none' && !walker.isIgnored(currentNode, 'tokens')) {
+        if (
+          computed.display !== 'none' &&
+          !walker.isVisuallyHidden(currentNode) &&
+          !walker.isIgnored(currentNode, 'tokens')
+        ) {
           snapshots.push({
             selector: meta.selector,
             hostComponent: meta.hostComponent,
