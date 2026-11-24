@@ -222,4 +222,82 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
     expect(violations).toHaveLength(1);
     expect(violations[0]?.selector).toBe('div.scoped-white');
   });
+
+  it('resolves Shadow DOM <slot> background and exempts <ag-button disabled> during dark-mode audits (Issue #52)', async () => {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root {
+              --ag-bg: #ffffff;
+              --ag-primary-bg: #2563eb;
+              --ag-primary-fg: #ffffff;
+              --ag-inverse-bg: #f1f5f9;
+              --ag-inverse-fg: #0f172a;
+              --ag-disabled-bg: #e2e8f0;
+              --ag-disabled-fg: #94a3b8;
+            }
+            :root[data-theme="dark"] {
+              --ag-bg: rgb(1, 4, 9);
+              --ag-primary-bg: #1d4ed8;
+              --ag-primary-fg: #f8fafc;
+              --ag-inverse-bg: #f1f5f9;
+              --ag-inverse-fg: #0f172a;
+              --ag-disabled-bg: #1e293b;
+              --ag-disabled-fg: #475569;
+            }
+            body { margin: 0; padding: 24px; background: var(--ag-bg); color: #f0f6fc; }
+            ag-button[variant="primary"] { color: var(--ag-primary-fg); }
+            ag-button[variant="inverse"] { color: var(--ag-inverse-fg); }
+            ag-button[disabled] { color: var(--ag-disabled-fg); }
+          </style>
+        </head>
+        <body>
+          <ag-button variant="primary">Primary Action</ag-button>
+          <ag-button variant="inverse">Inverse Pill Action</ag-button>
+          <ag-button disabled>Disabled Button</ag-button>
+          <script>
+            class AgButton extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const isDisabled = this.hasAttribute('disabled');
+                const variant = this.getAttribute('variant') || 'primary';
+                const bg = isDisabled
+                  ? 'var(--ag-disabled-bg)'
+                  : variant === 'inverse'
+                  ? 'var(--ag-inverse-bg)'
+                  : 'var(--ag-primary-bg)';
+                const fg = isDisabled
+                  ? 'var(--ag-disabled-fg)'
+                  : variant === 'inverse'
+                  ? 'var(--ag-inverse-fg)'
+                  : 'var(--ag-primary-fg)';
+                shadow.innerHTML =
+                  '<button ' +
+                    (isDisabled ? 'disabled ' : '') +
+                    'style="background: ' + bg + '; color: ' + fg + '; border: 0; padding: 8px 16px;">' +
+                    '<slot></slot>' +
+                  '</button>';
+              }
+            }
+            customElements.define('ag-button', AgButton);
+          </script>
+        </body>
+      </html>
+    `);
+
+    const violations = await runDarkModeAudit(page);
+    await context.close();
+
+    expect(violations).toEqual([]);
+  });
+
 });
