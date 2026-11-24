@@ -1121,4 +1121,150 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalTokenViolations).toBe(0);
   });
 
+  it('validates tokensPath arrays in uirig.config.json and rejects empty or blank entries with ERR_CONFIG_SCHEMA', () => {
+    const validArrayConfig = join(tempDir, 'array-tokens.config.json');
+    writeFileSync(
+      validArrayConfig,
+      JSON.stringify({
+        targetUrls: ['http://localhost:3000'],
+        tokensPath: ['./src/styles/ag-tokens.css', './src/styles/ag-tokens-dark.css'],
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+
+    const loaded = loadUirigConfig(validArrayConfig);
+    expect(loaded.tokensPath).toEqual([
+      './src/styles/ag-tokens.css',
+      './src/styles/ag-tokens-dark.css',
+    ]);
+
+    const emptyArrayConfig = join(tempDir, 'empty-array.config.json');
+    writeFileSync(
+      emptyArrayConfig,
+      JSON.stringify({
+        targetUrls: ['http://localhost:3000'],
+        tokensPath: [],
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+    expect(() => loadUirigConfig(emptyArrayConfig)).toThrow(/ERR_CONFIG_SCHEMA/);
+
+    const blankItemConfig = join(tempDir, 'blank-item.config.json');
+    writeFileSync(
+      blankItemConfig,
+      JSON.stringify({
+        targetUrls: ['http://localhost:3000'],
+        tokensPath: ['./ag-tokens.css', '   '],
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+    expect(() => loadUirigConfig(blankItemConfig)).toThrow(/ERR_CONFIG_SCHEMA/);
+  });
+
+  it('loads and merges split light + dark CSS token files via tokensPath array with 0 dark-mode token_drift violations', async () => {
+    const lightTokensFile = join(tempDir, 'ag-tokens.css');
+    const darkTokensFile = join(tempDir, 'ag-tokens-dark.css');
+    const htmlPath = join(tempDir, 'split-theme.html');
+    const configFile = join(tempDir, 'uirig.config.json');
+
+    writeFileSync(
+      lightTokensFile,
+      [
+        ':where(html) {',
+        '  --ag-neutral-950: #010409;',
+        '  --ag-neutral-50: #f0f6fc;',
+        '  --ag-bg: #ffffff;',
+        '  --ag-fg: #0f172a;',
+        '  --ag-space-4: 16px;',
+        '  --ag-font-md: 16px;',
+        '  --ag-radius-none: 0px;',
+        '}',
+      ].join('\n'),
+      'utf8'
+    );
+
+    writeFileSync(
+      darkTokensFile,
+      [
+        '[data-theme="dark"] {',
+        '  --ag-bg: var(--ag-neutral-950);',
+        '  --ag-fg: var(--ag-neutral-50);',
+        '}',
+      ].join('\n'),
+      'utf8'
+    );
+
+    const mergedScale = loadTokenScale(
+      ['./ag-tokens.css', './ag-tokens-dark.css'],
+      configFile
+    );
+    expect(mergedScale.colors).toContain('rgb(255, 255, 255)');
+    expect(mergedScale.colors).toContain('rgb(15, 23, 42)');
+    expect(mergedScale.colors).toContain('rgb(1, 4, 9)');
+    expect(mergedScale.colors).toContain('rgb(240, 246, 252)');
+
+    writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <link rel="stylesheet" href="./ag-tokens.css" />
+          <link rel="stylesheet" href="./ag-tokens-dark.css" />
+          <style>
+            body { margin: 0; padding: 16px; background: var(--ag-bg); color: var(--ag-fg); font-size: 16px; border-radius: 0px; }
+            p { margin: 0; font-size: 16px; }
+          </style>
+        </head>
+        <body><p>Split light and dark CSS tokens</p></body>
+      </html>`,
+      'utf8'
+    );
+
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: ['./split-theme.html'],
+        tokensPath: ['./ag-tokens.css', './ag-tokens-dark.css'],
+        themes: ['light', 'dark'],
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+
+    const report = await executeCheckCommand({
+      configPath: configFile,
+      cwd: tempDir,
+      only: 'tokens',
+      headless: true,
+      silentStdout: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    expect(report.exitCode).toBe(0);
+    expect(report.summary.totalTokenViolations).toBe(0);
+  });
+
 });

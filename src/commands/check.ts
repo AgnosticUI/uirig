@@ -82,7 +82,7 @@ export interface IThresholdBudgets {
 export interface IUirigConfig {
   $schema?: string;
   targetUrls: Array<string>;
-  tokensPath?: string;
+  tokensPath?: string | Array<string>;
   autoTokens?: boolean;
   themes?: Array<string>;
   changedPaths?: IChangedPathsConfig;
@@ -97,8 +97,8 @@ export interface ICheckCommandOptions {
   /** Optional positional `<url-or-file>` target for zero-config or single-target overrides. */
   target?: string;
   configPath?: string;
-  /** Optional explicit token scale path override (`--tokens-path` / `--token-path`), resolved relative to `cwd`. */
-  tokensPath?: string;
+  /** Optional explicit token scale path(s) override (`--tokens-path` / `--token-path`), resolved relative to `cwd`. */
+  tokensPath?: string | Array<string>;
   json?: boolean;
   headless?: boolean;
   /** When true, prints every individual failing selector beneath each engine section in human output. */
@@ -240,15 +240,20 @@ export function loadUirigConfig(
     );
   }
 
-  if (
-    candidate.tokensPath !== undefined &&
-    (typeof candidate.tokensPath !== 'string' || candidate.tokensPath.trim().length === 0)
-  ) {
-    throw new Error(
-      "ERR_CONFIG_SCHEMA: 'tokensPath' must be a non-empty file path string when specified in " +
-        configPath +
-        '.'
-    );
+  if (candidate.tokensPath !== undefined) {
+    const isValidSingle =
+      typeof candidate.tokensPath === 'string' && candidate.tokensPath.trim().length > 0;
+    const isValidArray =
+      Array.isArray(candidate.tokensPath) &&
+      candidate.tokensPath.length > 0 &&
+      candidate.tokensPath.every((p) => typeof p === 'string' && p.trim().length > 0);
+    if (!isValidSingle && !isValidArray) {
+      throw new Error(
+        "ERR_CONFIG_SCHEMA: 'tokensPath' must be a non-empty file path string or non-empty array of file path strings when specified in " +
+          configPath +
+          '.'
+      );
+    }
   }
 
   if (!Array.isArray(candidate.viewports) || candidate.viewports.length === 0) {
@@ -330,6 +335,7 @@ export function loadUirigConfig(
     ignore: ignoreRules,
   };
 }
+
 export function resolveExecutionConfig(
   options: ICheckCommandOptions,
   cwd: string
@@ -388,114 +394,141 @@ function hasAnyNormalizedTokens(scale: ITokenScaleConfig): boolean {
   );
 }
 
-export function loadTokenScale(tokensPath: string, basePathForResolution: string): ITokenScaleConfig {
+export function loadTokenScale(
+  tokensPath: string | Array<string>,
+  basePathForResolution: string
+): ITokenScaleConfig {
+  const pathList = Array.isArray(tokensPath) ? tokensPath : [tokensPath];
+  if (pathList.length === 0 || pathList.some((p) => p.trim().length === 0)) {
+    throw new Error(
+      'ERR_TOKENS_SCHEMA: tokensPath must contain at least one non-empty file path. ' +
+        TOKEN_FORMAT_REMEDIATION_GUIDE
+    );
+  }
+
   const baseDir =
     basePathForResolution.endsWith('.json')
       ? dirname(basePathForResolution)
       : basePathForResolution;
-  const resolvedTokensPath = resolve(baseDir, tokensPath);
-  logTelemetry(
-    'check:tokens',
-    'Loading design token scale from ' + paint(resolvedTokensPath, 'cyan') + '...'
-  );
 
-  if (!existsSync(resolvedTokensPath)) {
-    throw new Error(
-      'ERR_TOKENS_MISSING: Token scale file not found at ' +
-        resolvedTokensPath +
-        '. Check the path in tokensPath / --tokens-path, or pass --auto-tokens.'
+  const scales = new Array<ITokenScaleConfig>();
+  const cssContents = new Array<string>();
+
+  for (const singlePath of pathList) {
+    const resolvedTokensPath = resolve(baseDir, singlePath.trim());
+    logTelemetry(
+      'check:tokens',
+      'Loading design token scale from ' + paint(resolvedTokensPath, 'cyan') + '...'
     );
-  }
 
-  let raw: string;
-  try {
-    raw = readFileSync(resolvedTokensPath, 'utf8');
-  } catch (err: unknown) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error('ERR_TOKENS_MISSING: Unable to read ' + resolvedTokensPath + ': ' + detail);
-  }
-
-  if (resolvedTokensPath.toLowerCase().endsWith('.css')) {
-    const cssScale = parseCssCustomPropertyTokens(raw);
-    if (!hasAnyNormalizedTokens(cssScale)) {
+    if (!existsSync(resolvedTokensPath)) {
       throw new Error(
-        'ERR_TOKENS_SCHEMA: No valid CSS custom properties (--*) with color or length values were found in ' +
+        'ERR_TOKENS_MISSING: Token scale file not found at ' +
           resolvedTokensPath +
+          '. Check the path in tokensPath / --tokens-path, or pass --auto-tokens.'
+      );
+    }
+
+    let raw: string;
+    try {
+      raw = readFileSync(resolvedTokensPath, 'utf8');
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error('ERR_TOKENS_MISSING: Unable to read ' + resolvedTokensPath + ': ' + detail);
+    }
+
+    if (resolvedTokensPath.toLowerCase().endsWith('.css')) {
+      cssContents.push(raw);
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        'ERR_TOKENS_INVALID_JSON: Failed to parse ' +
+          resolvedTokensPath +
+          ': ' +
+          detail +
           '. ' +
           TOKEN_FORMAT_REMEDIATION_GUIDE
       );
     }
-    return cssScale;
-  }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err: unknown) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      'ERR_TOKENS_INVALID_JSON: Failed to parse ' +
-        resolvedTokensPath +
-        ': ' +
-        detail +
-        '. ' +
-        TOKEN_FORMAT_REMEDIATION_GUIDE
-    );
-  }
-
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(
-      'ERR_TOKENS_SCHEMA: Token file at ' +
-        resolvedTokensPath +
-        ' must be a JSON object. ' +
-        TOKEN_FORMAT_REMEDIATION_GUIDE
-    );
-  }
-
-  const candidate = parsed as Partial<ITokenScaleConfig>;
-  const hasFlatArrayShape =
-    Array.isArray(candidate.colors) ||
-    Array.isArray(candidate.spacing) ||
-    Array.isArray(candidate.fontSizes) ||
-    Array.isArray(candidate.radii);
-
-  if (hasFlatArrayShape) {
-    if (
-      !Array.isArray(candidate.colors) ||
-      !Array.isArray(candidate.spacing) ||
-      !Array.isArray(candidate.fontSizes) ||
-      !Array.isArray(candidate.radii) ||
-      !candidate.colors.every((v) => typeof v === 'string') ||
-      !candidate.spacing.every((v) => typeof v === 'string') ||
-      !candidate.fontSizes.every((v) => typeof v === 'string') ||
-      !candidate.radii.every((v) => typeof v === 'string')
-    ) {
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
       throw new Error(
-        'ERR_TOKENS_SCHEMA: Flat token scale JSON at ' +
+        'ERR_TOKENS_SCHEMA: Token file at ' +
           resolvedTokensPath +
-          ' must define string arrays for all four keys: colors, spacing, fontSizes, and radii. ' +
+          ' must be a JSON object. ' +
           TOKEN_FORMAT_REMEDIATION_GUIDE
       );
     }
-    return {
-      colors: candidate.colors,
-      spacing: candidate.spacing,
-      fontSizes: candidate.fontSizes,
-      radii: candidate.radii,
-    };
+
+    const candidate = parsed as Partial<ITokenScaleConfig>;
+    const hasFlatArrayShape =
+      Array.isArray(candidate.colors) ||
+      Array.isArray(candidate.spacing) ||
+      Array.isArray(candidate.fontSizes) ||
+      Array.isArray(candidate.radii);
+
+    if (hasFlatArrayShape) {
+      if (
+        !Array.isArray(candidate.colors) ||
+        !Array.isArray(candidate.spacing) ||
+        !Array.isArray(candidate.fontSizes) ||
+        !Array.isArray(candidate.radii) ||
+        !candidate.colors.every((v) => typeof v === 'string') ||
+        !candidate.spacing.every((v) => typeof v === 'string') ||
+        !candidate.fontSizes.every((v) => typeof v === 'string') ||
+        !candidate.radii.every((v) => typeof v === 'string')
+      ) {
+        throw new Error(
+          'ERR_TOKENS_SCHEMA: Flat token scale JSON at ' +
+            resolvedTokensPath +
+            ' must define string arrays for all four keys: colors, spacing, fontSizes, and radii. ' +
+            TOKEN_FORMAT_REMEDIATION_GUIDE
+        );
+      }
+      scales.push({
+        colors: candidate.colors,
+        spacing: candidate.spacing,
+        fontSizes: candidate.fontSizes,
+        radii: candidate.radii,
+      });
+      continue;
+    }
+
+    const dictionaryScale = parseW3cOrStyleDictionaryTokens(raw);
+    if (!hasAnyNormalizedTokens(dictionaryScale)) {
+      throw new Error(
+        'ERR_TOKENS_SCHEMA: Token file at ' +
+          resolvedTokensPath +
+          ' did not match flat scale arrays or W3C ($value) / Style Dictionary (value) token entries. ' +
+          TOKEN_FORMAT_REMEDIATION_GUIDE
+      );
+    }
+    scales.push(dictionaryScale);
   }
 
-  const dictionaryScale = parseW3cOrStyleDictionaryTokens(raw);
-  if (!hasAnyNormalizedTokens(dictionaryScale)) {
-    throw new Error(
-      'ERR_TOKENS_SCHEMA: Token file at ' +
-        resolvedTokensPath +
-        ' did not match flat scale arrays or W3C ($value) / Style Dictionary (value) token entries. ' +
-        TOKEN_FORMAT_REMEDIATION_GUIDE
-    );
+  if (cssContents.length > 0) {
+    const cssScale = parseCssCustomPropertyTokens(cssContents.join('\n'));
+    if (!hasAnyNormalizedTokens(cssScale)) {
+      throw new Error(
+        'ERR_TOKENS_SCHEMA: No valid CSS custom properties (--*) with color or length values were found in the specified CSS file(s). ' +
+          TOKEN_FORMAT_REMEDIATION_GUIDE
+      );
+    }
+    scales.push(cssScale);
   }
 
-  return dictionaryScale;
+  const firstScale = scales.at(0);
+  if (pathList.length === 1 && scales.length === 1 && firstScale !== undefined) {
+    return firstScale;
+  }
+
+  return mergeTokenScales(...scales);
 }
 
 export function evaluatePosixExitCode(results: Array<IViewportAuditReport>): PosixExitCode {
@@ -967,9 +1000,12 @@ export async function executeCheckCommand(
           options.only &&
           softTokenEngines.has(options.only)
         ) {
+          const formattedTokensPath = Array.isArray(effectiveTokensPath)
+            ? effectiveTokensPath.join(', ')
+            : effectiveTokensPath;
           console.error(
             '[tokens:warn] Missing tokensPath (' +
-              effectiveTokensPath +
+              formattedTokensPath +
               "); continuing '" +
               options.only +
               "' audit without token suggestions."
