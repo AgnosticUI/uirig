@@ -154,4 +154,64 @@ describe('::: ISSUE #37: MCP SERVER PARITY (THEMES, SOURCE-MAP, --FIX & A2UI TOO
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+  it('==> Should accept tokensPath array in uirig_tokens MCP calls for split light + dark CSS stylesheets', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'uirig-mcp-multitokens-'));
+    try {
+      writeFileSync(
+        join(tempDir, 'ag-tokens.css'),
+        ':where(html) { --ag-bg: #ffffff; --ag-fg: #0f172a; --ag-space: 16px; --ag-font: 16px; --ag-radius: 0px; }',
+        'utf8'
+      );
+      writeFileSync(
+        join(tempDir, 'ag-tokens-dark.css'),
+        '[data-theme="dark"] { --ag-bg: #010409; --ag-fg: #f0f6fc; }',
+        'utf8'
+      );
+      writeFileSync(
+        join(tempDir, 'split.html'),
+        `<!DOCTYPE html>
+        <html>
+          <head>
+            <link rel="stylesheet" href="./ag-tokens.css" />
+            <link rel="stylesheet" href="./ag-tokens-dark.css" />
+            <style>
+              body { margin: 0; padding: 16px; background: var(--ag-bg); color: var(--ag-fg); font-size: 16px; border-radius: 0px; }
+              p { margin: 0; font-size: 16px; }
+            </style>
+          </head>
+          <body><p>MCP multi-token CSS check</p></body>
+        </html>`,
+        'utf8'
+      );
+
+      const server = createUirigMcpServer(pool, '0.3.0');
+      const client = new Client({ name: 'test-client', version: '1.0.0' });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+      await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+
+      const res = await client.callTool({
+        name: 'uirig_tokens',
+        arguments: {
+          target: './split.html',
+          cwd: tempDir,
+          tokensPath: ['./ag-tokens.css', './ag-tokens-dark.css'],
+          themes: ['light', 'dark'],
+          viewport: { name: 'desktop', width: 1280, height: 800 },
+        },
+      });
+
+      expect(res.isError).toBe(false);
+      const text = (res.content as Array<{ type: string; text: string }>).at(0)?.text ?? '{}';
+      const payload = JSON.parse(text) as { passed: boolean; exitCode: number };
+      expect(payload.passed).toBe(true);
+      expect(payload.exitCode).toBe(0);
+
+      await client.close();
+      await server.close();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
 });

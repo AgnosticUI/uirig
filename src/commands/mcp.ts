@@ -32,6 +32,10 @@ export interface IMcpServerOptions {
 }
 
 const AUDIT_INPUT_SHAPE = {
+  tokensPath: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .describe('Optional path or array of paths to W3C, Style Dictionary, flat JSON, or CSS custom property token files (e.g. ["./ag-tokens.css", "./ag-tokens-dark.css"]).'),
   autoTokens: z
     .boolean()
     .optional()
@@ -204,6 +208,7 @@ export function createUirigMcpServer(
             target: rawArgs.target,
             selectors: rawArgs.selectors,
             configPath: rawArgs.configPath,
+            tokensPath: rawArgs.tokensPath,
             autoTokens: rawArgs.autoTokens,
             themes: rawArgs.themes,
             changed: rawArgs.changed,
@@ -265,7 +270,7 @@ export function createUirigMcpServer(
 
   server.tool(
     'uirig_discover_tokens',
-    'Auto-discover design tokens (colors, spacing, fontSizes, radii) from W3C *.tokens.json, Style Dictionary JSON, and Tailwind v4 @theme CSS files in a workspace.',
+    'Auto-discover design tokens (colors, spacing, fontSizes, radii) from W3C *.tokens.json, Style Dictionary JSON, *token*.css stylesheets, and Tailwind v4 @theme CSS files in a workspace.',
     DISCOVER_TOKENS_INPUT_SHAPE,
     async (rawArgs: DiscoverTokensToolArgs) => {
       const scale = discoverWorkspaceTokens(rawArgs.cwd ?? process.cwd());
