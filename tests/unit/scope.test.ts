@@ -77,9 +77,10 @@ describe('scope.ts — Component-Scoped Selector Parser & Shadow DOM Matcher', (
 
     const results = await page.evaluate(
       ({ fnBody }) => {
-        const matchFn = new Function('el', 'selectors', fnBody) as (
+        const matchFn = new Function('el', 'selectors', 'excludeSelectors', fnBody) as (
           el: Element,
-          selectors?: string[]
+          selectors?: string[],
+          excludeSelectors?: string[]
         ) => boolean;
 
         const navLink = document.querySelector('#global-nav a')!;
@@ -95,7 +96,6 @@ describe('scope.ts — Component-Scoped Selector Parser & Shadow DOM Matcher', (
         };
       },
       {
-        // Extract function body so we test the exact production `isElementInSelectorScope` logic
         fnBody: isElementInSelectorScope
           .toString()
           .replace(/^[^{]*\{/, '')
@@ -109,4 +109,66 @@ describe('scope.ts — Component-Scoped Selector Parser & Shadow DOM Matcher', (
     expect(results.shadowBtnInWidgetTag).toBe(true);
     expect(results.navWhenUnscoped).toBe(true);
   });
+
+  it('carves out --exclude subtrees inside --scope and across Light + Shadow DOM (Issue #58)', async () => {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const page = await browser.newPage();
+    await page.setContent(`
+      <header id="shell-nav"><a href="/">Nav</a></header>
+      <main id="uirig-stage">
+        <h3 class="demo-title">Demo Heading</h3>
+        <ag-card id="card-1"><p>Card content</p></ag-card>
+      </main>
+      <script>
+        const card = document.getElementById('card-1');
+        const sr = card.attachShadow({ mode: 'open' });
+        sr.innerHTML = '<div class="card-body"><span class="internal-skip">Skip</span><button>OK</button></div>';
+      </script>
+    `);
+
+    const res = await page.evaluate(
+      ({ fnSrc }) => {
+        const checkScope = new Function(`return (${fnSrc});`)() as (
+          el: Element,
+          include?: string[],
+          exclude?: string[]
+        ) => boolean;
+
+        const shellNav = document.querySelector('#shell-nav a')!;
+        const demoTitle = document.querySelector('.demo-title')!;
+        const cardBtn = document.querySelector('#card-1')!.shadowRoot!.querySelector('button')!;
+        const internalSkip = document
+          .querySelector('#card-1')!
+          .shadowRoot!.querySelector('.internal-skip')!;
+
+        return {
+          shellNavInScope: checkScope(shellNav, ['#uirig-stage'], ['h3.demo-title']),
+          demoTitleInScope: checkScope(demoTitle, ['#uirig-stage'], ['h3.demo-title']),
+          cardBtnInScope: checkScope(
+            cardBtn,
+            ['#uirig-stage'],
+            ['h3.demo-title', '.internal-skip']
+          ),
+          internalSkipInScope: checkScope(
+            internalSkip,
+            ['#uirig-stage'],
+            ['h3.demo-title', '.internal-skip']
+          ),
+          demoTitleWhenOnlyExclude: checkScope(demoTitle, undefined, ['h3.demo-title']),
+          cardBtnWhenOnlyExclude: checkScope(cardBtn, undefined, ['h3.demo-title']),
+        };
+      },
+      { fnSrc: isElementInSelectorScope.toString() }
+    );
+
+    expect(res.shellNavInScope).toBe(false);
+    expect(res.demoTitleInScope).toBe(false);
+    expect(res.cardBtnInScope).toBe(true);
+    expect(res.internalSkipInScope).toBe(false);
+    expect(res.demoTitleWhenOnlyExclude).toBe(false);
+    expect(res.cardBtnWhenOnlyExclude).toBe(true);
+  });
+
 });

@@ -1,7 +1,8 @@
 /**
  * src/utils/scope.ts
  * Component-scoped CSS selector parsing, browser syntax validation, and
- * Shadow-DOM-aware subtree matching & element counting for `--selectors` / `-s` audits.
+ * Shadow-DOM-aware subtree matching & element counting for `--scope` / `--selectors`
+ * and `--exclude` carve-out audits.
  */
 
 import type { Page } from 'playwright';
@@ -71,7 +72,8 @@ export function parseSelectorList(raw: string): string[] {
  */
 export async function validateSelectorsInBrowser(
   page: Page,
-  selectors: string[]
+  selectors: string[],
+  flagLabel: string = '--scope / --selectors'
 ): Promise<void> {
   if (selectors.length === 0) {
     return;
@@ -90,86 +92,119 @@ export async function validateSelectorsInBrowser(
 
   if (invalidSelector !== null) {
     throw new Error(
-      `ERR_INVALID_SELECTOR: Invalid CSS selector '${invalidSelector}' passed to --selectors.`
+      `ERR_INVALID_SELECTOR: Invalid CSS selector '${invalidSelector}' passed to ${flagLabel}.`
     );
   }
 }
 
 /**
  * Counts how many unique elements across Light DOM and open `ShadowRoot` trees
- * match at least one selector in `selectors` on the loaded `page`.
+ * match at least one selector in `selectors` (excluding any element inside `excludeSelectors`).
  */
 export async function countMatchedSelectorsInBrowser(
   page: Page,
-  selectors: string[]
+  selectors: string[],
+  excludeSelectors?: string[]
 ): Promise<number> {
   if (selectors.length === 0) {
     return 0;
   }
 
-  return await page.evaluate((sels: string[]): number => {
-    const matched = new Set<Element>();
+  return await page.evaluate(
+    ({
+      sels,
+      excludes,
+      scopeFnSrc,
+    }: {
+      sels: string[];
+      excludes?: string[];
+      scopeFnSrc: string;
+    }): number => {
+      const checkScope = new Function(`return (${scopeFnSrc});`)() as (
+        el: Element,
+        include?: string[],
+        exclude?: string[]
+      ) => boolean;
+      const matched = new Set<Element>();
 
-    function visitRoot(root: Document | ShadowRoot): void {
-      for (const sel of sels) {
-        try {
-          for (const el of Array.from(root.querySelectorAll(sel))) {
-            matched.add(el);
+      function visitRoot(root: Document | ShadowRoot): void {
+        for (const sel of sels) {
+          try {
+            for (const el of Array.from(root.querySelectorAll(sel))) {
+              if (checkScope(el, sels, excludes)) {
+                matched.add(el);
+              }
+            }
+          } catch {
+            // Malformed selectors are rejected upfront by validateSelectorsInBrowser
           }
-        } catch {
-          // Malformed selectors are rejected upfront by validateSelectorsInBrowser
+        }
+
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+        let current: Node | null = walker.currentNode;
+        while (current) {
+          if (current instanceof Element && current.shadowRoot) {
+            visitRoot(current.shadowRoot);
+          }
+          current = walker.nextNode();
         }
       }
 
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-      let current: Node | null = walker.currentNode;
-      while (current) {
-        if (current instanceof Element && current.shadowRoot) {
-          visitRoot(current.shadowRoot);
-        }
-        current = walker.nextNode();
-      }
+      visitRoot(document);
+      return matched.size;
+    },
+    {
+      sels: selectors,
+      excludes: excludeSelectors,
+      scopeFnSrc: isElementInSelectorScope.toString(),
     }
-
-    visitRoot(document);
-    return matched.size;
-  }, selectors);
+  );
 }
 
 /**
- * Pure browser-side helper that checks whether `el` matches any selector in `selectors`
- * directly OR is a descendant (across Light DOM and open `ShadowRoot.host` boundaries)
- * of an element matching any selector in `selectors`.
- * When `selectors` is undefined or empty, returns `true` (full-page audit).
+ * Pure browser-side helper that checks whether `el`:
+ * 1. Is NOT matched by (or a Light/Shadow descendant of) any selector in `excludeSelectors`, AND
+ * 2. Matches any selector in `selectors` directly OR is a Light/Shadow descendant of an
+ *    element matching `selectors` (when `selectors` is empty/undefined, defaults to `true`).
  */
 export function isElementInSelectorScope(
   el: Element,
-  selectors?: string[]
+  selectors?: string[],
+  excludeSelectors?: string[]
 ): boolean {
+  function matchesAnyAncestorOrSelf(target: Element, candidateSelectors: string[]): boolean {
+    let current: Node | null = target;
+    while (current !== null) {
+      if (current.nodeType === 1 /* ELEMENT_NODE */) {
+        const element = current as Element;
+        for (const sel of candidateSelectors) {
+          try {
+            if (element.matches(sel)) {
+              return true;
+            }
+          } catch {
+            // Ignore malformed selector during walk (caught upfront by validateSelectorsInBrowser)
+          }
+        }
+        current = element.parentElement ?? element.getRootNode();
+      } else if (current instanceof ShadowRoot) {
+        current = current.host;
+      } else {
+        current = null;
+      }
+    }
+    return false;
+  }
+
+  if (excludeSelectors && excludeSelectors.length > 0) {
+    if (matchesAnyAncestorOrSelf(el, excludeSelectors)) {
+      return false;
+    }
+  }
+
   if (!selectors || selectors.length === 0) {
     return true;
   }
 
-  let current: Node | null = el;
-  while (current !== null) {
-    if (current.nodeType === 1 /* ELEMENT_NODE */) {
-      const element = current as Element;
-      for (const sel of selectors) {
-        try {
-          if (element.matches(sel)) {
-            return true;
-          }
-        } catch {
-          // Ignore malformed selector during walk (caught upfront by validateSelectorsInBrowser)
-        }
-      }
-      current = element.parentElement ?? element.getRootNode();
-    } else if (current instanceof ShadowRoot) {
-      current = current.host;
-    } else {
-      current = null;
-    }
-  }
-
-  return false;
+  return matchesAnyAncestorOrSelf(el, selectors);
 }

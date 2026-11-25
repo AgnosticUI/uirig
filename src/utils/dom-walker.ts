@@ -50,7 +50,8 @@ export function createBrowserDomWalker(
   ignoreRules: IUirigIgnoreRule[] = [],
   ignoreHelperSource?: string,
   selectors?: string[],
-  scopeHelperSource?: string
+  scopeHelperSource?: string,
+  excludeSelectors?: string[]
 ): {
   formatSelector: (el: Element) => string;
   resolveHostComponent: (el: Element) => string | null;
@@ -68,7 +69,11 @@ export function createBrowserDomWalker(
     url: string,
     rules: IUirigIgnoreRule[]
   ) => boolean;
-  type ScopePredicate = (el: Element, activeSelectors?: string[]) => boolean;
+  type ScopePredicate = (
+    el: Element,
+    activeSelectors?: string[],
+    activeExcludes?: string[]
+  ) => boolean;
 
   const checkIgnored: IgnorePredicate = ignoreHelperSource
     ? (new Function(`return (${ignoreHelperSource});`)() as IgnorePredicate)
@@ -79,6 +84,8 @@ export function createBrowserDomWalker(
     : () => true;
 
   const activeSelectors = selectors && selectors.length > 0 ? selectors : undefined;
+  const activeExcludes =
+    excludeSelectors && excludeSelectors.length > 0 ? excludeSelectors : undefined;
 
   const nonVisualTags = new Set([
     'HTML',
@@ -116,7 +123,7 @@ export function createBrowserDomWalker(
   }
 
   function isInScope(el: Element): boolean {
-    return checkInScope(el, activeSelectors);
+    return checkInScope(el, activeSelectors, activeExcludes);
   }
 
   function isVisuallyHidden(el: Element): boolean {
@@ -172,7 +179,7 @@ export function createBrowserDomWalker(
 
           if (
             (includeBody || currentNode.tagName !== 'BODY') &&
-            checkInScope(currentNode, activeSelectors)
+            checkInScope(currentNode, activeSelectors, activeExcludes)
           ) {
             onElement(currentNode, {
               selector: fullSelector,
