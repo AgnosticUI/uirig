@@ -610,18 +610,94 @@ export async function extractTextContrastSnapshots(
         return false;
       }
 
-      function collectAncestorStyleLayers(el: Element): IAncestorStyleLayer[] {
+            function collectAncestorStyleLayers(el: Element): IAncestorStyleLayer[] {
         const bottomUpLayers: IAncestorStyleLayer[] = [];
+        const visited = new Set<Element>();
+        const initialRoot = el.getRootNode();
+        const isInsideShadow = initialRoot instanceof ShadowRoot;
         let current: Element | null = el;
+        let hasOpaqueShadowSurfaceBg = false;
+        let nearestBoxElement: Element | null = null;
+        let shadowHostInsertIndex = -1;
 
-        while (current) {
+        while (current && !visited.has(current)) {
+          visited.add(current);
           const style = window.getComputedStyle(current);
+          if (!nearestBoxElement && style.display !== 'contents') {
+            const rect = current.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              nearestBoxElement = current;
+            }
+          }
+
+          if (isInsideShadow && shadowHostInsertIndex === -1 && current.getRootNode() !== initialRoot) {
+            shadowHostInsertIndex = bottomUpLayers.length;
+          }
+
           const parsedOpacity = Number.parseFloat(style.opacity);
+          const effectiveOpacity = Number.isFinite(parsedOpacity) ? parsedOpacity : 1;
+          const rawBg = (style.backgroundColor || 'rgba(0, 0, 0, 0)').trim();
+          const lowerBg = rawBg.toLowerCase();
+          const isTransparentBg =
+            !lowerBg || lowerBg === 'transparent' || lowerBg === 'rgba(0, 0, 0, 0)';
+
+          let resolvedLayerBg = rawBg || 'rgba(0, 0, 0, 0)';
+          if (isTransparentBg && style.backgroundImage && style.backgroundImage !== 'none') {
+            const firstColorMatch =
+              /(?:#[0-9a-f]{3,8}|(?:rgba?|hsla?|oklch|oklab|lab|lch|color)\([^)]+\))/i.exec(
+                style.backgroundImage
+              );
+            if (firstColorMatch?.[0]) {
+              resolvedLayerBg = firstColorMatch[0];
+            }
+          }
+
+          const isLayerOpaque =
+            resolvedLayerBg.toLowerCase() !== 'transparent' &&
+            resolvedLayerBg.toLowerCase() !== 'rgba(0, 0, 0, 0)';
+          if (isLayerOpaque && isInsideShadow && current.getRootNode() === initialRoot) {
+            hasOpaqueShadowSurfaceBg = true;
+          }
+
           bottomUpLayers.push({
-            backgroundColor: style.backgroundColor || 'rgba(0, 0, 0, 0)',
-            opacity: Number.isFinite(parsedOpacity) ? parsedOpacity : 1,
+            backgroundColor: resolvedLayerBg,
+            opacity: effectiveOpacity,
           });
           current = getFlattenedParentElement(current);
+        }
+
+        if (isInsideShadow && !hasOpaqueShadowSurfaceBg && nearestBoxElement) {
+          const rect = nearestBoxElement.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const pointElements =
+            typeof initialRoot.elementsFromPoint === 'function'
+              ? initialRoot.elementsFromPoint(cx, cy)
+              : [];
+
+          const insertAt =
+            shadowHostInsertIndex !== -1 ? shadowHostInsertIndex : bottomUpLayers.length;
+          const fallbackLayers: IAncestorStyleLayer[] = [];
+
+          for (const hit of pointElements) {
+            if (!hit || visited.has(hit) || hit.getRootNode() !== initialRoot) {
+              continue;
+            }
+            const hitStyle = window.getComputedStyle(hit);
+            const hitBg = (hitStyle.backgroundColor || '').trim();
+            const lowerHitBg = hitBg.toLowerCase();
+            if (lowerHitBg && lowerHitBg !== 'transparent' && lowerHitBg !== 'rgba(0, 0, 0, 0)') {
+              const hitOpacity = Number.parseFloat(hitStyle.opacity);
+              fallbackLayers.push({
+                backgroundColor: hitBg,
+                opacity: Number.isFinite(hitOpacity) ? hitOpacity : 1,
+              });
+            }
+          }
+
+          if (fallbackLayers.length > 0) {
+            bottomUpLayers.splice(insertAt, 0, ...fallbackLayers);
+          }
         }
 
         return bottomUpLayers.reverse();

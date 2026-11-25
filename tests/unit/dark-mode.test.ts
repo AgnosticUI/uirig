@@ -351,4 +351,60 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
     expect(violations).toEqual([]);
   });
 
+  it('resolves enclosing Shadow DOM control surface backgrounds for projected <slot> nodes in dark mode (Issue #54)', async () => {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 24px; background: rgb(255, 255, 255); color: rgb(15, 23, 42); }
+            html.dark body { background: rgb(248, 250, 252); }
+            ag-button, ag-selection-button { color: rgb(255, 255, 255); }
+          </style>
+        </head>
+        <body>
+          <ag-button>Dark Mode Primary Button</ag-button>
+          <ag-selection-button>Dark Mode Selection Option</ag-selection-button>
+          <script>
+            class AgButton extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                shadow.innerHTML =
+                  '<button style="background: rgb(29, 78, 216); color: rgb(255, 255, 255); border: 0; padding: 8px 16px;">' +
+                    '<slot></slot>' +
+                  '</button>';
+              }
+            }
+            customElements.define('ag-button', AgButton);
+
+            class AgSelectionButton extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                shadow.innerHTML =
+                  '<div style="position: relative; display: inline-block; padding: 8px 16px;">' +
+                    '<span aria-hidden="true" style="position: absolute; inset: 0; background: rgb(15, 23, 42); z-index: 0;"></span>' +
+                    '<span style="position: relative; z-index: 1; color: rgb(255, 255, 255);"><slot></slot></span>' +
+                  '</div>';
+              }
+            }
+            customElements.define('ag-selection-button', AgSelectionButton);
+          </script>
+        </body>
+      </html>
+    `);
+
+    const violations = await runDarkModeAudit(page);
+    await context.close();
+
+    expect(violations).toEqual([]);
+  });
+
 });
