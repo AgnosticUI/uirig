@@ -584,6 +584,32 @@ export async function extractTextContrastSnapshots(
         return false;
       }
 
+      function isEffectivelyInvisibleOverlay(el: Element): boolean {
+        let current: Element | null = el;
+        let cumulativeOpacity = 1;
+
+        while (current) {
+          const style = window.getComputedStyle(current);
+          if (
+            style.display === 'none' ||
+            style.visibility === 'hidden' ||
+            style.visibility === 'collapse'
+          ) {
+            return true;
+          }
+          const parsedOpacity = Number.parseFloat(style.opacity);
+          if (Number.isFinite(parsedOpacity)) {
+            cumulativeOpacity *= parsedOpacity;
+            if (cumulativeOpacity <= 0.001) {
+              return true;
+            }
+          }
+          current = getFlattenedParentElement(current);
+        }
+
+        return false;
+      }
+
       function collectAncestorStyleLayers(el: Element): IAncestorStyleLayer[] {
         const bottomUpLayers: IAncestorStyleLayer[] = [];
         let current: Element | null = el;
@@ -608,6 +634,7 @@ export async function extractTextContrastSnapshots(
           computed.display !== 'none' &&
           computed.visibility !== 'hidden' &&
           !walker.isVisuallyHidden(currentNode) &&
+          !isEffectivelyInvisibleOverlay(currentNode) &&
           (hasDirectUnassignedVisibleText(currentNode) || hasSlottedDirectText(currentNode)) &&
           !isInactiveUiComponent(currentNode) &&
           !walker.isIgnored(currentNode, activeRule)
