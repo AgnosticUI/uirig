@@ -334,4 +334,69 @@ describe('::: ISSUE #37: MCP SERVER PARITY (THEMES, SOURCE-MAP, --FIX & A2UI TOO
     }
   });
 
+  it('==> Should expose uirig_states MCP tool and catch click-occluded controls & missing :focus-visible rings (Issue #16)', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'uirig-mcp-states-'));
+    try {
+      writeFileSync(
+        join(tempDir, 'states-fixture.html'),
+        `<!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { margin: 0; padding: 16px; background: #ffffff; color: #0f172a; }
+              .stack { position: relative; width: 180px; height: 44px; margin-bottom: 12px; }
+              .stack button, .stack .shield { position: absolute; inset: 0; width: 100%; height: 100%; }
+              .shield { opacity: 0; z-index: 5; }
+              button.no-ring { outline: none; border: 1px solid #cbd5e1; background: #ffffff; padding: 8px 14px; }
+              button.no-ring:focus-visible { outline: none; }
+            </style>
+          </head>
+          <body>
+            <div class="stack">
+              <button id="blocked-btn">Blocked</button>
+              <div class="shield"></div>
+            </div>
+            <button id="no-ring-btn" class="no-ring">No Ring</button>
+          </body>
+        </html>`,
+        'utf8'
+      );
+
+      const server = createUirigMcpServer(pool, '0.3.1');
+      const client = new Client({ name: 'test-client', version: '1.0.0' });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+      await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+
+      const res = await client.callTool({
+        name: 'uirig_states',
+        arguments: {
+          target: './states-fixture.html',
+          cwd: tempDir,
+          viewport: { name: 'desktop', width: 1280, height: 800 },
+        },
+      });
+
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>).at(0)?.text ?? '{}';
+      const payload = JSON.parse(text) as {
+        passed: boolean;
+        exitCode: number;
+        violations: Array<{ engine: string; violationType: string; selector: string }>;
+      };
+      expect(payload.passed).toBe(false);
+      expect(payload.exitCode).toBe(1);
+      expect(payload.violations).toHaveLength(2);
+      expect(payload.violations.map((v) => v.violationType).sort()).toEqual([
+        'click_occluded',
+        'missing_focus_visible',
+      ]);
+
+      await client.close();
+      await server.close();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
 });

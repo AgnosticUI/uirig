@@ -162,6 +162,12 @@ const MCP_TOOL_SPECS: Array<IMcpToolSpec> = [
       'Audit Light + Shadow DOM for broken ARIA/label IDs, accessible names, broken media, unsafe links, orphaned slots, and prompt-injection traps.',
     only: 'dom',
   },
+  {
+    name: 'uirig_states',
+    only: 'states',
+    description:
+      'Audit interactive controls across Light DOM and open ShadowRoots for click-occlusion (elementsFromPoint) and :focus-visible indicator parity via CDP.',
+  },
 ];
 
 const A2UI_DELTA_INPUT_SHAPE = {

@@ -1576,4 +1576,55 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.summary.totalDomViolations).toBe(0);
   });
 
+  it('catches click-occluded controls and missing :focus-visible indicators via --only=states and returns exitCode 1', async () => {
+    const html = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background: #ffffff; color: #0f172a; font-family: sans-serif; }
+            .stack { position: relative; width: 180px; height: 44px; margin-bottom: 12px; }
+            .stack button, .stack .shield { position: absolute; inset: 0; width: 100%; height: 100%; }
+            .shield { opacity: 0; z-index: 5; }
+            button.no-ring { outline: none; border: 1px solid #cbd5e1; background: #ffffff; padding: 8px 14px; }
+            button.no-ring:focus-visible { outline: none; }
+          </style>
+        </head>
+        <body>
+          <div class="stack">
+            <button id="blocked-cta">Blocked CTA</button>
+            <div class="shield"></div>
+          </div>
+          <button id="unfocused-cta" class="no-ring">No Focus Ring</button>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(html);
+    activeServer = server;
+
+    const report = await executeCheckCommand({
+      target: url,
+      only: 'states',
+      cwd: tempDir,
+      viewportsOverride: [{ name: 'desktop', width: 1280, height: 800 }],
+      headless: true,
+      silentStdout: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    expect(report.exitCode).toBe(1);
+    expect(report.summary.totalStateViolations).toBe(2);
+    expect(report.results.at(0)?.stateViolations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          violationType: 'click_occluded',
+          selector: 'button#blocked-cta',
+        }),
+        expect.objectContaining({
+          violationType: 'missing_focus_visible',
+          selector: 'button#unfocused-cta',
+        }),
+      ])
+    );
+  });
+
 });

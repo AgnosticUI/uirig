@@ -63,11 +63,13 @@ import {
 import type { IUirigIgnoreRule } from '../utils/ignore.js';
 import { resolveA2uiAttributionsForSelectors } from '../utils/a2ui-attribution.js';
 import { resolveViolationSourceLocations } from '../core/source-map.js';
+import { runInteractiveStatesAudit } from '../core/states.js';
 import type {
-  IA2uiAttribution,
   IDarkModeViolation,
   IDomIntegrityViolation,
+  IInteractiveStateViolation,
   IRuntimeErrorViolation,
+  IA2uiAttribution,
   ISourceLocation,
 } from '../interfaces/locator.js';
 
@@ -100,7 +102,15 @@ export interface IUirigConfig {
   ignore?: Array<IUirigIgnoreRule>;
 }
 
-export type AuditToolName = 'tokens' | 'contrast' | 'dark-mode' | 'stress' | 'cls' | 'dom' | 'sweep';
+export type AuditToolName =
+  | 'tokens'
+  | 'contrast'
+  | 'dark-mode'
+  | 'stress'
+  | 'cls'
+  | 'dom'
+  | 'states'
+  | 'sweep';
 
 export interface ICheckCommandOptions {
   target?: string;
@@ -149,6 +159,7 @@ export interface IViewportAuditReport {
   sweepViolations?: Array<IBreakpointSweepViolation>;
   clsEvaluation: IClsEvaluationResult;
   domViolations?: Array<IDomIntegrityViolation>;
+  stateViolations?: Array<IInteractiveStateViolation>;
   runtimeErrors?: Array<IRuntimeErrorViolation>;
 }
 
@@ -167,6 +178,7 @@ export interface ICheckExecutionReport {
     totalSweepViolations?: number;
     totalClsViolations: number;
     totalDomViolations?: number;
+    totalStateViolations?: number;
     totalRuntimeErrors?: number;
   };
 }
@@ -560,35 +572,30 @@ export function loadTokenScale(
 }
 
 export function evaluatePosixExitCode(results: Array<IViewportAuditReport>): PosixExitCode {
-  let hasStructuralOrClsFailure = false;
-  let hasPolicyOrIntegrityFailure = false;
+  let hasExitOneViolation = false;
 
   for (const report of results) {
     if (
+      report.clsEvaluation.violation !== null ||
       report.stressViolations.length > 0 ||
-      (report.sweepViolations?.length ?? 0) > 0 ||
-      report.clsEvaluation.violation !== null
+      (report.sweepViolations?.length ?? 0) > 0
     ) {
-      hasStructuralOrClsFailure = true;
+      return 2;
     }
+
     if (
       report.tokenViolations.length > 0 ||
       report.contrastViolations.length > 0 ||
       (report.darkModeViolations?.length ?? 0) > 0 ||
       (report.domViolations?.length ?? 0) > 0 ||
+      (report.stateViolations?.length ?? 0) > 0 ||
       (report.runtimeErrors?.length ?? 0) > 0
     ) {
-      hasPolicyOrIntegrityFailure = true;
+      hasExitOneViolation = true;
     }
   }
 
-  if (hasStructuralOrClsFailure) {
-    return 2;
-  }
-  if (hasPolicyOrIntegrityFailure) {
-    return 1;
-  }
-  return 0;
+  return hasExitOneViolation ? 1 : 0;
 }
 
 export async function auditViewportInParallel(
@@ -621,8 +628,10 @@ export async function auditViewportInParallel(
   const runStress = !only || only === 'stress';
   const runCls = !only || only === 'cls';
   const runDom = !only || only === 'dom';
+  const runStates = !only || only === 'states';
   const runSweep = sweepSpec !== undefined && (!only || only === 'sweep');
   const runRuntimeCapture = !only;
+
   const hasSelectors = Boolean(selectors && selectors.length > 0);
   const hasExcludeSelectors = Boolean(excludeSelectors && excludeSelectors.length > 0);
 
@@ -745,6 +754,7 @@ export async function auditViewportInParallel(
     runStressTrack(),
     runClsTrack(),
   ]);
+
   const runReadOnlyTrack = async (): Promise<{
     matchedSelectorCount?: number;
     spatialBrief?: string;
@@ -754,6 +764,7 @@ export async function auditViewportInParallel(
     contrastViolations: Array<IContrastViolation>;
     sweepViolations: Array<IBreakpointSweepViolation>;
     domViolations: Array<IDomIntegrityViolation>;
+    stateViolations: Array<IInteractiveStateViolation>;
     runtimeErrors: Array<IRuntimeErrorViolation>;
   }> => {
     const hasMutatingViolations =
@@ -762,6 +773,7 @@ export async function auditViewportInParallel(
       !runTokens &&
       !runContrast &&
       !runDom &&
+      !runStates &&
       !runSweep &&
       !runRuntimeCapture &&
       !hasSelectors &&
@@ -773,6 +785,7 @@ export async function auditViewportInParallel(
         contrastViolations: new Array<IContrastViolation>(),
         sweepViolations: new Array<IBreakpointSweepViolation>(),
         domViolations: new Array<IDomIntegrityViolation>(),
+        stateViolations: new Array<IInteractiveStateViolation>(),
         runtimeErrors: new Array<IRuntimeErrorViolation>(),
       };
     }
@@ -868,6 +881,14 @@ export async function auditViewportInParallel(
           })
         : new Array<IDomIntegrityViolation>();
 
+      const stateViolations = runStates
+        ? await runInteractiveStatesAudit(page, {
+            ignoreRules,
+            selectors,
+            excludeSelectors,
+          })
+        : new Array<IInteractiveStateViolation>();
+
       const sweepViolations =
         runSweep && sweepSpec !== undefined
           ? await runBreakpointSweepAudit(page, {
@@ -888,6 +909,7 @@ export async function auditViewportInParallel(
         ...stressViolations.map((v) => v.selector),
         ...sweepViolations.map((v) => v.selector),
         ...domViolations.map((v) => v.selector),
+        ...stateViolations.map((v) => v.selector),
       ];
       let a2uiAttributions: Record<string, IA2uiAttribution | null> | undefined;
       let sourceLocations: Record<string, ISourceLocation | null> | undefined;
@@ -909,6 +931,7 @@ export async function auditViewportInParallel(
         contrastViolations,
         sweepViolations,
         domViolations,
+        stateViolations,
         runtimeErrors,
       };
     } finally {
@@ -949,6 +972,7 @@ export async function auditViewportInParallel(
       : {}),
     clsEvaluation,
     domViolations: readOnlyResult.domViolations,
+    stateViolations: readOnlyResult.stateViolations,
     runtimeErrors: readOnlyResult.runtimeErrors,
   };
 }
@@ -1097,7 +1121,7 @@ export async function executeCheckCommand(
     const autoTokensEnabled = Boolean(options.autoTokens ?? config.autoTokens);
     const effectiveTokensPath = options.tokensPath ?? config.tokensPath;
     const tokensResolutionBase = options.tokensPath ? cwd : configLabel;
-    const tokenAgnosticEngines = new Set<AuditToolName>(['stress', 'cls', 'dom', 'sweep']);
+    const tokenAgnosticEngines = new Set<AuditToolName>(['stress', 'cls', 'dom', 'states', 'sweep']);
     const softTokenEngines = new Set<AuditToolName>(['contrast', 'dark-mode']);
     let tokenScale: ITokenScaleConfig | null = null;
     let shouldAutoDiscoverRootTokens = false;
@@ -1289,6 +1313,7 @@ export async function executeCheckCommand(
         0
       ),
       totalDomViolations: results.reduce((sum, r) => sum + (r.domViolations?.length ?? 0), 0),
+      totalStateViolations: results.reduce((sum, r) => sum + (r.stateViolations?.length ?? 0), 0),
       totalRuntimeErrors: results.reduce((sum, r) => sum + (r.runtimeErrors?.length ?? 0), 0),
     };
 
