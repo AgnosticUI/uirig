@@ -54,8 +54,10 @@ export interface IBreakpointSweepOptions {
   touchTargetMinSpacingPx?: number;
   /** Optional runtime ignore rules from `uirig.config.json`. */
   ignoreRules?: Array<IUirigIgnoreRule>;
-  /** Optional CSS selectors scoping element checks to matching subtrees. */
+  /** Optional CSS selectors scoping element checks to matching subtrees (`--scope` / `--selectors`). */
   selectors?: Array<string>;
+  /** Optional CSS selectors carved out from breakpoint sweep checks (`--exclude`). */
+  excludeSelectors?: Array<string>;
 }
 
 /**
@@ -138,6 +140,12 @@ interface ISweepStepDomSnapshot {
   documentScrollWidth: number;
   windowInnerWidth: number;
   ignoreRootScrollLeak: boolean;
+  scopedContainerLeaks: Array<{
+    selector: string;
+    hostComponent: string | null;
+    measuredLeakPixels: number;
+    inShadowDom: boolean;
+  }>;
   parentChildPairs: Array<{
     parent: IBoundingBox;
     child: IBoundingBox;
@@ -152,6 +160,7 @@ async function evaluateSweepStepGeometry(
     touchTargetMinSpacingPx: number;
     ignoreRules: Array<IUirigIgnoreRule>;
     selectors?: Array<string>;
+    excludeSelectors?: Array<string>;
     walkerFactorySrc: string;
     ignoreHelperSrc: string;
     scopeHelperSrc: string;
@@ -161,14 +170,18 @@ async function evaluateSweepStepGeometry(
 
   const snapshot = await page.evaluate(
     ({
+      tolerancePx,
       rules,
       activeSelectors,
+      activeExcludes,
       walkerFactory,
       ignoreHelper,
       scopeHelper,
     }: {
+      tolerancePx: number;
       rules: Array<IUirigIgnoreRule>;
       activeSelectors?: Array<string>;
+      activeExcludes?: Array<string>;
       walkerFactory: string;
       ignoreHelper: string;
       scopeHelper: string;
@@ -181,7 +194,8 @@ async function evaluateSweepStepGeometry(
         rules,
         ignoreHelper,
         activeSelectors,
-        scopeHelper
+        scopeHelper,
+        activeExcludes
       );
 
       const interactiveTags = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA']);
@@ -189,9 +203,8 @@ async function evaluateSweepStepGeometry(
 
       function isHiddenSubtree(el: Element): boolean {
         if (
-          el.classList.contains('sr-only') ||
-          el.classList.contains('visually-hidden') ||
-          el.closest('.sr-only, .visually-hidden, [aria-hidden="true"], [inert]')
+          walker.isVisuallyHidden(el) ||
+          el.closest('[aria-hidden="true"], [inert]')
         ) {
           return true;
         }
@@ -222,7 +235,7 @@ async function evaluateSweepStepGeometry(
 
       const parentChildPairs = new Array<{ parent: IBoundingBox; child: IBoundingBox }>();
       const interactiveTargets = new Array<IBoundingBox>();
-
+      const scopedContainerLeaks: ISweepStepDomSnapshot['scopedContainerLeaks'] = [];
       walker.walkElements(
         (currentEl, meta) => {
           const computed = window.getComputedStyle(currentEl);
@@ -233,6 +246,35 @@ async function evaluateSweepStepGeometry(
             walker.isIgnored(currentEl, 'sweep')
           ) {
             return;
+          }
+
+          if (activeSelectors && activeSelectors.length > 0) {
+            let matchesScopeBoundary = false;
+            for (const sel of activeSelectors) {
+              try {
+                if (currentEl.matches(sel)) {
+                  matchesScopeBoundary = true;
+                  break;
+                }
+              } catch {
+                // Ignore malformed selector
+              }
+            }
+            if (
+              matchesScopeBoundary &&
+              computed.overflowX !== 'auto' &&
+              computed.overflowX !== 'scroll' &&
+              computed.overflowX !== 'hidden' &&
+              currentEl.clientWidth > 0 &&
+              currentEl.scrollWidth > currentEl.clientWidth + tolerancePx
+            ) {
+              scopedContainerLeaks.push({
+                selector: meta.selector,
+                hostComponent: meta.hostComponent,
+                measuredLeakPixels: Math.round((currentEl.scrollWidth - currentEl.clientWidth) * 100) / 100,
+                inShadowDom: meta.inShadowDom,
+              });
+            }
           }
 
           const rect = currentEl.getBoundingClientRect();
@@ -308,13 +350,16 @@ async function evaluateSweepStepGeometry(
         documentScrollWidth: document.documentElement.scrollWidth,
         windowInnerWidth: window.innerWidth,
         ignoreRootScrollLeak: walker.isIgnored(document.documentElement, 'sweep'),
+        scopedContainerLeaks,
         parentChildPairs,
         interactiveTargets,
       };
     },
     {
+      tolerancePx: options.overflowPixelTolerance,
       rules: options.ignoreRules,
       activeSelectors: options.selectors,
+      activeExcludes: options.excludeSelectors,
       walkerFactory: options.walkerFactorySrc,
       ignoreHelper: options.ignoreHelperSrc,
       scopeHelper: options.scopeHelperSrc,
@@ -331,6 +376,18 @@ async function evaluateSweepStepGeometry(
     );
     if (scrollLeak) {
       violations.push(scrollLeak);
+    }
+  }
+
+  if (isScopedAudit) {
+    for (const leak of snapshot.scopedContainerLeaks) {
+      violations.push({
+        violationType: 'horizontal_scrollbar',
+        selector: leak.selector,
+        hostComponent: leak.hostComponent,
+        measuredLeakPixels: leak.measuredLeakPixels,
+        inShadowDom: leak.inShadowDom,
+      });
     }
   }
 

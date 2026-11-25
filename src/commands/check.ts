@@ -92,6 +92,8 @@ export interface IUirigConfig {
   autoTokens?: boolean;
   themes?: Array<string>;
   sweep?: string | boolean;
+  scope?: Array<string>;
+  exclude?: Array<string>;
   changedPaths?: IChangedPathsConfig;
   thresholdBudgets: IThresholdBudgets;
   viewports: Array<IViewportConfig>;
@@ -111,7 +113,9 @@ export interface ICheckCommandOptions {
   groupByRoot?: boolean;
   top?: number;
   maxTokens?: number;
+  scope?: Array<string>;
   selectors?: Array<string>;
+  exclude?: Array<string>;
   changed?: boolean;
   baseRef?: string;
   changedPaths?: IChangedPathsConfig;
@@ -133,6 +137,7 @@ export interface IViewportAuditReport {
   viewport: IViewportConfig;
   theme?: string;
   scopedSelectors?: Array<string>;
+  excludedSelectors?: Array<string>;
   matchedSelectorCount?: number;
   spatialBrief?: string;
   a2uiAttributions?: Record<string, IA2uiAttribution | null>;
@@ -260,7 +265,7 @@ export function loadUirigConfig(
     );
   }
 
-    const ignoreRules = new Array<IUirigIgnoreRule>();
+  const ignoreRules = new Array<IUirigIgnoreRule>();
   if (candidate.ignore !== undefined) {
     if (!Array.isArray(candidate.ignore)) {
       throw new Error("ERR_CONFIG_SCHEMA: 'ignore' must be an array of ignore rule objects.");
@@ -280,6 +285,36 @@ export function loadUirigConfig(
   const configThemes = Array.isArray(candidate.themes)
     ? candidate.themes.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
     : undefined;
+
+  let configScope: Array<string> | undefined;
+  if (candidate.scope !== undefined) {
+    if (
+      !Array.isArray(candidate.scope) ||
+      !candidate.scope.every((s) => typeof s === 'string' && s.trim().length > 0)
+    ) {
+      throw new Error(
+        "ERR_CONFIG_SCHEMA: 'scope' must be an array of non-empty CSS selector strings."
+      );
+    }
+    if (candidate.scope.length > 0) {
+      configScope = candidate.scope.map((s) => s.trim());
+    }
+  }
+
+  let configExclude: Array<string> | undefined;
+  if (candidate.exclude !== undefined) {
+    if (
+      !Array.isArray(candidate.exclude) ||
+      !candidate.exclude.every((s) => typeof s === 'string' && s.trim().length > 0)
+    ) {
+      throw new Error(
+        "ERR_CONFIG_SCHEMA: 'exclude' must be an array of non-empty CSS selector strings."
+      );
+    }
+    if (candidate.exclude.length > 0) {
+      configExclude = candidate.exclude.map((s) => s.trim());
+    }
+  }
 
   const rawChangedPaths = candidate.changedPaths;
   let parsedChangedPaths: IChangedPathsConfig | undefined;
@@ -317,6 +352,8 @@ export function loadUirigConfig(
     autoTokens: candidate.autoTokens === true,
     ...(configThemes && configThemes.length > 0 ? { themes: configThemes } : {}),
     ...(parsedSweep !== undefined ? { sweep: parsedSweep } : {}),
+    ...(configScope ? { scope: configScope } : {}),
+    ...(configExclude ? { exclude: configExclude } : {}),
     ...(parsedChangedPaths ? { changedPaths: parsedChangedPaths } : {}),
     thresholdBudgets: {
       clsMaxLimit: budgets.clsMaxLimit,
@@ -568,7 +605,8 @@ export async function auditViewportInParallel(
   autoDiscoverRootTokens: boolean = false,
   themeName?: string,
   cwd: string = process.cwd(),
-  sweepSpec?: string
+  sweepSpec?: string,
+  excludeSelectors?: Array<string>
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
   const isDarkThemeSkin = themeName ? /(?:^|[-_])dark(?:$|[-_])/i.test(themeName) : false;
@@ -586,9 +624,12 @@ export async function auditViewportInParallel(
   const runSweep = sweepSpec !== undefined && (!only || only === 'sweep');
   const runRuntimeCapture = !only;
   const hasSelectors = Boolean(selectors && selectors.length > 0);
+  const hasExcludeSelectors = Boolean(excludeSelectors && excludeSelectors.length > 0);
 
   const activeScope = only ? 'single engine (' + only + ')' : '4 isolated contexts';
   const selectorTag = hasSelectors && selectors ? ' [scope: ' + selectors.join(', ') + ']' : '';
+  const excludeTag =
+    hasExcludeSelectors && excludeSelectors ? ' [exclude: ' + excludeSelectors.join(', ') + ']' : '';
   const themeTag = themeName ? ' [theme: ' + themeName + ']' : '';
   const sweepTag = runSweep && sweepSpec ? ' [sweep: ' + sweepSpec + ']' : '';
   const vpLabel =
@@ -598,6 +639,7 @@ export async function auditViewportInParallel(
     'Running ' +
       activeScope +
       selectorTag +
+      excludeTag +
       ' for ' +
       paint(url, 'cyan') +
       ' @ ' +
@@ -646,6 +688,7 @@ export async function auditViewportInParallel(
         ignoreRules,
         allowedColors: effectiveTokenScale?.colors ?? new Array<string>(),
         selectors,
+        excludeSelectors,
       });
     } finally {
       await context.close();
@@ -670,6 +713,7 @@ export async function auditViewportInParallel(
         touchTargetMinSpacingPx: budgets.touchTargetMinSpacingPx,
         ignoreRules,
         selectors,
+        excludeSelectors,
       });
     } finally {
       await context.close();
@@ -765,7 +809,11 @@ export async function auditViewportInParallel(
       }
       let matchedSelectorCount: number | undefined;
       if (hasSelectors && selectors) {
-        matchedSelectorCount = await countMatchedSelectorsInBrowser(page, selectors);
+        matchedSelectorCount = await countMatchedSelectorsInBrowser(
+          page,
+          selectors,
+          excludeSelectors
+        );
         const countBadge =
           matchedSelectorCount === 0
             ? paint('0 (WARNING: selector matched 0 elements!)', 'bold', 'yellow')
@@ -791,7 +839,13 @@ export async function auditViewportInParallel(
 
       const tokenViolations =
         runTokens && effectiveTokenScale !== null
-          ? await crawlPageTokens(page, effectiveTokenScale, ignoreRules, selectors)
+          ? await crawlPageTokens(
+              page,
+              effectiveTokenScale,
+              ignoreRules,
+              selectors,
+              excludeSelectors
+            )
           : new Array<ITokenViolation>();
       const contrastViolations = runContrast
         ? await auditPageContrast(
@@ -800,7 +854,8 @@ export async function auditViewportInParallel(
             ignoreRules,
             'contrast',
             effectiveTokenScale?.colors ?? new Array<string>(),
-            selectors
+            selectors,
+            excludeSelectors
           )
         : new Array<IContrastViolation>();
 
@@ -809,6 +864,7 @@ export async function auditViewportInParallel(
             navigationResponse: isLocalStaticTarget ? null : response,
             ignoreRules,
             selectors,
+            excludeSelectors,
           })
         : new Array<IDomIntegrityViolation>();
 
@@ -821,6 +877,7 @@ export async function auditViewportInParallel(
               touchTargetMinSpacingPx: budgets.touchTargetMinSpacingPx,
               ignoreRules,
               selectors,
+              excludeSelectors,
             })
           : new Array<IBreakpointSweepViolation>();
 
@@ -871,6 +928,9 @@ export async function auditViewportInParallel(
           matchedSelectorCount: readOnlyResult.matchedSelectorCount ?? 0,
         }
       : {}),
+    ...(hasExcludeSelectors && excludeSelectors
+      ? { excludedSelectors: excludeSelectors }
+      : {}),
     ...(readOnlyResult.spatialBrief !== undefined
       ? { spatialBrief: readOnlyResult.spatialBrief }
       : {}),
@@ -892,6 +952,7 @@ export async function auditViewportInParallel(
     runtimeErrors: readOnlyResult.runtimeErrors,
   };
 }
+
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
 ): Promise<ICheckExecutionReport> {
@@ -924,9 +985,27 @@ export async function executeCheckCommand(
       parseSweepRange(effectiveSweepSpec);
     }
 
-    let effectiveSelectors: Array<string> | undefined = options.selectors
-      ? [...options.selectors]
-      : undefined;
+    const combinedExplicitScope = [
+      ...(options.scope ?? new Array<string>()),
+      ...(options.selectors ?? new Array<string>()),
+    ];
+    const baseScopeSelectors =
+      combinedExplicitScope.length > 0
+        ? Array.from(new Set(combinedExplicitScope))
+        : config.scope
+          ? [...config.scope]
+          : undefined;
+    let effectiveSelectors: Array<string> | undefined =
+      baseScopeSelectors && baseScopeSelectors.length > 0 ? baseScopeSelectors : undefined;
+
+    const baseExcludeSelectors =
+      options.exclude && options.exclude.length > 0
+        ? Array.from(new Set(options.exclude))
+        : config.exclude
+          ? [...config.exclude]
+          : undefined;
+    const effectiveExcludeSelectors: Array<string> | undefined =
+      baseExcludeSelectors && baseExcludeSelectors.length > 0 ? baseExcludeSelectors : undefined;
 
     if (options.changed) {
       const effectiveChangedPaths = options.changedPaths ?? config.changedPaths;
@@ -1100,16 +1179,32 @@ export async function executeCheckCommand(
       browser = ownedBrowser;
     }
 
-    if (effectiveSelectors && effectiveSelectors.length > 0) {
+    const hasSelectorsToValidate = Boolean(effectiveSelectors && effectiveSelectors.length > 0);
+    const hasExcludesToValidate = Boolean(
+      effectiveExcludeSelectors && effectiveExcludeSelectors.length > 0
+    );
+    if (hasSelectorsToValidate || hasExcludesToValidate) {
       const validationContext = await browser.newContext();
       try {
         const validationPage = await validationContext.newPage();
-        await validateSelectorsInBrowser(validationPage, effectiveSelectors);
+        if (effectiveSelectors && effectiveSelectors.length > 0) {
+          await validateSelectorsInBrowser(
+            validationPage,
+            effectiveSelectors,
+            '--scope / --selectors'
+          );
+        }
+        if (effectiveExcludeSelectors && effectiveExcludeSelectors.length > 0) {
+          await validateSelectorsInBrowser(
+            validationPage,
+            effectiveExcludeSelectors,
+            '--exclude'
+          );
+        }
       } finally {
         await validationContext.close();
       }
     }
-
     const rawThemes =
       options.themes && options.themes.length > 0 ? options.themes : config.themes;
     const activeThemes: Array<string | undefined> =
@@ -1134,7 +1229,8 @@ export async function executeCheckCommand(
               shouldAutoDiscoverRootTokens,
               themeName,
               cwd,
-              effectiveSweepSpec
+              effectiveSweepSpec,
+              effectiveExcludeSelectors
             );
             sweepResults.push({
               ...viewportReport,

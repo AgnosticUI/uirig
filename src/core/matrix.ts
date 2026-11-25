@@ -411,7 +411,8 @@ export async function extractTextContrastSnapshots(
   page: Page,
   ignoreRules: IUirigIgnoreRule[] = [],
   ruleName: string = 'contrast',
-  selectors?: string[]
+  selectors?: string[],
+  excludeSelectors?: string[]
 ): Promise<IExtractedTextContrastEntry[]> {
   logTelemetry(
     'matrix:crawler',
@@ -426,6 +427,7 @@ export async function extractTextContrastSnapshots(
     ({
       rules,
       activeSelectors,
+      activeExcludes,
       walkerFactorySrc,
       ignoreHelperSrc,
       scopeHelperSrc,
@@ -433,6 +435,7 @@ export async function extractTextContrastSnapshots(
     }: {
       rules: IUirigIgnoreRule[];
       activeSelectors?: string[];
+      activeExcludes?: string[];
       walkerFactorySrc: string;
       ignoreHelperSrc: string;
       scopeHelperSrc: string;
@@ -446,11 +449,11 @@ export async function extractTextContrastSnapshots(
         rules,
         ignoreHelperSrc,
         activeSelectors,
-        scopeHelperSrc
+        scopeHelperSrc,
+        activeExcludes
       );
       const results: IRawExtractedTextSnapshot[] = [];
 
-      // Only treat direct text nodes NOT projected into a Shadow DOM <slot> as painted by `el`
       function hasDirectUnassignedVisibleText(el: Element): boolean {
         for (const child of Array.from(el.childNodes)) {
           if (child.nodeType === Node.TEXT_NODE && (child.textContent ?? '').trim().length > 0) {
@@ -463,8 +466,6 @@ export async function extractTextContrastSnapshots(
         return false;
       }
 
-      // When `el` is the innermost <slot> directly receiving Light DOM text nodes
-      // (i.e. not merely forwarding to an inner <slot>), treat `el` as the text carrier.
       function hasSlottedDirectText(el: Element): boolean {
         if (el.tagName !== 'SLOT') {
           return false;
@@ -525,10 +526,6 @@ export async function extractTextContrastSnapshots(
           computed.getPropertyValue('-webkit-text-fill-color') || computed.color || '';
         return isTransparentCssColor(textFill);
       }
-
-      // Walk upward across the flattened render tree: if `current` is projected into a
-      // Shadow DOM `<slot>` (`current.assignedSlot`), climb through that `<slot>` and its
-      // enclosing Shadow DOM containers (`<button>`) before exiting via `ShadowRoot.host`.
       function getFlattenedParentElement(el: Element): Element | null {
         if (el.assignedSlot) {
           return el.assignedSlot;
@@ -540,9 +537,6 @@ export async function extractTextContrastSnapshots(
         return rootNode instanceof ShadowRoot ? rootNode.host : null;
       }
 
-      // WCAG 2.1 SC 1.4.3 exemption: text that is part of an inactive user interface
-      // component (`[disabled]`, `[aria-disabled="true"]`, or inside a disabled `<fieldset>`)
-      // across either the flattened render tree or Light DOM ancestry is exempt from contrast checks.
       function isInactiveUiComponent(el: Element): boolean {
         const checkElementDisabled = (node: Element): boolean => {
           if (node.hasAttribute('disabled')) {
@@ -566,8 +560,6 @@ export async function extractTextContrastSnapshots(
           current = getFlattenedParentElement(current);
         }
 
-        // Also check Light DOM host ancestors when `el` is a <slot> inside an open ShadowRoot
-        // whose Light DOM host element carries `[disabled]` or `[aria-disabled="true"]`.
         let hostCursor: Element | null = el;
         while (hostCursor) {
           if (checkElementDisabled(hostCursor)) {
@@ -610,7 +602,7 @@ export async function extractTextContrastSnapshots(
         return false;
       }
 
-            function collectAncestorStyleLayers(el: Element): IAncestorStyleLayer[] {
+      function collectAncestorStyleLayers(el: Element): IAncestorStyleLayer[] {
         const bottomUpLayers: IAncestorStyleLayer[] = [];
         const visited = new Set<Element>();
         const initialRoot = el.getRootNode();
@@ -702,7 +694,6 @@ export async function extractTextContrastSnapshots(
 
         return bottomUpLayers.reverse();
       }
-
       walker.walkElements((currentNode, meta) => {
         const computed = window.getComputedStyle(currentNode);
 
@@ -718,8 +709,6 @@ export async function extractTextContrastSnapshots(
           const clippedGradient = hasClippedTextGradient(computed);
           const styleLayers = collectAncestorStyleLayers(currentNode);
 
-          // When `background-clip: text` is active, the element's own background paints inside
-          // the glyph fill rather than as a rectangular backdrop behind the characters.
           if (clippedGradient && styleLayers.length > 0) {
             const leafLayer = styleLayers[styleLayers.length - 1];
             if (leafLayer) {
@@ -744,6 +733,7 @@ export async function extractTextContrastSnapshots(
     {
       rules: ignoreRules,
       activeSelectors: selectors,
+      activeExcludes: excludeSelectors,
       walkerFactorySrc: createBrowserDomWalker.toString(),
       ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
       scopeHelperSrc: isElementInSelectorScope.toString(),
@@ -761,13 +751,14 @@ export async function extractTextContrastSnapshots(
     }
   );
 
+  const shadowCount = snapshots.filter((s) => s.inShadowDom).length;
   logTelemetry(
     'matrix:crawler',
-    `Extracted ${paint(
-      String(snapshots.length),
+    `Extracted ${paint(String(snapshots.length), 'bold', 'cyan')} visible text nodes (${paint(
+      String(shadowCount),
       'bold',
-      'cyan'
-    )} visible text elements for contrast audit.`
+      'magenta'
+    )} inside open Shadow DOM).`
   );
 
   return snapshots;
@@ -787,19 +778,36 @@ export async function auditPageContrast(
   ignoreRules: IUirigIgnoreRule[] = [],
   ruleName: string = 'contrast',
   allowedColors: string[] = [],
-  selectors?: string[]
+  selectors?: string[],
+  excludeSelectors?: string[]
 ): Promise<IContrastViolation[]> {
   logTelemetry(
     'matrix:audit',
-    `Starting rendered luminance contrast audit (threshold: ${paint(`${minRatio}:1`, 'bold', 'cyan')})...`
+    `Starting WCAG 2.1 contrast ratio audit (threshold: ${paint(
+      `${minRatio}:1`,
+      'bold',
+      'cyan'
+    )})...`
   );
 
-  const entries = await extractTextContrastSnapshots(page, ignoreRules, ruleName, selectors);
-  const violations: IContrastViolation[] = [];
+  const snapshots = await extractTextContrastSnapshots(
+    page,
+    ignoreRules,
+    ruleName,
+    selectors,
+    excludeSelectors
+  );
 
-  for (const entry of entries) {
+  const violations: IContrastViolation[] = [];
+  for (const snapshot of snapshots) {
     const violation = evaluateContrastEntry({
-      ...entry,
+      selector: snapshot.selector,
+      hostComponent: snapshot.hostComponent,
+      foregroundColor: snapshot.foregroundColor,
+      gradientColors: snapshot.gradientColors,
+      backgroundLayers: snapshot.backgroundLayers,
+      styleLayers: snapshot.styleLayers,
+      inShadowDom: snapshot.inShadowDom,
       minRatio,
       allowedColors,
     });
@@ -813,7 +821,10 @@ export async function auditPageContrast(
       ? paint(String(violations.length), 'bold', 'red')
       : paint('0', 'bold', 'green');
 
-  logTelemetry('matrix:audit', `Contrast audit complete. Violations detected: ${countBadge}`);
+  logTelemetry(
+    'matrix:audit',
+    `Contrast audit complete. Total violations detected: ${countBadge}`
+  );
 
   return violations;
 }

@@ -20,8 +20,10 @@ export interface IDomAuditOptions {
   navigationResponse?: Response | null;
   /** Optional runtime ignore rules from `uirig.config.json`. */
   ignoreRules?: Array<IUirigIgnoreRule>;
-  /** Optional CSS selectors limiting the DOM integrity sweep to matching subtrees. */
+  /** Optional CSS selectors limiting the DOM integrity sweep to matching subtrees (`--scope` / `--selectors`). */
   selectors?: Array<string>;
+  /** Optional CSS selectors carved out from the DOM integrity sweep (`--exclude`). */
+  excludeSelectors?: Array<string>;
 }
 
 /**
@@ -118,12 +120,16 @@ export function describeOrphanedSlotReason(params: {
 /**
  * Runs the read-only Light + Shadow DOM integrity sweep against an active Playwright Page.
  */
+/**
+ * Runs the read-only Light + Shadow DOM integrity sweep against an active Playwright Page.
+ */
 export async function runDomIntegrityAudit(
   page: Page,
   options: IDomAuditOptions = {}
 ): Promise<Array<IDomIntegrityViolation>> {
   const ignoreRules = options.ignoreRules ?? new Array<IUirigIgnoreRule>();
   const selectors = options.selectors;
+  const excludeSelectors = options.excludeSelectors;
   const isScopedAudit = Boolean(selectors && selectors.length > 0);
 
   logTelemetry(
@@ -147,12 +153,14 @@ export async function runDomIntegrityAudit(
     ({
       rules,
       activeSelectors,
+      activeExcludes,
       walkerFactorySrc,
       ignoreHelperSrc,
       scopeHelperSrc,
     }: {
       rules: Array<IUirigIgnoreRule>;
       activeSelectors?: Array<string>;
+      activeExcludes?: Array<string>;
       walkerFactorySrc: string;
       ignoreHelperSrc: string;
       scopeHelperSrc: string;
@@ -165,7 +173,8 @@ export async function runDomIntegrityAudit(
         rules,
         ignoreHelperSrc,
         activeSelectors,
-        scopeHelperSrc
+        scopeHelperSrc,
+        activeExcludes
       );
       const found = new Array<IDomIntegrityViolation>();
 
@@ -221,7 +230,7 @@ export async function runDomIntegrityAudit(
         return false;
       }
 
-            function hasSlottedAccessibleContent(el: Element): boolean {
+      function hasSlottedAccessibleContent(el: Element): boolean {
         const slots = Array.from(el.querySelectorAll('slot'));
         for (const slot of slots) {
           const assigned = slot.assignedNodes({ flatten: true });
@@ -330,6 +339,7 @@ export async function runDomIntegrityAudit(
             });
           }
         }
+
         // 6. Unmuted `<video autoplay>` elements
         if (tag === 'VIDEO') {
           const videoEl = el as HTMLVideoElement;
@@ -483,6 +493,7 @@ export async function runDomIntegrityAudit(
     {
       rules: ignoreRules,
       activeSelectors: selectors,
+      activeExcludes: excludeSelectors,
       walkerFactorySrc: createBrowserDomWalker.toString(),
       ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
       scopeHelperSrc: isElementInSelectorScope.toString(),
@@ -494,6 +505,7 @@ export async function runDomIntegrityAudit(
   const axViolations = await auditComputedAccessibilityTree(page, {
     ignoreRules,
     selectors,
+    excludeSelectors,
   });
 
   const existingUnlabeledSelectors = new Set(
@@ -520,3 +532,4 @@ export async function runDomIntegrityAudit(
 
   return violations;
 }
+
