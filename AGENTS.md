@@ -45,6 +45,7 @@ npx @rlevin/uirig ./dist/index.html --auto-tokens --selectors="ag-button, .prici
 
 ## Ground Rules for AI Agents
 
+- **Browser Setup:** If Chromium is not yet cached, `uirig` auto-installs its matching binary on first run (or falls back to system Chrome). To pre-install explicitly in CI or mixed-Playwright workspaces, run `npx @rlevin/uirig install` (or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`).
 - **Do not bypass `uirig.config.json` budgets** (`clsMaxLimit`, `overflowPixelTolerance`, `touchTargetMinSpacingPx`, `darkModeMaxSurfaceLuminance`) or sprinkle `data-uirig-ignore` attributes to silence legitimate failures. Fix the underlying layout, contrast, or token usage instead.
 - **Prefer design tokens over raw values:** When `suggestedToken` is present in a violation, apply the semantic CSS custom property rather than hardcoding hex colors or pixel values.
 - **Shadow DOM paths:** Selectors formatted as `host-tag::shadow > inner-selector` or `host-tag >> shadow-root >> inner-selector` indicate an element inside an open `ShadowRoot` owned by `hostComponent`.

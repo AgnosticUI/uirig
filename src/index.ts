@@ -19,6 +19,7 @@ import {
   type PosixExitCode,
 } from './commands/check.js';
 import { executeManifestCommand } from './commands/manifest.js';
+import { installBundledChromium } from './utils/browser-launch.js';
 import { logTelemetry, paint } from './utils/formatter.js';
 import { parseSelectorList } from './utils/scope.js';
 import { readFileSync } from 'fs';
@@ -87,6 +88,20 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       '1                   Filesystem write error or invalid working directory',
     ],
     examples: ['npx @rlevin/uirig init'],
+  },
+  install: {
+    summary: 'Download and install the exact Chromium binary required by @rlevin/uirig.',
+    usage: 'uirig install [--help]',
+    mechanics: [
+      'Resolves @rlevin/uirig\'s own bundled Playwright CLI so host-workspace Playwright versions never mismatch.',
+      'Installs Chromium into Playwright\'s shared browser cache and streams progress to stderr.',
+    ],
+    options: ['-h, --help          Show help for the install subcommand'],
+    exitCodes: [
+      '0                   Chromium browser binary installed successfully',
+      '1                   Browser download or installation failed',
+    ],
+    examples: ['npx @rlevin/uirig install', 'npx uirig install'],
   },
   check: {
     summary: 'Run all verification engines concurrently across configured or direct targets in isolated contexts.',
@@ -295,6 +310,7 @@ ${paint('USAGE:', 'bold')}
 
 ${paint('COMMANDS:', 'bold')}
   init                            Scaffold uirig.config.json, .uirig/session.json, and .uirig/SKILL.md
+  install                         Download the exact Chromium binary required by @rlevin/uirig
   check [<url-or-file>]           Run all verification engines concurrently in isolated contexts
   tokens [<url-or-file>]          Run only the shadow-piercing design token drift auditor
   contrast [<url-or-file>]        Run only the WCAG 2.1 rendered luminance contrast gate
@@ -382,6 +398,7 @@ export type ParsedCliCommand =
   | { command: 'help'; topic?: string }
   | { command: 'version' }
   | { command: 'init' }
+  | { command: 'install' }
   | { command: 'manifest' }
   | {
       command: 'mcp';
@@ -849,6 +866,13 @@ export function parseCliArgs(argv: Array<string>): ParsedCliCommand {
     return { command: 'init' };
   }
 
+  if (firstArg === 'install' || firstArg === 'setup') {
+    if (secondArg === '-h' || secondArg === '--help') {
+      return { command: 'help', topic: 'install' };
+    }
+    return { command: 'install' };
+  }
+
   if (firstArg === 'manifest') {
     if (secondArg === '-h' || secondArg === '--help') {
       return { command: 'help', topic: 'manifest' };
@@ -881,6 +905,7 @@ export function parseCliArgs(argv: Array<string>): ParsedCliCommand {
 
 export interface ICliCommandHandlers {
   init?: () => Promise<void>;
+  install?: () => Promise<void>;
   manifest?: () => Promise<void>;
   check?: typeof executeCheckCommand;
   mcp?: (options: IMcpCommandOptions) => Promise<void>;
@@ -917,6 +942,12 @@ export async function runCli(
     if (parsed.command === 'manifest') {
       const runManifest = handlers.manifest ?? executeManifestCommand;
       await runManifest();
+      return 0;
+    }
+
+    if (parsed.command === 'install') {
+      const runInstall = handlers.install ?? installBundledChromium;
+      await runInstall();
       return 0;
     }
 

@@ -517,4 +517,18 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     );
   });
 
+  it('parses and routes `uirig install` (and `setup` alias) to the browser installer and renders help text', async () => {
+    expect(parseCliArgs(['install'])).toEqual({ command: 'install' });
+    expect(parseCliArgs(['setup'])).toEqual({ command: 'install' });
+
+    const helpExit = await runCli(['install', '--help']);
+    expect(helpExit).toBe(0);
+    const helpOutput = String(stdoutSpy.mock.calls.at(-1)?.at(0) ?? '');
+    expect(helpOutput).toContain('uirig install');
+    expect(helpOutput).toContain('Playwright');
+
+    const installSpy = vi.fn(async () => {});
+    expect(await runCli(['install'], { install: installSpy })).toBe(0);
+    expect(installSpy).toHaveBeenCalledTimes(1);
+  });
 });
