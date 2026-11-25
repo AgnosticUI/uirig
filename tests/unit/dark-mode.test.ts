@@ -300,4 +300,55 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
     expect(violations).toEqual([]);
   });
 
+  it('excludes opacity: 0 and visibility: hidden overlays and tooltips from dark-mode contrast and surface checks (Issue #57)', async () => {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 24px; background: rgb(1, 4, 9); color: rgb(248, 250, 252); }
+          </style>
+        </head>
+        <body>
+          <ag-combobox></ag-combobox>
+          <ag-slider></ag-slider>
+          <script>
+            class AgCombobox extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                shadow.innerHTML =
+                  '<div class="listbox" style="opacity: 0; pointer-events: none;">' +
+                    '<div class="ag-combobox__no-results" style="width: 240px; height: 90px; color: rgb(1, 4, 9); background: rgb(255, 255, 255);">No results found</div>' +
+                  '</div>';
+              }
+            }
+            customElements.define('ag-combobox', AgCombobox);
+
+            class AgSlider extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                shadow.innerHTML =
+                  '<div class="ag-slider__tooltip" style="visibility: hidden; width: 180px; height: 80px; color: rgb(255, 255, 255); background: rgb(255, 255, 255);">50%</div>';
+              }
+            }
+            customElements.define('ag-slider', AgSlider);
+          </script>
+        </body>
+      </html>
+    `);
+
+    const violations = await runDarkModeAudit(page);
+    await context.close();
+
+    expect(violations).toEqual([]);
+  });
+
 });
