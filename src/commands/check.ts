@@ -92,6 +92,8 @@ export interface IUirigConfig {
   autoTokens?: boolean;
   themes?: Array<string>;
   sweep?: string | boolean;
+  scope?: Array<string>;
+  exclude?: Array<string>;
   changedPaths?: IChangedPathsConfig;
   thresholdBudgets: IThresholdBudgets;
   viewports: Array<IViewportConfig>;
@@ -111,7 +113,9 @@ export interface ICheckCommandOptions {
   groupByRoot?: boolean;
   top?: number;
   maxTokens?: number;
+  scope?: Array<string>;
   selectors?: Array<string>;
+  exclude?: Array<string>;
   changed?: boolean;
   baseRef?: string;
   changedPaths?: IChangedPathsConfig;
@@ -133,6 +137,7 @@ export interface IViewportAuditReport {
   viewport: IViewportConfig;
   theme?: string;
   scopedSelectors?: Array<string>;
+  excludedSelectors?: Array<string>;
   matchedSelectorCount?: number;
   spatialBrief?: string;
   a2uiAttributions?: Record<string, IA2uiAttribution | null>;
@@ -260,7 +265,7 @@ export function loadUirigConfig(
     );
   }
 
-    const ignoreRules = new Array<IUirigIgnoreRule>();
+  const ignoreRules = new Array<IUirigIgnoreRule>();
   if (candidate.ignore !== undefined) {
     if (!Array.isArray(candidate.ignore)) {
       throw new Error("ERR_CONFIG_SCHEMA: 'ignore' must be an array of ignore rule objects.");
@@ -280,6 +285,36 @@ export function loadUirigConfig(
   const configThemes = Array.isArray(candidate.themes)
     ? candidate.themes.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
     : undefined;
+
+  let configScope: Array<string> | undefined;
+  if (candidate.scope !== undefined) {
+    if (
+      !Array.isArray(candidate.scope) ||
+      !candidate.scope.every((s) => typeof s === 'string' && s.trim().length > 0)
+    ) {
+      throw new Error(
+        "ERR_CONFIG_SCHEMA: 'scope' must be an array of non-empty CSS selector strings."
+      );
+    }
+    if (candidate.scope.length > 0) {
+      configScope = candidate.scope.map((s) => s.trim());
+    }
+  }
+
+  let configExclude: Array<string> | undefined;
+  if (candidate.exclude !== undefined) {
+    if (
+      !Array.isArray(candidate.exclude) ||
+      !candidate.exclude.every((s) => typeof s === 'string' && s.trim().length > 0)
+    ) {
+      throw new Error(
+        "ERR_CONFIG_SCHEMA: 'exclude' must be an array of non-empty CSS selector strings."
+      );
+    }
+    if (candidate.exclude.length > 0) {
+      configExclude = candidate.exclude.map((s) => s.trim());
+    }
+  }
 
   const rawChangedPaths = candidate.changedPaths;
   let parsedChangedPaths: IChangedPathsConfig | undefined;
@@ -317,6 +352,8 @@ export function loadUirigConfig(
     autoTokens: candidate.autoTokens === true,
     ...(configThemes && configThemes.length > 0 ? { themes: configThemes } : {}),
     ...(parsedSweep !== undefined ? { sweep: parsedSweep } : {}),
+    ...(configScope ? { scope: configScope } : {}),
+    ...(configExclude ? { exclude: configExclude } : {}),
     ...(parsedChangedPaths ? { changedPaths: parsedChangedPaths } : {}),
     thresholdBudgets: {
       clsMaxLimit: budgets.clsMaxLimit,

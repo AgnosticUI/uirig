@@ -1343,4 +1343,61 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
     expect(report.results.at(0)?.sweepViolations?.at(0)?.failedWidths).toBe('720px-800px');
   });
 
+  it('validates scope and exclude selector arrays in uirig.config.json and rejects non-string or blank entries with ERR_CONFIG_SCHEMA', () => {
+    const validScopeConfig = join(tempDir, 'scope-exclude.config.json');
+    writeFileSync(
+      validScopeConfig,
+      JSON.stringify({
+        targetUrls: ['http://localhost:3000'],
+        scope: [' #uirig-stage ', 'main.content'],
+        exclude: ['h3.demo-title'],
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+
+    const loaded = loadUirigConfig(validScopeConfig);
+    expect(loaded.scope).toEqual(['#uirig-stage', 'main.content']);
+    expect(loaded.exclude).toEqual(['h3.demo-title']);
+
+    const badScopeConfig = join(tempDir, 'bad-scope.config.json');
+    writeFileSync(
+      badScopeConfig,
+      JSON.stringify({
+        targetUrls: ['http://localhost:3000'],
+        scope: ['#uirig-stage', '   '],
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+    expect(() => loadUirigConfig(badScopeConfig)).toThrow(/ERR_CONFIG_SCHEMA/);
+
+    const badExcludeConfig = join(tempDir, 'bad-exclude.config.json');
+    writeFileSync(
+      badExcludeConfig,
+      JSON.stringify({
+        targetUrls: ['http://localhost:3000'],
+        exclude: 'h3.demo-title',
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+    expect(() => loadUirigConfig(badExcludeConfig)).toThrow(/ERR_CONFIG_SCHEMA/);
+  });
+
 });
