@@ -54,7 +54,7 @@ describe('uirig mcp — Native MCP Server Mode (src/commands/mcp.ts)', () => {
     return client;
   }
 
-  it('starts over stdio with zero stdout pollution and lists all 10 uirig verification & A2UI tools', async () => {
+  it('starts over stdio with zero stdout pollution and lists all 11 uirig verification & A2UI tools', async () => {
     const mcpClient = await connectMcpClient();
     const { tools } = await mcpClient.listTools();
     const names = tools.map((t) => t.name).sort();
@@ -67,12 +67,12 @@ describe('uirig mcp — Native MCP Server Mode (src/commands/mcp.ts)', () => {
       'uirig_dark_mode',
       'uirig_discover_tokens',
       'uirig_dom',
+      'uirig_states',
       'uirig_stress',
       'uirig_sweep',
       'uirig_tokens',
     ]);
   });
-
 
   it('reuses a warm Chromium instance across sequential MCP tool calls and returns agentic JSON', async () => {
     const htmlPath = join(tempDir, 'component.html');
