@@ -209,7 +209,9 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     const darkModeOutput = String(stdoutSpy.mock.calls.at(-1)?.at(0) ?? '');
     expect(darkModeOutput).toContain('uirig dark-mode');
     expect(darkModeOutput).toContain('prefers-color-scheme: dark');
-    expect(darkModeOutput).toContain('--selectors=<csv>');
+    expect(darkModeOutput).toContain('--scope=<csv>');
+    expect(darkModeOutput).toContain('--exclude=<csv>');
+    expect(darkModeOutput).toContain('-s, --selectors');
 
     const checkHelpExit = await runCli(['help', 'check']);
     expect(checkHelpExit).toBe(0);
@@ -228,6 +230,7 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
 
     expect(renderHelpText('nonexistent-topic')).toBe(CLI_HELP_TEXT.trim());
   });
+
 
     it('routes `init`, `manifest`, and `check` (including zero-config target, selectors, groupByRoot, top, maxTokens, spatialBrief & verbose) to handlers and forwards POSIX exit code', async () => {
     console.log('[TEST] Verifying subcommand routing and exit code propagation...');
@@ -429,6 +432,64 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     });
     expect(await runCli(['check', 'http://127.0.0'], { check: checkSpy })).toBe(1);
     expect(await runCli(['http://127.0.0'], { check: checkSpy })).toBe(1);
+  });
+
+  it('parses comma-separated and repeatable --scope and --exclude flags with deduplication and forwards them to executeCheckCommand', async () => {
+    const checkSpy = vi.fn(async () => createMockReport(0));
+
+    expect(
+      parseCliArgs([
+        'check',
+        'http://localhost:5173',
+        '--scope=#uirig-stage, main.panel',
+        '--scope',
+        'main.panel, ag-button',
+        '--exclude=h3.demo-title, .badge',
+        '--exclude',
+        '.badge, footer',
+      ])
+    ).toMatchObject({
+      command: 'check',
+      target: 'http://localhost:5173',
+      scope: ['#uirig-stage', 'main.panel', 'ag-button'],
+      exclude: ['h3.demo-title', '.badge', 'footer'],
+    });
+
+    expect(parseCliArgs(['check', '--scope=']).command).toBe('unknown');
+    expect(parseCliArgs(['check', '--scope']).command).toBe('unknown');
+    expect(parseCliArgs(['check', '--exclude=']).command).toBe('unknown');
+    expect(parseCliArgs(['check', '--exclude']).command).toBe('unknown');
+
+    const exitCode = await runCli(
+      [
+        'check',
+        './index.html',
+        '--scope=#uirig-stage',
+        '--exclude=h3.demo-title',
+        '--json',
+      ],
+      { check: checkSpy }
+    );
+    expect(exitCode).toBe(0);
+    expect(checkSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: './index.html',
+        scope: ['#uirig-stage'],
+        exclude: ['h3.demo-title'],
+        json: true,
+      })
+    );
+  });
+
+  it('documents --scope and --exclude in CLI_HELP_TEXT and subcommand --help output', async () => {
+    expect(CLI_HELP_TEXT).toContain('--scope=<csv>');
+    expect(CLI_HELP_TEXT).toContain('--exclude=<csv>');
+
+    const exitCode = await runCli(['check', '--help']);
+    expect(exitCode).toBe(0);
+    const output = String(stdoutSpy.mock.calls.at(-1)?.at(0) ?? '');
+    expect(output).toContain('--scope=<csv>');
+    expect(output).toContain('--exclude=<csv>');
   });
 
 });

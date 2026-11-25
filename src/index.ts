@@ -58,7 +58,8 @@ const SHARED_AUDIT_OPTIONS = [
   '--sweep[=<range>]      Step viewport across <min>:<max>:<step> widths (default: 320:1440:40)',
   '--changed              Scope audit to components modified in git diff (optional: --base <ref>)',
   '--base=<ref>           Git base ref for --changed diff comparison (e.g. --base=main)',
-  '-s, --selectors=<csv>  Filter element checks to matching CSS selectors (repeatable)',
+  '--scope=<csv>          Restrict audit to matching CSS selector containers (alias: -s, --selectors; repeatable)',
+  '--exclude=<csv>        Carve out matching CSS selector subtrees from audit (repeatable)',
   '--config=<path>        Path to uirig.config.json (also supports: --config <path>)',
   '--fix                  Apply deterministic 1-to-1 fixes on disk and re-verify',
   '--group-by-root        Collapse child failures under their shared parent container or host',
@@ -88,11 +89,11 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   check: {
     summary: 'Run all verification engines concurrently across configured or direct targets in isolated contexts.',
-    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--sweep[=<min:max:step>]] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig check [<url-or-file>] [--only=<tool>] [--sweep[=<min:max:step>]] [--tokens-path=<path>] [--auto-tokens] [--scope=<csv>] [--exclude=<csv>] [--changed] [--base=<ref>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Launches a single headless Chromium instance and isolates each (url, viewport) pair in a fresh BrowserContext.',
       'Automatically serves local .html files on an ephemeral 127.0.0.1 HTTP server when given a file path.',
-      'Ranks violations from highest impact to lowest and supports --sweep, --tokens-path, --auto-tokens, --changed, --group-by-root, --top, and --max-tokens.',
+      'Supports --scope (or --selectors / -s) to bound audits to target containers and --exclude to carve out subtrees.',
     ],
     options: [
       '--only=<tool>          Filter execution to one engine: tokens | contrast | dark-mode | stress | cls | dom | sweep',
@@ -105,18 +106,18 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     ],
     examples: [
       'npx @rlevin/uirig check',
+      'npx @rlevin/uirig check http://localhost:5173 --scope="#uirig-stage" --exclude="h3.demo-title" --verbose',
       'npx @rlevin/uirig check http://localhost:5173 --sweep=320:1440:40 --json',
       'npx @rlevin/uirig check http://localhost:5173 --tokens-path=./design.tokens.json --verbose',
       'npx @rlevin/uirig check --changed --base=main --json',
-      'npx @rlevin/uirig check ./dist/index.html --selectors="#hero, .card" --verbose',
     ],
   },
   sweep: {
     summary: 'Step an active Chromium viewport across [min, max, step] widths and report failing width ranges.',
-    usage: 'uirig sweep [<url-or-file>] [--sweep=<min:max:step>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig sweep [<url-or-file>] [--sweep=<min:max:step>] [--scope=<csv>] [--exclude=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Resizes a single open Chromium page across the configured width range (default 320:1440:40) without extra browser launches.',
-      'Evaluates horizontal overflow and sibling touch-target collisions at each width and collapses contiguous hits into failedWidths ranges.',
+      'Evaluates horizontal overflow (relative to --scope containers when scoped) and sibling touch-target collisions at each width.',
     ],
     options: SHARED_AUDIT_OPTIONS,
     exitCodes: [
@@ -130,7 +131,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   tokens: {
     summary: 'Audit Light DOM and open ShadowRoot computed styles against your design token scale.',
-    usage: 'uirig tokens [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig tokens [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--scope=<csv>] [--exclude=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Climbs Light DOM and nested Web Component ShadowRoot trees to inspect rendered colors, spacing, font sizes, and radii.',
       'Accepts W3C ($value), Style Dictionary (value), flat JSON, or CSS custom property token files via tokensPath / --tokens-path.',
@@ -142,13 +143,13 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
     ],
     examples: [
       'npx @rlevin/uirig tokens http://localhost:5173 --tokens-path=./tokens.css --verbose',
-      'npx @rlevin/uirig tokens http://localhost:5173 --selectors="ag-button" --verbose',
+      'npx @rlevin/uirig tokens http://localhost:5173 --scope="ag-button" --verbose',
       'npx @rlevin/uirig tokens --config=./uirig.config.json --json',
     ],
   },
   contrast: {
     summary: 'Verify WCAG 2.1 AA rendered luminance contrast (>= 4.5:1) using Porter-Duff alpha compositing.',
-    usage: 'uirig contrast [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig contrast [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--scope=<csv>] [--exclude=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Walks Light DOM and ShadowRoot.host ancestors to composite translucent backgrounds before computing luminance contrast.',
       'Computes the nearest passing design system color token (suggestedToken) when tokensPath / --tokens-path or --auto-tokens is set.',
@@ -159,14 +160,13 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       '1                   One or more text nodes fell below required contrast ratios',
     ],
     examples: [
-      'npx @rlevin/uirig contrast ./dist/index.html -s "#pricing" --verbose',
+      'npx @rlevin/uirig contrast ./dist/index.html --scope="#pricing" --verbose',
       'npx @rlevin/uirig contrast http://localhost:5173 --json',
     ],
   },
-
-    'dark-mode': {
+  'dark-mode': {
     summary: 'Emulate dark color scheme / [data-theme="dark"] and audit dark contrast & un-inverted bright surfaces.',
-    usage: 'uirig dark-mode [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig dark-mode [<url-or-file>] [--tokens-path=<path>] [--auto-tokens] [--scope=<csv>] [--exclude=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Forces prefers-color-scheme: dark and toggles data-theme="dark" on <html> inside an isolated browser context.',
       'Re-runs Porter-Duff contrast checks and flags large surfaces stranded above 0.85 relative luminance.',
@@ -183,10 +183,10 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   stress: {
     summary: 'Fuzz text with +30% expansion and space-free strings to catch layout overflow, bleed, and tiny tap targets.',
-    usage: 'uirig stress [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig stress [<url-or-file>] [--scope=<csv>] [--exclude=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Injects +30% longer copy and unbreakable email/URL tokens to test flex/grid resilience and container clipping.',
-      'Checks horizontal scrollbar bleed (100vw), squished avatars, stuck opacity: 0 elements, and 24x24px minimum tap targets.',
+      'Checks horizontal scrollbar bleed (or --scope container overflow when scoped), squished avatars, stuck opacity: 0 elements, and 24x24px minimum tap targets.',
     ],
     options: SHARED_AUDIT_OPTIONS,
     exitCodes: [
@@ -217,7 +217,7 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
   },
   dom: {
     summary: 'Audit Light + Shadow DOM for broken ARIA/label IDs, broken media, unsafe links, and prompt-injection traps.',
-    usage: 'uirig dom [<url-or-file>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    usage: 'uirig dom [<url-or-file>] [--scope=<csv>] [--exclude=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
     mechanics: [
       'Verifies aria-labelledby / label[for] ID resolution, accessible names on controls, and loaded <img> dimensions.',
       'Flags javascript: URIs, target="_blank" without rel="noopener", and invisible AI prompt-injection text.',
@@ -295,7 +295,8 @@ ${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / sweep /
   --sweep[=<min:max:step>]        Step viewport across responsive widths (default: 320:1440:40)
   --changed                       Scope audit to components modified in git diff (optional: --base <ref>)
   --base=<ref>                    Git base ref for --changed diff comparison (e.g. --base=main)
-  -s, --selectors=<csv>           Filter element checks to matching CSS selectors (repeatable)
+  --scope=<csv>                   Restrict audit to matching CSS selector containers (alias: -s, --selectors; repeatable)
+  --exclude=<csv>                 Carve out matching CSS selector subtrees from audit (repeatable)
   --config=<path>                 Path to uirig.config.json (also supports: --config <path>)
   --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls | dom | sweep
   --group-by-root                 Collapse child failures under their shared parent container or host
@@ -380,7 +381,9 @@ export type ParsedCliCommand =
       changed?: boolean;
       baseRef?: string;
       fix?: boolean;
+      scope?: Array<string>;
       selectors?: Array<string>;
+      exclude?: Array<string>;
       configPath?: string;
       groupByRoot: boolean;
       top?: number;
@@ -531,7 +534,9 @@ function parseAuditCommandArgs(
   let baseRef: string | undefined;
   let fix = false;
   const collectedThemes = new Array<string>();
+  const collectedScope = new Array<string>();
   const collectedSelectors = new Array<string>();
+  const collectedExclude = new Array<string>();
   let groupByRoot = false;
   let top: number | undefined;
   let maxTokens: number | undefined;
@@ -666,6 +671,24 @@ function parseAuditCommandArgs(
       }
       maxTokens = parsedTokens;
       i++;
+    } else if (token.startsWith('--scope=')) {
+      const rawVal = token.slice('--scope='.length);
+      const parsed = parseSelectorList(rawVal);
+      if (parsed.length === 0) {
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing CSS selector value after --scope=' };
+      }
+      collectedScope.push(...parsed);
+    } else if (token === '--scope') {
+      const nextToken = restArgs.at(i + 1);
+      if (!nextToken || nextToken.startsWith('-')) {
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing CSS selector value after --scope' };
+      }
+      const parsed = parseSelectorList(nextToken);
+      if (parsed.length === 0) {
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Empty CSS selector value after --scope' };
+      }
+      collectedScope.push(...parsed);
+      i++;
     } else if (token.startsWith('--selectors=') || token.startsWith('-s=')) {
       const rawVal = token.startsWith('--selectors=') ? token.slice('--selectors='.length) : token.slice('-s='.length);
       const parsed = parseSelectorList(rawVal);
@@ -683,6 +706,24 @@ function parseAuditCommandArgs(
         return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Empty CSS selector value after ' + token };
       }
       collectedSelectors.push(...parsed);
+      i++;
+    } else if (token.startsWith('--exclude=')) {
+      const rawVal = token.slice('--exclude='.length);
+      const parsed = parseSelectorList(rawVal);
+      if (parsed.length === 0) {
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing CSS selector value after --exclude=' };
+      }
+      collectedExclude.push(...parsed);
+    } else if (token === '--exclude') {
+      const nextToken = restArgs.at(i + 1);
+      if (!nextToken || nextToken.startsWith('-')) {
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Missing CSS selector value after --exclude' };
+      }
+      const parsed = parseSelectorList(nextToken);
+      if (parsed.length === 0) {
+        return { command: 'unknown', rawCommand: rawSubcommand, reason: 'Empty CSS selector value after --exclude' };
+      }
+      collectedExclude.push(...parsed);
       i++;
     } else if (token.startsWith('--only=')) {
       const toolValue = token.slice('--only='.length).trim() as AuditToolName;
@@ -724,7 +765,9 @@ function parseAuditCommandArgs(
     }
   }
 
+  const uniqueScope = collectedScope.length > 0 ? Array.from(new Set(collectedScope)) : undefined;
   const uniqueSelectors = collectedSelectors.length > 0 ? Array.from(new Set(collectedSelectors)) : undefined;
+  const uniqueExclude = collectedExclude.length > 0 ? Array.from(new Set(collectedExclude)) : undefined;
   const uniqueThemes = collectedThemes.length > 0 ? Array.from(new Set(collectedThemes)) : undefined;
   const uniqueTokensPaths =
     collectedTokensPaths.length > 0 ? Array.from(new Set(collectedTokensPaths)) : undefined;
@@ -746,7 +789,9 @@ function parseAuditCommandArgs(
     ...(changed ? { changed: true } : {}),
     ...(baseRef ? { baseRef } : {}),
     ...(fix ? { fix: true } : {}),
+    ...(uniqueScope ? { scope: uniqueScope } : {}),
     selectors: uniqueSelectors,
+    ...(uniqueExclude ? { exclude: uniqueExclude } : {}),
     configPath,
     groupByRoot,
     top,
@@ -875,10 +920,13 @@ export async function runCli(
       only: parsed.only,
       ...(parsed.autoTokens ? { autoTokens: true } : {}),
       ...(parsed.themes ? { themes: parsed.themes } : {}),
+      ...(parsed.sweep !== undefined ? { sweep: parsed.sweep } : {}),
       ...(parsed.changed ? { changed: true } : {}),
       ...(parsed.baseRef ? { baseRef: parsed.baseRef } : {}),
       ...(parsed.fix ? { fix: true } : {}),
+      ...(parsed.scope ? { scope: parsed.scope } : {}),
       selectors: parsed.selectors,
+      ...(parsed.exclude ? { exclude: parsed.exclude } : {}),
       groupByRoot: parsed.groupByRoot,
       top: parsed.top,
       maxTokens: parsed.maxTokens,
