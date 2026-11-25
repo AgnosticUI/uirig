@@ -15,9 +15,13 @@ import {
   loadUirigConfig,
   loadTokenScale,
   evaluatePosixExitCode,
+  auditViewportInParallel,
   executeCheckCommand,
+  ZERO_CONFIG_DEFAULTS,
+  FALLBACK_TOKEN_SCALE,
   type IViewportAuditReport,
 } from '../../src/commands/check.js';
+
 import { WarmBrowserPool } from '../../src/core/browser-pool.js';
 
 function createCleanViewportReport(): IViewportAuditReport {
@@ -1398,6 +1402,178 @@ describe('check.ts — Isolated Parallel Context Dispatcher', () => {
       'utf8'
     );
     expect(() => loadUirigConfig(badExcludeConfig)).toThrow(/ERR_CONFIG_SCHEMA/);
+  });
+
+  it('threads excludeSelectors through auditViewportInParallel across all engines and selector counting', async () => {
+    const html = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 16px; background: rgb(255, 255, 255); color: rgb(17, 24, 39); font-size: 16px; }
+            #uirig-stage { padding: 16px; background: rgb(243, 244, 246); border-radius: 8px; }
+            .demo-title { color: rgb(210, 210, 210); padding: 13px; }
+            .clean-card p { margin: 0; font-size: 16px; color: rgb(17, 24, 39); }
+            :root[data-theme="dark"] body { background: rgb(17, 24, 39); color: rgb(255, 255, 255); }
+            :root[data-theme="dark"] #uirig-stage { background: rgb(17, 24, 39); }
+            :root[data-theme="dark"] .clean-card p { color: rgb(255, 255, 255); }
+          </style>
+        </head>
+        <body>
+          <section id="uirig-stage">
+            <h3 class="demo-title">Excluded Demo Title <input placeholder="Excluded unlabeled input" /></h3>
+            <div class="clean-card">
+              <p>In-scope compliant content</p>
+            </div>
+          </section>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(html);
+    activeServer = server;
+
+    const pool = new WarmBrowserPool({ headless: true, idleTimeoutMs: 60_000 });
+    try {
+      const browser = await pool.acquire();
+      const report = await auditViewportInParallel(
+        browser,
+        url,
+        { name: 'desktop', width: 1280, height: 800 },
+        FALLBACK_TOKEN_SCALE,
+        ZERO_CONFIG_DEFAULTS.thresholdBudgets,
+        undefined,
+        [],
+        false,
+        ['#uirig-stage', '.demo-title'],
+        false,
+        false,
+        undefined,
+        tempDir,
+        undefined,
+        ['.demo-title']
+      );
+
+      expect(report.scopedSelectors).toEqual(['#uirig-stage', '.demo-title']);
+      expect(report.excludedSelectors).toEqual(['.demo-title']);
+      expect(report.matchedSelectorCount).toBe(1);
+      expect(report.tokenViolations).toHaveLength(0);
+      expect(report.contrastViolations).toHaveLength(0);
+      expect(report.darkModeViolations).toHaveLength(0);
+      expect(report.stressViolations).toHaveLength(0);
+      expect(report.domViolations).toHaveLength(0);
+    } finally {
+      await pool.dispose();
+    }
+  });
+
+  it('applies scope and exclude from uirig.config.json and options, carves out excluded subtrees, and rejects invalid exclude selectors', async () => {
+    const html = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root { --bg: #ffffff; --fg: #111827; }
+            :root[data-theme="dark"] { --bg: #0f172a; --fg: #f8fafc; }
+            body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font-family: sans-serif; }
+            .host-shell .bad-contrast { color: rgb(210, 210, 210); }
+            #uirig-stage h3.demo-title { color: rgb(210, 210, 210); }
+            #uirig-stage p.valid-copy { margin: 0; font-size: 16px; }
+          </style>
+        </head>
+        <body>
+          <header class="host-shell">
+            <span class="bad-contrast">Host shell noise outside --scope</span>
+          </header>
+          <section id="uirig-stage">
+            <h3 class="demo-title">Carved-out demo heading</h3>
+            <p class="valid-copy">Audited stage copy</p>
+          </section>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(html);
+    activeServer = server;
+
+    const configFile = join(tempDir, 'uirig.config.json');
+    writeFileSync(
+      configFile,
+      JSON.stringify({
+        targetUrls: [url],
+        scope: ['#uirig-stage'],
+        exclude: ['h3.demo-title'],
+        thresholdBudgets: {
+          clsMaxLimit: 0.1,
+          overflowPixelTolerance: 2,
+          touchTargetMinSpacingPx: 24,
+        },
+        viewports: [{ name: 'desktop', width: 1280, height: 800 }],
+      }),
+      'utf8'
+    );
+
+    const configScopedReport = await executeCheckCommand({
+      configPath: configFile,
+      cwd: tempDir,
+      headless: true,
+      silentStdout: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    expect(configScopedReport.exitCode).toBe(0);
+    expect(configScopedReport.results.at(0)?.scopedSelectors).toEqual(['#uirig-stage']);
+    expect(configScopedReport.results.at(0)?.excludedSelectors).toEqual(['h3.demo-title']);
+    expect(configScopedReport.results.at(0)?.matchedSelectorCount).toBe(1);
+
+    await expect(
+      executeCheckCommand({
+        target: url,
+        cwd: tempDir,
+        exclude: ['div > > .invalid-exclude'],
+        headless: true,
+        silentStdout: true,
+        reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+      })
+    ).rejects.toThrow(/ERR_INVALID_SELECTOR/);
+  });
+
+  it('supports document-wide --exclude carve-outs when --scope is omitted', async () => {
+    const html = `<!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            :root { --bg: #ffffff; --fg: #111827; }
+            :root[data-theme="dark"] { --bg: #0f172a; --fg: #f8fafc; }
+            body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font-family: sans-serif; }
+            .legacy-banner .low-contrast { color: rgb(210, 210, 210); }
+          </style>
+        </head>
+        <body>
+          <div class="legacy-banner">
+            <span class="low-contrast">Excluded globally</span>
+            <input placeholder="Excluded globally" />
+          </div>
+          <main>
+            <p>Compliant main content</p>
+          </main>
+        </body>
+      </html>`;
+
+    const { server, url } = await startFixtureServer(html);
+    activeServer = server;
+
+    const report = await executeCheckCommand({
+      target: url,
+      cwd: tempDir,
+      exclude: ['.legacy-banner'],
+      viewportsOverride: [{ name: 'desktop', width: 1280, height: 800 }],
+      headless: true,
+      silentStdout: true,
+      reportOutputPath: join(tempDir, '.uirig', 'github_pr_comment.md'),
+    });
+
+    expect(report.exitCode).toBe(0);
+    expect(report.results.at(0)?.scopedSelectors).toBeUndefined();
+    expect(report.results.at(0)?.excludedSelectors).toEqual(['.legacy-banner']);
+    expect(report.summary.totalContrastViolations).toBe(0);
+    expect(report.summary.totalDomViolations).toBe(0);
   });
 
 });
