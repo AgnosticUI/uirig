@@ -271,4 +271,67 @@ describe('::: ISSUE #37: MCP SERVER PARITY (THEMES, SOURCE-MAP, --FIX & A2UI TOO
     }
   });
 
+  it('==> Should support scope and exclude arrays in MCP audit tool calls (Issue #58)', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'uirig-mcp-scope-exclude-'));
+    try {
+      writeFileSync(
+        join(tempDir, 'scoped-stage.html'),
+        `<!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              :root { --bg: #ffffff; --fg: #111827; }
+              :root[data-theme="dark"] { --bg: #0f172a; --fg: #f8fafc; }
+              body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font-family: sans-serif; }
+              .host-shell { width: 1600px; color: rgb(210, 210, 210); }
+              #uirig-stage h3.demo-title { color: rgb(210, 210, 210); }
+              #uirig-stage p.clean-copy { margin: 0; font-size: 16px; }
+            </style>
+          </head>
+          <body>
+            <header class="host-shell">Host scrollbar & contrast outside #uirig-stage</header>
+            <section id="uirig-stage">
+              <h3 class="demo-title">Excluded demo heading</h3>
+              <p class="clean-copy">Audited stage copy</p>
+            </section>
+          </body>
+        </html>`,
+        'utf8'
+      );
+
+      const server = createUirigMcpServer(pool, '0.3.1');
+      const client = new Client({ name: 'test-client', version: '1.0.0' });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+      await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+
+      const res = await client.callTool({
+        name: 'uirig_check',
+        arguments: {
+          target: './scoped-stage.html',
+          cwd: tempDir,
+          scope: ['#uirig-stage'],
+          exclude: ['h3.demo-title'],
+          viewport: { name: 'desktop', width: 1280, height: 800 },
+        },
+      });
+
+      expect(res.isError).toBe(false);
+      const text = (res.content as Array<{ type: string; text: string }>).at(0)?.text ?? '{}';
+      const payload = JSON.parse(text) as {
+        passed: boolean;
+        exitCode: number;
+        violations: Array<unknown>;
+      };
+      expect(payload.passed).toBe(true);
+      expect(payload.exitCode).toBe(0);
+      expect(payload.violations).toHaveLength(0);
+
+      await client.close();
+      await server.close();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
 });

@@ -64,10 +64,18 @@ const AUDIT_INPUT_SHAPE = {
     .string()
     .optional()
     .describe('Live URL (e.g. http://localhost:5173) or local .html file path. Omit to use uirig.config.json.'),
+  scope: z
+    .array(z.string())
+    .optional()
+    .describe('Optional CSS selectors restricting the audit boundary to matching containers and open ShadowRoots (e.g. ["#uirig-stage"]).'),
   selectors: z
     .array(z.string())
     .optional()
-    .describe('Optional CSS selectors to scope element-level checks (e.g. ["ag-button", ".pricing-card"]).'),
+    .describe('Alias for scope: optional CSS selectors to scope element-level checks (e.g. ["ag-button", ".pricing-card"]).'),
+  exclude: z
+    .array(z.string())
+    .optional()
+    .describe('Optional CSS selectors carved out from auditing across Light DOM and open ShadowRoots (e.g. ["h3.demo-title"]).'),
   configPath: z
     .string()
     .optional()
@@ -216,7 +224,9 @@ export function createUirigMcpServer(
 
           const report = await executeCheckCommand({
             target: rawArgs.target,
+            scope: rawArgs.scope,
             selectors: rawArgs.selectors,
+            exclude: rawArgs.exclude,
             configPath: rawArgs.configPath,
             tokensPath: rawArgs.tokensPath,
             autoTokens: rawArgs.autoTokens,
