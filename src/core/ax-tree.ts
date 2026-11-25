@@ -36,8 +36,10 @@ export interface ICdpAxNode {
 export interface IAxTreeAuditOptions {
   /** Optional runtime ignore rules from `uirig.config.json`. */
   ignoreRules?: Array<IUirigIgnoreRule>;
-  /** Optional CSS (Cascading Style Sheets) selectors limiting the AX sweep to matching subtrees. */
+  /** Optional CSS selectors limiting the AX sweep to matching subtrees (`--scope` / `--selectors`). */
   selectors?: Array<string>;
+  /** Optional CSS selectors carved out from the AX sweep (`--exclude`). */
+  excludeSelectors?: Array<string>;
 }
 
 interface IResolvedDomTargetMetadata {
@@ -177,7 +179,8 @@ function inspectResolvedDomElementInBrowser(
   rules: Array<IUirigIgnoreRule>,
   ignoreHelperSrc: string,
   activeSelectors: Array<string> | undefined,
-  scopeHelperSrc: string
+  scopeHelperSrc: string,
+  activeExcludes?: Array<string>
 ): IResolvedDomTargetMetadata | null {
   if (!this || (this as Node).nodeType !== 1) {
     return null;
@@ -204,8 +207,7 @@ function inspectResolvedDomElementInBrowser(
     };
   }
 
-  const hasSelectors = Array.isArray(activeSelectors) && activeSelectors.length > 0;
-  const inScope = !hasSelectors || isInScopeFn(targetEl, activeSelectors);
+  const inScope = isInScopeFn(targetEl, activeSelectors, activeExcludes);
   if (!inScope) {
     return {
       ignored: false,
@@ -248,7 +250,7 @@ function inspectResolvedDomElementInBrowser(
     }
   }
 
-    let hasHiddenOrInertDomAncestor = false;
+  let hasHiddenOrInertDomAncestor = false;
   let ancestorCursor: Element | null = targetEl.parentElement;
   if (!ancestorCursor) {
     ancestorCursor = immediateRoot instanceof ShadowRoot ? immediateRoot.host : null;
@@ -323,6 +325,7 @@ export async function auditComputedAccessibilityTree(
 ): Promise<Array<IDomIntegrityViolation>> {
   const ignoreRules = options.ignoreRules ?? new Array<IUirigIgnoreRule>();
   const selectors = options.selectors;
+  const excludeSelectors = options.excludeSelectors;
   const violations = new Array<IDomIntegrityViolation>();
 
   const cdp = await page.context().newCDPSession(page);
@@ -362,11 +365,10 @@ export async function auditComputedAccessibilityTree(
     const scopeHelperSrc = isElementInSelectorScope.toString();
     const inspectFnSrc = inspectResolvedDomElementInBrowser.toString();
     const wrappedFunctionDeclaration =
-      'function(pageUrl, rules, ignoreHelperSrc, activeSelectors, scopeHelperSrc) { return (' +
+      'function(pageUrl, rules, ignoreHelperSrc, activeSelectors, scopeHelperSrc, activeExcludes) { return (' +
       inspectFnSrc +
-      ').call(this, pageUrl, rules, ignoreHelperSrc, activeSelectors, scopeHelperSrc); }';
+      ').call(this, pageUrl, rules, ignoreHelperSrc, activeSelectors, scopeHelperSrc, activeExcludes); }';
     const emittedKeys = new Set<string>();
-
     for (const axNode of axNodes) {
       const backendNodeId = axNode.backendDOMNodeId;
       if (typeof backendNodeId !== 'number') {
@@ -408,6 +410,7 @@ export async function auditComputedAccessibilityTree(
             { value: ignoreHelperSrc },
             { value: selectors ?? null },
             { value: scopeHelperSrc },
+            { value: excludeSelectors ?? null },
           ],
           returnByValue: true,
         })) as { result?: { value?: IResolvedDomTargetMetadata | null } };

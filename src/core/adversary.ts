@@ -4,7 +4,8 @@
  * Injects +30% text expansion across Light DOM and open ShadowRoots,
  * then evaluates parent-child containment bounds, viewport horizontal scrollbar leaks,
  * and interactive touch-target spacing invariants using Euclidean box math,
- * respecting `data-uirig-ignore="stress|all"`, config `ignore` rules, and `--selectors` scoping.
+ * respecting `data-uirig-ignore="stress|all"`, config `ignore` rules, `--scope` / `--selectors`,
+ * and `--exclude` carve-outs.
  */
 
 import type { Page } from 'playwright';
@@ -55,16 +56,18 @@ export interface IGeometricViolation {
  * Configuration budgets passed into `runGeometricStressAudit` (mapped from `uirig.config.json`).
  */
 export interface IStressAuditOptions {
-  /** Allowed sub-pixel rounding buffer in pixels (default 2px). */
+  /** Allowed sub-pixel rounding buffer in pixels (defaults to 2px). */
   overflowPixelTolerance?: number;
-  /** Minimum edge-to-edge clearance between interactive controls in pixels (default 24px). */
+  /** Minimum edge-to-edge clearance between interactive controls in pixels (defaults to 24px). */
   touchTargetMinSpacingPx?: number;
-  /** Expansion multiplier applied to visible text nodes (default 0.30 for +30% length). */
+  /** Text expansion multiplier (defaults to 0.30 for +30% pseudo-localization). */
   expansionRatio?: number;
   /** Optional runtime ignore rules from `uirig.config.json`. */
   ignoreRules?: IUirigIgnoreRule[];
-  /** Optional CSS selectors limiting stress mutation and geometric evaluation to matching subtrees. */
+  /** Optional CSS selectors limiting the geometric stress audit to matching subtrees (`--scope` / `--selectors`). */
   selectors?: string[];
+  /** Optional CSS selectors carved out from the geometric stress audit (`--exclude`). */
+  excludeSelectors?: string[];
 }
 
 /**
@@ -98,7 +101,6 @@ export function checkParentChildOverflow(
 
   return null;
 }
-
 /**
  * Checks whether the global document scroll width exceeds the active viewport width
  * beyond `overflowPixelTolerance`, which causes a rogue horizontal scrollbar.
@@ -210,13 +212,13 @@ interface IStressDomSnapshot {
   undersizedTargets: IBoundingBox[];
   squishedAvatars: Array<{
     selector: string;
-    hostComponent: string | null;
+    hostComponent?: string | null;
     inShadowDom: boolean;
     aspectDriftPercent: number;
   }>;
   stuckInvisibleElements: Array<{
     selector: string;
-    hostComponent: string | null;
+    hostComponent?: string | null;
     inShadowDom: boolean;
   }>;
 }
@@ -224,8 +226,8 @@ interface IStressDomSnapshot {
 /**
  * Mutates a live Playwright Page by injecting +30% text expansion and long space-free
  * strings (emails/URLs) across Light DOM and open ShadowRoot nodes (optionally scoped
- * to `options.selectors`), then evaluates containment bounds, touch targets, avatars,
- * and stuck `opacity: 0` elements.
+ * to `options.selectors` with `options.excludeSelectors` carved out), then evaluates
+ * containment bounds, touch targets, avatars, and stuck `opacity: 0` elements.
  */
 export async function runGeometricStressAudit(
   page: Page,
@@ -236,6 +238,7 @@ export async function runGeometricStressAudit(
   const expansionRatio = options.expansionRatio ?? 0.3;
   const ignoreRules = options.ignoreRules ?? [];
   const selectors = options.selectors;
+  const excludeSelectors = options.excludeSelectors;
   const isScopedAudit = Boolean(selectors && selectors.length > 0);
 
   logTelemetry(
@@ -252,6 +255,7 @@ export async function runGeometricStressAudit(
       minTouchPx,
       rules,
       activeSelectors,
+      activeExcludes,
       walkerFactorySrc,
       ignoreHelperSrc,
       scopeHelperSrc,
@@ -260,6 +264,7 @@ export async function runGeometricStressAudit(
       minTouchPx: number;
       rules: IUirigIgnoreRule[];
       activeSelectors?: string[];
+      activeExcludes?: string[];
       walkerFactorySrc: string;
       ignoreHelperSrc: string;
       scopeHelperSrc: string;
@@ -272,9 +277,9 @@ export async function runGeometricStressAudit(
         rules,
         ignoreHelperSrc,
         activeSelectors,
-        scopeHelperSrc
+        scopeHelperSrc,
+        activeExcludes
       );
-
       const interactiveTags = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA']);
       const inlineProseParents = new Set(['P', 'LI', 'BLOCKQUOTE', 'DD', 'TD', 'SPAN']);
       const pseudoGlyphs = 'Ĥéĺĺő_Ŵőŕĺď_Ťéśť_Łőćáĺé';
@@ -336,6 +341,7 @@ export async function runGeometricStressAudit(
         },
         { includeBody: false }
       );
+
       // Step 1: Expand visible text nodes and inject unbreakable strings across Light + Shadow DOM
       let injectedUnbreakable = false;
       walker.walkElements((currentEl) => {
@@ -430,6 +436,7 @@ export async function runGeometricStressAudit(
               undersizedTargets.push(currentBox);
             }
           }
+
           const parentEl = currentEl.parentElement;
           if (
             parentEl &&
@@ -479,7 +486,6 @@ export async function runGeometricStressAudit(
         },
         { includeBody: false }
       );
-
       return {
         documentScrollWidth: document.documentElement.scrollWidth,
         windowInnerWidth: window.innerWidth,
@@ -496,6 +502,7 @@ export async function runGeometricStressAudit(
       minTouchPx: touchTargetMinSpacingPx,
       rules: ignoreRules,
       activeSelectors: selectors,
+      activeExcludes: excludeSelectors,
       walkerFactorySrc: createBrowserDomWalker.toString(),
       ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
       scopeHelperSrc: isElementInSelectorScope.toString(),

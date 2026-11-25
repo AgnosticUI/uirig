@@ -416,5 +416,46 @@ describe('::: PHASE 3 TASK 3.3 (CHUNK 1): GEOMETRIC INVARIANT MATH GATES :::', (
 
       expect(violations).toEqual([]);
     });
+
+    it('==> Should evaluate horizontal overflow relative to --scope container and carve out --exclude subtrees (Issue #58)', async () => {
+      if (!browser) {
+        browser = await chromium.launch({ headless: true });
+      }
+      const context = await browser.newContext({ viewport: { width: 420, height: 600 } });
+      const page = await context.newPage();
+
+      await page.setContent(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { margin: 0; padding: 16px; font-family: sans-serif; }
+              #host-shell-wide { width: 900px; height: 24px; background: #eee; }
+              #uirig-stage { width: 260px; border: 1px solid #cbd5e1; padding: 8px; margin-top: 16px; }
+              .demo-title { display: inline-block; white-space: nowrap; font-size: 16px; }
+              .clean-widget { width: 100%; }
+            </style>
+          </head>
+          <body>
+            <div id="host-shell-wide">Host shell horizontal scrollbar outside scope</div>
+            <div id="uirig-stage">
+              <h3 class="demo-title">Excluded Demo Harness Title That Overflows</h3>
+              <div class="clean-widget">Clean component</div>
+            </div>
+          </body>
+        </html>
+      `);
+
+      const violations = await runGeometricStressAudit(page, {
+        overflowPixelTolerance: 2,
+        touchTargetMinSpacingPx: 24,
+        selectors: ['#uirig-stage'],
+        excludeSelectors: ['h3.demo-title'],
+      });
+
+      await context.close();
+
+      expect(violations).toEqual([]);
+    });
   });
 });

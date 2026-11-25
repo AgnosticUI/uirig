@@ -168,7 +168,8 @@ export function validateComputedStyleEntry(
 export async function extractShadowPiercingStyles(
   page: Page,
   ignoreRules: IUirigIgnoreRule[] = [],
-  selectors?: string[]
+  selectors?: string[],
+  excludeSelectors?: string[]
 ): Promise<IExtractedElementStyles[]> {
   logTelemetry(
     'tokens:crawler',
@@ -179,12 +180,14 @@ export async function extractShadowPiercingStyles(
     ({
       rules,
       activeSelectors,
+      activeExcludes,
       walkerFactorySrc,
       ignoreHelperSrc,
       scopeHelperSrc,
     }: {
       rules: IUirigIgnoreRule[];
       activeSelectors?: string[];
+      activeExcludes?: string[];
       walkerFactorySrc: string;
       ignoreHelperSrc: string;
       scopeHelperSrc: string;
@@ -197,7 +200,8 @@ export async function extractShadowPiercingStyles(
         rules,
         ignoreHelperSrc,
         activeSelectors,
-        scopeHelperSrc
+        scopeHelperSrc,
+        activeExcludes
       );
 
       const snapshots: IExtractedElementStyles[] = [];
@@ -233,6 +237,7 @@ export async function extractShadowPiercingStyles(
     {
       rules: ignoreRules,
       activeSelectors: selectors,
+      activeExcludes: excludeSelectors,
       walkerFactorySrc: createBrowserDomWalker.toString(),
       ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
       scopeHelperSrc: isElementInSelectorScope.toString(),
@@ -261,11 +266,17 @@ export async function crawlPageTokens(
   page: Page,
   scale: ITokenScaleConfig,
   ignoreRules: IUirigIgnoreRule[] = [],
-  selectors?: string[]
+  selectors?: string[],
+  excludeSelectors?: string[]
 ): Promise<ITokenViolation[]> {
   logTelemetry('tokens:audit', 'Starting full viewport design token crawl...');
 
-  const extractedEntries = await extractShadowPiercingStyles(page, ignoreRules, selectors);
+  const extractedEntries = await extractShadowPiercingStyles(
+    page,
+    ignoreRules,
+    selectors,
+    excludeSelectors
+  );
 
   const allViolations: ITokenViolation[] = [];
   for (const entry of extractedEntries) {

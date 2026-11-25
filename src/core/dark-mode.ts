@@ -49,8 +49,10 @@ export interface IDarkModeAuditOptions {
   ignoreRules?: IUirigIgnoreRule[];
   /** Optional approved color tokens from `tokensPath` used to compute `suggestedToken` fixes. */
   allowedColors?: string[];
-  /** Optional CSS selectors limiting the dark-mode audit to matching subtrees. */
+  /** Optional CSS selectors limiting the dark-mode audit to matching subtrees (`--scope` / `--selectors`). */
   selectors?: string[];
+  /** Optional CSS selectors carved out from the dark-mode audit (`--exclude`). */
+  excludeSelectors?: string[];
 }
 
 export function findNearestDarkSurfaceToken(
@@ -143,6 +145,7 @@ export async function runDarkModeAudit(
   const ignoreRules = options.ignoreRules ?? [];
   const allowedColors = options.allowedColors ?? [];
   const selectors = options.selectors;
+  const excludeSelectors = options.excludeSelectors;
 
   logTelemetry(
     'dark-mode:audit',
@@ -178,7 +181,8 @@ export async function runDarkModeAudit(
       ignoreRules,
       'dark-mode',
       allowedColors,
-      selectors
+      selectors,
+      excludeSelectors
     );
     for (const failure of contrastFailures) {
       violations.push({
@@ -192,17 +196,18 @@ export async function runDarkModeAudit(
         inShadowDom: failure.inShadowDom,
       });
     }
-
     const surfaceSnapshots = await page.evaluate(
       ({
         rules,
         activeSelectors,
+        activeExcludes,
         walkerFactorySrc,
         ignoreHelperSrc,
         scopeHelperSrc,
       }: {
         rules: IUirigIgnoreRule[];
         activeSelectors?: string[];
+        activeExcludes?: string[];
         walkerFactorySrc: string;
         ignoreHelperSrc: string;
         scopeHelperSrc: string;
@@ -215,7 +220,8 @@ export async function runDarkModeAudit(
           rules,
           ignoreHelperSrc,
           activeSelectors,
-          scopeHelperSrc
+          scopeHelperSrc,
+          activeExcludes
         );
         const surfaces: ISurfaceLuminanceSnapshot[] = [];
 
@@ -313,6 +319,7 @@ export async function runDarkModeAudit(
       {
         rules: ignoreRules,
         activeSelectors: selectors,
+        activeExcludes: excludeSelectors,
         walkerFactorySrc: createBrowserDomWalker.toString(),
         ignoreHelperSrc: isElementIgnoredInBrowser.toString(),
         scopeHelperSrc: isElementInSelectorScope.toString(),
