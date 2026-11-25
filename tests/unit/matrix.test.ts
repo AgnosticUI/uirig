@@ -473,4 +473,60 @@ describe('::: PHASE 3 TASK 3.2 + ISSUE #7 (CHUNK 1): COLORJS.IO CONTRAST, ALPHA 
     expect(violations).toEqual([]);
   });
 
+  it('==> Should resolve enclosing Shadow DOM control surfaces (solid, gradient, and layered) for projected <slot> nodes (Issue #54)', async () => {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { margin: 0; padding: 24px; background: rgb(255, 255, 255); color: rgb(15, 23, 42); }
+            ag-button { color: rgb(255, 255, 255); }
+            ag-selection-button { color: rgb(255, 255, 255); }
+          </style>
+        </head>
+        <body>
+          <ag-button>Primary Gradient Button</ag-button>
+          <ag-selection-button>Layered Selection Option</ag-selection-button>
+          <script>
+            class AgButton extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                shadow.innerHTML =
+                  '<button style="background: linear-gradient(180deg, rgb(29, 78, 216), rgb(30, 64, 175)); color: rgb(255, 255, 255); border: 0; padding: 8px 16px;">' +
+                    '<slot></slot>' +
+                  '</button>';
+              }
+            }
+            customElements.define('ag-button', AgButton);
+
+            class AgSelectionButton extends HTMLElement {
+              constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                shadow.innerHTML =
+                  '<div style="position: relative; display: inline-block; padding: 8px 16px;">' +
+                    '<span aria-hidden="true" style="position: absolute; inset: 0; background: rgb(15, 23, 42); z-index: 0;"></span>' +
+                    '<span style="position: relative; z-index: 1; color: rgb(255, 255, 255);"><slot></slot></span>' +
+                  '</div>';
+              }
+            }
+            customElements.define('ag-selection-button', AgSelectionButton);
+          </script>
+        </body>
+      </html>
+    `);
+
+    const violations = await auditPageContrast(page, MIN_WCAG_AA_CONTRAST);
+    await context.close();
+
+    expect(violations).toEqual([]);
+  });
+
 });
