@@ -11,6 +11,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { z } from 'zod';
+import { UIRIG_VERSION } from '../index.js';
 import {
   executeCheckCommand,
   type AuditToolName,
@@ -204,7 +205,7 @@ interface IMcpToolSpec {
 
 export function createUirigMcpServer(
   browserPool: WarmBrowserPool,
-  version: string = '0.3.1'
+  version: string = UIRIG_VERSION
 ): McpServer {
   const server = new McpServer({
     name: 'uirig',
@@ -316,7 +317,7 @@ export async function executeMcpCommand(options: IMcpServerOptions = {}): Promis
   const transportMode = options.transport ?? 'stdio';
   const port = options.port ?? 3333;
   const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_BROWSER_IDLE_TIMEOUT_MS;
-  const version = options.version ?? '0.3.1';
+  const version = options.version ?? UIRIG_VERSION;
 
   const browserPool = new WarmBrowserPool({
     headless: true,
