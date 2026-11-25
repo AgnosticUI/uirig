@@ -17,13 +17,20 @@
 | **`tokens`** | Unaware of your design system's scale | Crawls Light DOM + open `ShadowRoot` computed styles for off-scale colors, spacing, font sizes, and radii, and emits `suggestedToken` |
 | **`cls` + `runtime`** | Misses uncaught console/page errors during shifts | Measures Google's W3C 1s/5s session-window CLS (`hadRecentInput: false`) and captures uncaught `pageerror` / `console.error` exceptions |
 | **`dom`** | Limited Shadow DOM & prompt-injection coverage | Validates Light + Shadow `aria-labelledby` / `label[for]` IDs, broken `<img>` loads, `javascript:` / missing `rel="noopener"` links, and hidden prompt-injection traps |
-| **`dom`** | Limited Shadow DOM & prompt-injection coverage | Validates Light + Shadow `aria-labelledby` / `label[for]` IDs, broken `<img>` loads, `javascript:` / missing `rel="noopener"` links, and hidden prompt-injection traps |
 | **`states`** | Static DOM trees miss click-stealing overlays & suppressed focus rings | Samples viewport- and overflow-clipped coordinates via Shadow-piercing `elementsFromPoint` (`click_occluded`) and forces `:focus-visible` via CDP (`missing_focus_visible`) |
 | **`a2ui` Attribution** | No awareness of generative `<a2ui-surface>` trees | Climbs composed `ShadowRoot.host` boundaries across Lit, React, Vue, Angular, or Flutter Web to map failures to `surfaceId`, `a2uiComponentId`, `wirePath`, and `updateComponents` hints |
 
 ---
 
 ## Installation & Quick Start
+
+### Prerequisites
+* **Node.js `>= 22.0.0`**
+* **Playwright Chromium binary:** `uirig` launches headless Chromium via Playwright. If you haven't installed Playwright's Chromium binary on your machine yet, install it once before your first audit:
+
+```bash
+npx playwright install chromium
+```
 
 ### Zero-Config Instant Audit (No Config File Required)
 Run `uirig` directly against any running dev server URL or standalone `.html` file:
