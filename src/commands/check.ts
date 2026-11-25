@@ -9,7 +9,8 @@
  */
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
-import { chromium, type Browser } from 'playwright';
+import type { Browser } from 'playwright';
+import { launchUirigChromium } from '../utils/browser-launch.js';
 import { crawlPageTokens, type ITokenScaleConfig, type ITokenViolation } from '../core/tokens.js';
 import {
   discoverWorkspaceTokens,
@@ -977,6 +978,24 @@ export async function auditViewportInParallel(
   };
 }
 
+async function acquireExecutionBrowser(
+  browserPool: WarmBrowserPool | undefined,
+  headless: boolean
+): Promise<{ browser: Browser; ownedBrowser: Browser | null }> {
+  if (browserPool) {
+    logTelemetry('check:browser', 'Acquiring warm Chromium instance from pool...');
+    const browser = await browserPool.acquire();
+    return { browser, ownedBrowser: null };
+  }
+
+  logTelemetry(
+    'check:browser',
+    'Launching single Chromium instance (headless=' + String(headless) + ')...'
+  );
+  const ownedBrowser = await launchUirigChromium({ headless });
+  return { browser: ownedBrowser, ownedBrowser };
+}
+
 export async function executeCheckCommand(
   options: ICheckCommandOptions = {}
 ): Promise<ICheckExecutionReport> {
@@ -1189,19 +1208,12 @@ export async function executeCheckCommand(
       }
     }
 
-    let browser: Browser;
-    if (options.browserPool) {
-      logTelemetry('check:browser', 'Acquiring warm Chromium instance from pool...');
-      browser = await options.browserPool.acquire();
-    } else {
-      const headless = options.headless ?? true;
-      logTelemetry(
-        'check:browser',
-        'Launching single Chromium instance (headless=' + String(headless) + ')...'
-      );
-      ownedBrowser = await chromium.launch({ headless });
-      browser = ownedBrowser;
-    }
+    const acquired = await acquireExecutionBrowser(
+      options.browserPool,
+      options.headless ?? true
+    );
+    ownedBrowser = acquired.ownedBrowser;
+    const browser = acquired.browser;
 
     const hasSelectorsToValidate = Boolean(effectiveSelectors && effectiveSelectors.length > 0);
     const hasExcludesToValidate = Boolean(

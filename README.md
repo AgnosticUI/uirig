@@ -26,11 +26,13 @@
 
 ### Prerequisites
 * **Node.js `>= 22.0.0`**
-* **Playwright Chromium binary:** `uirig` launches headless Chromium via Playwright. If you haven't installed Playwright's Chromium binary on your machine yet, install it once before your first audit:
+* **Playwright Chromium binary:** `uirig` auto-installs its matching Chromium binary on first run when missing (or falls back to system Chrome). To pre-install explicitly—especially in workspaces that already have a different `@playwright/test` version—run:
 
 ```bash
-npx playwright install chromium
+npx @rlevin/uirig install
 ```
+
+*(You can also point `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to a custom local Chrome/Chromium executable.)*
 
 ### Zero-Config Instant Audit (No Config File Required)
 Run `uirig` directly against any running dev server URL or standalone `.html` file:
