@@ -53,9 +53,11 @@ export function formatViewportConsoleSection(
   const darkViolations = vpReport.darkModeViolations ?? [];
   const sweepViolations = vpReport.sweepViolations ?? [];
   const domViolations = vpReport.domViolations ?? [];
+  const stateViolations = vpReport.stateViolations ?? [];
   const runtimeErrors = vpReport.runtimeErrors ?? [];
   const sourceMap = vpReport.sourceLocations ?? {};
   const a2uiMap = vpReport.a2uiAttributions ?? {};
+
 
   const themeTag = vpReport.theme ? ` [theme: ${vpReport.theme}]` : '';
   const viewportHeader = paint(
@@ -259,6 +261,31 @@ export function formatViewportConsoleSection(
           )}${related} (${paint(`failedWidths: ${v.failedWidths}`, 'bold', 'red')} | +${
             v.measuredLeakPixels
           }px)${ctx}`
+        );
+      }
+    }
+  }
+
+  // 9. Interactive States & Click-Occlusion (`states`)
+  if (stateViolations.length > 0 || verbose) {
+    lines.push(
+      `${paint('9. [states]', 'bold', 'magenta')}    Interactive State Hits  : ${formatCountBadge(
+        stateViolations.length
+      )}`
+    );
+    if (verbose) {
+      for (const v of stateViolations) {
+        const occluder = v.occludingSelector ? ` -> blocked by ${paint(v.occludingSelector, 'yellow')}` : '';
+        const ctx = formatViolationContext({
+          sourceLocation: sourceMap[v.selector] ?? null,
+          hostComponent: v.hostComponent,
+          a2ui: a2uiMap[v.selector] ?? null,
+        });
+        lines.push(
+          `   ${paint('•', 'red')} [${paint(v.violationType, 'cyan')}] ${paint(
+            v.selector,
+            'yellow'
+          )}${occluder} (${paint(v.detail, 'white')})${ctx}`
         );
       }
     }

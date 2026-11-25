@@ -17,6 +17,8 @@
 | **`tokens`** | Unaware of your design system's scale | Crawls Light DOM + open `ShadowRoot` computed styles for off-scale colors, spacing, font sizes, and radii, and emits `suggestedToken` |
 | **`cls` + `runtime`** | Misses uncaught console/page errors during shifts | Measures Google's W3C 1s/5s session-window CLS (`hadRecentInput: false`) and captures uncaught `pageerror` / `console.error` exceptions |
 | **`dom`** | Limited Shadow DOM & prompt-injection coverage | Validates Light + Shadow `aria-labelledby` / `label[for]` IDs, broken `<img>` loads, `javascript:` / missing `rel="noopener"` links, and hidden prompt-injection traps |
+| **`dom`** | Limited Shadow DOM & prompt-injection coverage | Validates Light + Shadow `aria-labelledby` / `label[for]` IDs, broken `<img>` loads, `javascript:` / missing `rel="noopener"` links, and hidden prompt-injection traps |
+| **`states`** | Static DOM trees miss click-stealing overlays & suppressed focus rings | Samples viewport- and overflow-clipped coordinates via Shadow-piercing `elementsFromPoint` (`click_occluded`) and forces `:focus-visible` via CDP (`missing_focus_visible`) |
 | **`a2ui` Attribution** | No awareness of generative `<a2ui-surface>` trees | Climbs composed `ShadowRoot.host` boundaries across Lit, React, Vue, Angular, or Flutter Web to map failures to `surfaceId`, `a2uiComponentId`, `wirePath`, and `updateComponents` hints |
 
 ---
@@ -226,7 +228,9 @@ npx @rlevin/uirig stress # [<url-or-file>] [--themes=<csv>] [--changed] [--base=
 
 npx @rlevin/uirig cls # [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
 
-npx @rlevin/uirig dom # [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--selectors=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+npx @rlevin/uirig dom # [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--scope=<csv>] [--exclude=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
+
+npx @rlevin/uirig states # [<url-or-file>] [--themes=<csv>] [--changed] [--base=<ref>] [--scope=<csv>] [--exclude=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]
 ```
 
 ### Shared Options
@@ -243,7 +247,7 @@ npx @rlevin/uirig dom # [<url-or-file>] [--themes=<csv>] [--changed] [--base=<re
 * `--spatial-brief`: Emit an ultra-compact, plain-text bounding-box summary (`header[0,0 1440x64] | aside[0,64 260x836] | main[260,64 1180x836]`) of semantic landmarks, top-level custom elements, and target selectors (~40 tokens, zero vision screenshots required).
 * `--verbose`: Print every individual failing selector path, source-map `file:line`, Shadow DOM host, A2UI component ID, measured delta, and suggested token beneath each engine summary.
 * `--config=<path>`: Use a custom configuration file path.
-* `--only=<tool>`: Filter `check` to a single engine (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, or `dom`).
+* `--only=<tool>`: Filter `check` to a single engine (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`, `states`, or `sweep`).
 * `--json`: Route colored diagnostic logs to `stderr` and write a single deduplicated JSON report (including `sourceFile`, `lineNumber`, `columnNumber`, and `unifiedDiff`) to `stdout`.
 * `--headed`: Run Chromium with a visible browser window for local inspection.
 * `<command> --help` / `help <command>`: Print detailed mechanics, flags, exit codes, and examples for any subcommand.
@@ -326,7 +330,7 @@ npx @rlevin/uirig http://localhost:5173 --auto-tokens --group-by-root --spatial-
 Each entry in `violations` includes `engine`, `hostComponent`, `a2ui` (when inside `<a2ui-surface>` or `[data-a2ui-surface]`), `sourceFile` / `lineNumber` / `columnNumber` (when CSS/JS source maps or dev metadata hooks like `data-source-loc` are present; `null` in unmapped production builds), `selector`, `childCount` / `sampleChildren` (when grouped), `suggestedToken`, and `remediationAdvice` so the agent can jump directly to the exact file and line without grepping the repository.
 
 ### 2. Native MCP Server Mode (`uirig mcp`)
-Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Cursor, Windsurf, Codex) by registering `uirig mcp`, which keeps a warm headless Chromium pool alive across edits and exposes `uirig_check`, `uirig_tokens`, `uirig_contrast`, `uirig_dark_mode`, `uirig_stress`, `uirig_cls`, `uirig_dom`, and `uirig_a2ui_delta` as native MCP tools:
+Eliminate Chromium cold-start latency inside AI coding hosts (Claude Code, Cursor, Windsurf, Codex) by registering `uirig mcp`, which keeps a warm headless Chromium pool alive across edits and exposes `uirig_check`, `uirig_tokens`, `uirig_contrast`, `uirig_dark_mode`, `uirig_stress`, `uirig_cls`, `uirig_dom`, `uirig_states`, `uirig_sweep`, `uirig_discover_tokens`, and `uirig_a2ui_delta` as native MCP tools:
 
 ```json
 {

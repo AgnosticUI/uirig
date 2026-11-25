@@ -492,4 +492,29 @@ describe('Root CLI Entry Router (src/index.ts)', () => {
     expect(output).toContain('--exclude=<csv>');
   });
 
+  it('routes `uirig states` and `uirig check --only=states` to executeCheckCommand with only: states', async () => {
+    const checkSpy = vi.fn(async () => createMockReport(0));
+
+    expect(parseCliArgs(['states', 'http://localhost:5173', '--json'])).toMatchObject({
+      command: 'check',
+      target: 'http://localhost:5173',
+      only: 'states',
+      json: true,
+    });
+
+    expect(parseCliArgs(['check', '--only=states'])).toMatchObject({
+      command: 'check',
+      only: 'states',
+    });
+
+    const exitCode = await runCli(['states', './index.html'], { check: checkSpy });
+    expect(exitCode).toBe(0);
+    expect(checkSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: './index.html',
+        only: 'states',
+      })
+    );
+  });
+
 });

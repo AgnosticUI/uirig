@@ -22,14 +22,14 @@ npx @rlevin/uirig ./dist/index.html --auto-tokens --selectors="ag-button, .prici
 
    *(If `@rlevin/uirig` is already installed in `node_modules`, `npx uirig ...` works interchangeably.)*
 2. **Evaluate the POSIX exit code and JSON `stdout` payload:**
-   - **Exit Code `0` (`"passed": true`):** All 6 engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`) and runtime JS error checks passed. You may finish your task.
-   - **Exit Code `1`:** Design token drift (`tokens`), light/dark WCAG contrast failure (`contrast`, `dark-mode`, including worst-case CSS `background-clip: text` gradient stops), structural DOM/ARIA/computed AX tree (`ax_empty_name`, `ax_hidden_focus`)/Web Component `<slot>` violation (`dom`), or uncaught runtime JS error.
-   - **Exit Code `2`:** Structural layout break (`stress`: container overflow, `100vw` scrollbar bleed, squished avatar, `<24px` tap target) or Cumulative Layout Shift budget breach (`cls`).
+   - **Exit Code `0` (`"passed": true`):** All engines (`tokens`, `contrast`, `dark-mode`, `stress`, `cls`, `dom`, `states`, and optional `sweep`) and runtime JS error checks passed. You may finish your task.
+   - **Exit Code `1`:** Design token drift (`tokens`), light/dark WCAG contrast failure (`contrast`, `dark-mode`, including worst-case CSS `background-clip: text` gradient stops), structural DOM/ARIA/computed AX tree (`ax_empty_name`, `ax_hidden_focus`)/Web Component `<slot>` violation (`dom`), interactive state/click-occlusion failure (`states`: `click_occluded`, `missing_focus_visible`), or uncaught runtime JS error.
+   - **Exit Code `2`:** Structural layout break (`stress` / `sweep`: container overflow, `100vw` scrollbar bleed, squished avatar, `<24px` tap target) or Cumulative Layout Shift budget breach (`cls`).
 3. **Verify Macro-Layout via `spatialBrief` (No Vision Screenshots Required):**
    - When `--spatial-brief` is passed, inspect the top-level `"spatialBrief"` field (e.g. `header[0,0 1440x64] | aside[0,64 260x836] | main[260,64 1180x836]`) to confirm side-by-side vs. stacked alignment and bounding-box dimensions without attaching vision screenshots.
 4. **Self-Heal & Re-Verify (Root Causes & Highest Impact First):**
    - When `--group-by-root` is passed, cascading child failures inside the same container or Web Component host collapse into a single parent entry with `childCount` and `sampleChildren`—fix the parent container/host rather than patching individual children.
-   - `violations` is always sorted from highest impact (`cls` / `runtime` = 100 pts, `stress` = 80 pts) to lowest (`tokens` = 40 pts, `dom` = 20 pts). When `--top` or `--max-tokens` trims the list, `totalViolations` and `truncatedCount` tell you how many lower-priority items remain.
+   - `violations` is always sorted from highest impact (`cls` / `runtime` = 100 pts, `stress` / `sweep` = 80 pts, `states` = 75 pts) to lowest (`tokens` = 40 pts, `dom` = 20 pts). When `--top` or `--max-tokens` trims the list, `totalViolations` and `truncatedCount` tell you how many lower-priority items remain.
    - Inspect each entry in `violations`:
      - `engine` & `violationType` (including `ax_empty_name`, `ax_hidden_focus`, and `orphaned_slot_content`)
      - `hostComponent` (the enclosing Web Component tag, e.g., `ag-button`)

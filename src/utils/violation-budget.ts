@@ -74,6 +74,8 @@ export function scoreViolationPriority(violation: IAgenticViolation): number {
     baseTierScore = 100;
   } else if (violation.engine === 'stress' || violation.engine === 'sweep') {
     baseTierScore = 80;
+  } else if (violation.engine === 'states') {
+    baseTierScore = 75;
   } else if (
     violation.engine === 'dom' &&
     violation.violationType.toLowerCase().includes('prompt_injection')

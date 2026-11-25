@@ -489,7 +489,7 @@ export function normalizeViewportViolations(
     });
   }
 
-    // 6. Normalize DOM & Markup Integrity Violations (`dom`)
+  // 6. Normalize DOM & Markup Integrity Violations (`dom`)
   for (const domViolation of viewportReport.domViolations ?? new Array()) {
     const hostComponent =
       domViolation.hostComponent !== undefined
@@ -542,6 +542,52 @@ export function normalizeViewportViolations(
       inShadowDom: domViolation.inShadowDom,
       occurrenceCount: 1,
       measuredDelta: domViolation.detail,
+      remediationAdvice,
+    });
+  }
+
+  // 6b. Normalize Interactive State & Click-Occlusion Violations (`states`)
+  for (const stateViolation of viewportReport.stateViolations ?? new Array()) {
+    const hostComponent =
+      stateViolation.hostComponent !== undefined
+        ? stateViolation.hostComponent
+        : extractHostComponentFromSelector(stateViolation.selector);
+
+    const fallbackAdvice =
+      stateViolation.violationType === 'click_occluded'
+        ? "Remove or apply 'pointer-events: none' to occluding overlay '" +
+          (stateViolation.occludingSelector ?? 'overlapping element') +
+          "' (or increase z-index / adjust positioning) so interactive control '" +
+          stateViolation.selector +
+          "' receives pointer clicks."
+        : "Add a visible ':focus-visible' indicator (e.g. 'outline: 2px solid currentColor; outline-offset: 2px' or a contrasting 'box-shadow' ring) to '" +
+          stateViolation.selector +
+          "' instead of suppressing focus outlines.";
+
+    const measuredDelta =
+      stateViolation.violationType === 'click_occluded' && stateViolation.occludingSelector
+        ? 'occluded by ' + stateViolation.occludingSelector
+        : stateViolation.detail;
+
+    const { a2ui, remediationAdvice } = resolveA2uiForViolation({
+      selector: stateViolation.selector,
+      engine: 'states',
+      violationType: stateViolation.violationType,
+      measuredDelta,
+      fallbackAdvice,
+    });
+
+    normalized.push({
+      engine: 'states',
+      violationType: stateViolation.violationType,
+      url: viewportReport.url,
+      viewport: viewportLabel,
+      hostComponent,
+      a2ui,
+      selector: stateViolation.selector,
+      inShadowDom: stateViolation.inShadowDom,
+      occurrenceCount: 1,
+      measuredDelta,
       remediationAdvice,
     });
   }

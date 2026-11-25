@@ -39,6 +39,7 @@ const AUDIT_TOOL_NAMES = new Set<AuditToolName>([
   'stress',
   'cls',
   'dom',
+  'states',
   'sweep',
 ]);
 
@@ -232,6 +233,23 @@ const SUBCOMMAND_HELP_SPECS: Record<string, ISubcommandHelpSpec> = {
       'npx @rlevin/uirig dom http://localhost:5173 --json',
     ],
   },
+  states: {
+    summary: 'Audit interactive controls for click-occlusion (elementsFromPoint) and :focus-visible ring parity via CDP.',
+    usage: 'uirig states [<url-or-file>] [--scope=<csv>] [--exclude=<csv>] [--config=<path>] [--group-by-root] [--top=<n>] [--max-tokens=<budget>] [--spatial-brief] [--verbose] [--json] [--headed]',
+    mechanics: [
+      'Samples center and inset coordinates via Shadow-DOM-piercing elementsFromPoint(x, y) to catch opaque or transparent (opacity: 0) click-stealing overlays.',
+      'Uses CDP CSS.forcePseudoState([\'focus-visible\']) to verify interactive controls produce a measurable visual focus indicator.',
+    ],
+    options: SHARED_AUDIT_OPTIONS,
+    exitCodes: [
+      '0                   All interactive controls are clickable and have visible :focus-visible indicators',
+      '1                   One or more interactive controls are click-occluded or lack a :focus-visible ring',
+    ],
+    examples: [
+      'npx @rlevin/uirig states http://localhost:5173 --verbose',
+      'npx @rlevin/uirig states ./dist/index.html --scope="#app" --json',
+    ],
+  },
   manifest: {
     summary: 'Print an ASCII repository directory tree blueprint while excluding blocklisted build/vendor directories.',
     usage: 'uirig manifest [--help]',
@@ -285,6 +303,7 @@ ${paint('COMMANDS:', 'bold')}
   sweep [<url-or-file>]           Step viewport across [min, max, step] widths and report failing ranges
   cls [<url-or-file>]             Run only the W3C session-window Cumulative Layout Shift monitor
   dom [<url-or-file>]             Run only the structural DOM, ARIA, media & prompt-injection gate
+  states [<url-or-file>]          Run only the interactive click-occlusion & :focus-visible state gate
   manifest                        Print ASCII repository tree blueprint (excluding blocklisted dirs)
   mcp                             Start persistent MCP server with warm Chromium (stdio or SSE)
 
@@ -298,7 +317,7 @@ ${paint('AUDIT OPTIONS (check / tokens / contrast / dark-mode / stress / sweep /
   --scope=<csv>                   Restrict audit to matching CSS selector containers (alias: -s, --selectors; repeatable)
   --exclude=<csv>                 Carve out matching CSS selector subtrees from audit (repeatable)
   --config=<path>                 Path to uirig.config.json (also supports: --config <path>)
-  --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls | dom | sweep
+  --only=<tool>                   Filter 'check' to one engine: tokens | contrast | dark-mode | stress | cls | dom | states | sweep
   --group-by-root                 Collapse child failures under their shared parent container or host
   --top=<n>                       Keep only the top N highest-priority violations (e.g. --top=5)
   --max-tokens=<budget>           Cap JSON output to approximately N LLM tokens (e.g. --max-tokens=1200)

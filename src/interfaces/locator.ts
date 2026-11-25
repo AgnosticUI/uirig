@@ -1,6 +1,6 @@
 /**
  * src/interfaces/locator.ts
- * Shared diagnostic and violation type contracts for `dark-mode`, `dom`, `runtime`,
+ * Shared diagnostic and violation type contracts for `dark-mode`, `dom`, `states`, `runtime`,
  * out-of-band A2UI (Agent-to-UI) `<a2ui-surface>` component attribution, and
  * framework source-map `file:line` attribution.
  */
@@ -13,6 +13,7 @@ export type UirigEngineName =
   | 'sweep'
   | 'cls'
   | 'dom'
+  | 'states'
   | 'runtime';
 
 /**
@@ -88,6 +89,22 @@ export interface IDomIntegrityViolation {
     | 'ax_hidden_focus';
   selector: string;
   hostComponent?: string | null;
+  detail: string;
+  inShadowDom: boolean;
+}
+
+/**
+ * Represents a single interactive state or click-occlusion violation (`uirig states`):
+ * - `click_occluded`: an unrelated element intercepts pointer events over the interactive control.
+ * - `missing_focus_visible`: forcing `:focus-visible` produces zero measurable visual focus ring delta.
+ */
+export interface IInteractiveStateViolation {
+  violationType: 'click_occluded' | 'missing_focus_visible';
+  selector: string;
+  hostComponent?: string | null;
+  /** Topmost non-descendant element intercepting clicks when `violationType === 'click_occluded'`. */
+  occludingSelector?: string;
+  /** Human- and agent-readable explanation of the occlusion or missing focus indicator. */
   detail: string;
   inShadowDom: boolean;
 }
