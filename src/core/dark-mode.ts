@@ -219,6 +219,43 @@ export async function runDarkModeAudit(
         );
         const surfaces: ISurfaceLuminanceSnapshot[] = [];
 
+        function getComposedParentElement(el: Element): Element | null {
+          if (el.assignedSlot) {
+            return el.assignedSlot;
+          }
+          if (el.parentElement) {
+            return el.parentElement;
+          }
+          const rootNode = el.getRootNode();
+          return rootNode instanceof ShadowRoot ? rootNode.host : null;
+        }
+
+        function isEffectivelyInvisibleSurface(el: Element): boolean {
+          let current: Element | null = el;
+          let cumulativeOpacity = 1;
+
+          while (current) {
+            const style = window.getComputedStyle(current);
+            if (
+              style.display === 'none' ||
+              style.visibility === 'hidden' ||
+              style.visibility === 'collapse'
+            ) {
+              return true;
+            }
+            const parsedOpacity = Number.parseFloat(style.opacity);
+            if (Number.isFinite(parsedOpacity)) {
+              cumulativeOpacity *= parsedOpacity;
+              if (cumulativeOpacity <= 0.001) {
+                return true;
+              }
+            }
+            current = getComposedParentElement(current);
+          }
+
+          return false;
+        }
+
         function collectAncestorStyleLayers(el: Element): IAncestorStyleLayer[] {
           const bottomUpLayers: IAncestorStyleLayer[] = [];
           let current: Element | null = el;
@@ -230,12 +267,7 @@ export async function runDarkModeAudit(
               backgroundColor: style.backgroundColor || 'rgba(0, 0, 0, 0)',
               opacity: Number.isFinite(parsedOpacity) ? parsedOpacity : 1,
             });
-            if (current.parentElement) {
-              current = current.parentElement;
-            } else {
-              const rootNode = current.getRootNode();
-              current = rootNode instanceof ShadowRoot ? rootNode.host : null;
-            }
+            current = getComposedParentElement(current);
           }
           return bottomUpLayers.reverse();
         }
@@ -248,6 +280,8 @@ export async function runDarkModeAudit(
           if (
             computed.display === 'none' ||
             computed.visibility === 'hidden' ||
+            walker.isVisuallyHidden(currentNode) ||
+            isEffectivelyInvisibleSurface(currentNode) ||
             walker.isIgnored(currentNode, 'dark-mode')
           ) {
             return;
