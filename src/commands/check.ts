@@ -94,6 +94,7 @@ export interface IUirigConfig {
   tokensPath?: string | Array<string>;
   autoTokens?: boolean;
   themes?: Array<string>;
+  darkThemeSelector?: string;
   sweep?: string | boolean;
   scope?: Array<string>;
   exclude?: Array<string>;
@@ -358,12 +359,26 @@ export function loadUirigConfig(
         ? true
         : undefined;
 
+  let parsedDarkThemeSelector: string | undefined;
+  if (candidate.darkThemeSelector !== undefined) {
+    if (
+      typeof candidate.darkThemeSelector !== 'string' ||
+      candidate.darkThemeSelector.trim().length === 0
+    ) {
+      throw new Error(
+        "ERR_CONFIG_SCHEMA: 'darkThemeSelector' must be a non-empty CSS attribute or class selector string."
+      );
+    }
+    parsedDarkThemeSelector = candidate.darkThemeSelector.trim();
+  }
+
   return {
     $schema: candidate.$schema,
     targetUrls: candidate.targetUrls,
     tokensPath: candidate.tokensPath,
     autoTokens: candidate.autoTokens === true,
     ...(configThemes && configThemes.length > 0 ? { themes: configThemes } : {}),
+    ...(parsedDarkThemeSelector ? { darkThemeSelector: parsedDarkThemeSelector } : {}),
     ...(parsedSweep !== undefined ? { sweep: parsedSweep } : {}),
     ...(configScope ? { scope: configScope } : {}),
     ...(configExclude ? { exclude: configExclude } : {}),
@@ -614,7 +629,8 @@ export async function auditViewportInParallel(
   themeName?: string,
   cwd: string = process.cwd(),
   sweepSpec?: string,
-  excludeSelectors?: Array<string>
+  excludeSelectors?: Array<string>,
+  darkThemeSelector?: string
 ): Promise<IViewportAuditReport> {
   const viewportSize = { width: viewport.width, height: viewport.height };
   const isDarkThemeSkin = themeName ? /(?:^|[-_])dark(?:$|[-_])/i.test(themeName) : false;
@@ -699,6 +715,7 @@ export async function auditViewportInParallel(
         allowedColors: effectiveTokenScale?.colors ?? new Array<string>(),
         selectors,
         excludeSelectors,
+        darkThemeSelector,
       });
     } finally {
       await context.close();
@@ -1266,7 +1283,8 @@ export async function executeCheckCommand(
               themeName,
               cwd,
               effectiveSweepSpec,
-              effectiveExcludeSelectors
+              effectiveExcludeSelectors,
+              config.darkThemeSelector
             );
             sweepResults.push({
               ...viewportReport,
