@@ -14,6 +14,40 @@ import {
   extractHostComponentFromSelector,
 } from '../utils/dom-walker.js';
 
+const CIRCULAR_PERCENT_RADII = new Set(['50%', '100%']);
+
+/**
+ * Evaluates a computed `borderRadius` string against the approved token scale,
+ * permitting universal circular percentages (`50%`, `100%`) as well as multi-corner
+ * or elliptical shorthands (e.g. `16px 16px 16px 4px` or `8px / 4px`) when every
+ * individual corner token is approved.
+ */
+export function isAllowedRadiusValue(
+  rawRadius: string,
+  allowedRadii: ReadonlySet<string>
+): boolean {
+  const trimmed = rawRadius.trim();
+  if (!trimmed) {
+    return true;
+  }
+
+  if (allowedRadii.has(trimmed) || CIRCULAR_PERCENT_RADII.has(trimmed)) {
+    return true;
+  }
+
+  const parts = trimmed
+    .split('/')
+    .flatMap((axis) => axis.trim().split(/\s+/))
+    .filter(Boolean);
+
+  if (parts.length < 2) {
+    return false;
+  }
+
+  return parts.every((part) => allowedRadii.has(part) || CIRCULAR_PERCENT_RADII.has(part));
+}
+
+
 /**
  * Defines the approved design system values that rendered DOM elements are allowed to use.
  * Any computed style outside these arrays will be flagged as design token drift.
@@ -148,7 +182,7 @@ export function validateComputedStyleEntry(
 
   // 5. Validate computed border radius against the approved geometry scale
   const radiusVal = entry.styles.borderRadius.trim();
-  if (radiusVal && !allowedRadii.has(radiusVal)) {
+  if (radiusVal && !isAllowedRadiusValue(radiusVal, allowedRadii)) {
     violations.push({
       selector: entry.selector,
       hostComponent,

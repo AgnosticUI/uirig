@@ -53,6 +53,8 @@ export interface IDarkModeAuditOptions {
   selectors?: string[];
   /** Optional CSS selectors carved out from the dark-mode audit (`--exclude`). */
   excludeSelectors?: string[];
+  /** Optional custom root theme selector (e.g. `'[data-color-mode="dark"]'` or `'.theme-dark'`). */
+  darkThemeSelector?: string;
 }
 
 export function findNearestDarkSurfaceToken(
@@ -120,10 +122,46 @@ export function evaluateDarkModeSurfaceEntry(
   return null;
 }
 
+export interface IParsedDarkThemeHook {
+  attribute?: { name: string; value: string };
+  className?: string;
+}
+
+/**
+ * Parses an optional custom root dark-theme selector such as
+ * `'[data-color-mode="dark"]'`, `'[data-dark]'`, or `'.theme-dark'`
+ * into an attribute or class mutation applied to `document.documentElement`.
+ */
+export function parseDarkThemeSelector(selector?: string): IParsedDarkThemeHook | null {
+  if (!selector) {
+    return null;
+  }
+  const trimmed = selector.trim().replace(/^(?:html|:root)\s*/i, '');
+  if (!trimmed) {
+    return null;
+  }
+
+  const attrMatch = trimmed.match(/^\[\s*([a-zA-Z0-9_-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\]]*)))?\s*\]$/);
+  if (attrMatch) {
+    const name = attrMatch[1];
+    const value = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4]?.trim() ?? '';
+    return { attribute: { name, value } };
+  }
+
+  const classMatch = trimmed.match(/^\.([a-zA-Z0-9_-]+)$/);
+  if (classMatch) {
+    return { className: classMatch[1] };
+  }
+
+  return null;
+}
+
 interface IOriginalHtmlThemeState {
   dataTheme: string | null;
   hadDarkClass: boolean;
   dataBsTheme: string | null;
+  customAttr?: { name: string; previousValue: string | null };
+  customClass?: { name: string; hadClass: boolean };
 }
 
 /**
@@ -156,21 +194,41 @@ export async function runDarkModeAudit(
     )})...`
   );
 
+  const parsedCustomHook = parseDarkThemeSelector(options.darkThemeSelector);
+
   await page.emulateMedia({ colorScheme: 'dark' });
-  const originalThemeState: IOriginalHtmlThemeState = await page.evaluate(() => {
-    const root = document.documentElement;
-    const snapshot: IOriginalHtmlThemeState = {
-      dataTheme: root.getAttribute('data-theme'),
-      hadDarkClass: root.classList.contains('dark'),
-      dataBsTheme: root.getAttribute('data-bs-theme'),
-    };
-    root.setAttribute('data-theme', 'dark');
-    root.classList.add('dark');
-    if (snapshot.dataBsTheme !== null) {
-      root.setAttribute('data-bs-theme', 'dark');
-    }
-    return snapshot;
-  });
+  const originalThemeState: IOriginalHtmlThemeState = await page.evaluate(
+    (customHook: IParsedDarkThemeHook | null) => {
+      const root = document.documentElement;
+      const snapshot: IOriginalHtmlThemeState = {
+        dataTheme: root.getAttribute('data-theme'),
+        hadDarkClass: root.classList.contains('dark'),
+        dataBsTheme: root.getAttribute('data-bs-theme'),
+      };
+      root.setAttribute('data-theme', 'dark');
+      root.classList.add('dark');
+      if (snapshot.dataBsTheme !== null) {
+        root.setAttribute('data-bs-theme', 'dark');
+      }
+      if (customHook?.attribute) {
+        snapshot.customAttr = {
+          name: customHook.attribute.name,
+          previousValue: root.getAttribute(customHook.attribute.name),
+        };
+        root.setAttribute(customHook.attribute.name, customHook.attribute.value);
+      }
+      if (customHook?.className) {
+        snapshot.customClass = {
+          name: customHook.className,
+          hadClass: root.classList.contains(customHook.className),
+        };
+        root.classList.add(customHook.className);
+      }
+      return snapshot;
+    },
+    parsedCustomHook
+  );
+
 
   try {
     const violations: IDarkModeViolation[] = [];
@@ -361,6 +419,16 @@ export async function runDarkModeAudit(
           root.removeAttribute('data-bs-theme');
         } else {
           root.setAttribute('data-bs-theme', prev.dataBsTheme);
+        }
+        if (prev.customAttr) {
+          if (prev.customAttr.previousValue === null) {
+            root.removeAttribute(prev.customAttr.name);
+          } else {
+            root.setAttribute(prev.customAttr.name, prev.customAttr.previousValue);
+          }
+        }
+        if (prev.customClass && !prev.customClass.hadClass) {
+          root.classList.remove(prev.customClass.name);
         }
       }, originalThemeState)
       .catch(() => {});

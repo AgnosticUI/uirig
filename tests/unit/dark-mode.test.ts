@@ -407,4 +407,40 @@ describe('dark-mode.ts — Theme Parity & Luminance Inversion Gate', () => {
     expect(violations).toEqual([]);
   });
 
+  it('supports custom darkThemeSelector attributes and classes and restores original <html> state (Issue #61)', async () => {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+    }
+    const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+    const page = await context.newPage();
+
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html data-color-mode="light">
+        <head>
+          <style>
+            html { --bg: #ffffff; --fg: #0f172a; }
+            html[data-color-mode="dark"] { --bg: #0d1117; --fg: #f0f6fc; }
+            body { margin: 0; padding: 24px; background: var(--bg); color: var(--fg); }
+          </style>
+        </head>
+        <body>
+          <h1>Primer-style Custom Attribute Dark Mode</h1>
+        </body>
+      </html>
+    `);
+
+    const violations = await runDarkModeAudit(page, {
+      darkThemeSelector: '[data-color-mode="dark"]',
+    });
+    expect(violations).toEqual([]);
+
+    const restoredAttr = await page.evaluate(() =>
+      document.documentElement.getAttribute('data-color-mode')
+    );
+    await context.close();
+
+    expect(restoredAttr).toBe('light');
+  });
+
 });

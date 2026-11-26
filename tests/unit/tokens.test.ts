@@ -117,6 +117,64 @@ describe('::: PHASE 3 TASK 3.1 (CHUNK 2): TOKEN VALIDATION LOGIC GATES :::', () 
       },
     ]);
   });
+
+  it('==> Should allow circular border-radius percentages (50% / 100%) and multi-corner token shorthands (Issue #62)', () => {
+    const scaleWith16px: ITokenScaleConfig = {
+      ...approvedScale,
+      radii: ['0px', '4px', '8px', '16px'],
+    };
+
+    const circularAvatar: IExtractedElementStyles = {
+      selector: 'ag-avatar >> shadow-root >> div.avatar',
+      inShadowDom: true,
+      styles: {
+        color: 'rgb(15, 23, 42)',
+        backgroundColor: 'rgb(59, 130, 246)',
+        paddingTop: '0px',
+        paddingBottom: '0px',
+        paddingLeft: '0px',
+        paddingRight: '0px',
+        fontSize: '14px',
+        borderRadius: '50%',
+      },
+    };
+
+    const speechBubble: IExtractedElementStyles = {
+      selector: 'ag-message-bubble >> shadow-root >> div.bubble',
+      inShadowDom: true,
+      styles: {
+        color: 'rgb(15, 23, 42)',
+        backgroundColor: 'rgb(255, 255, 255)',
+        paddingTop: '8px',
+        paddingBottom: '8px',
+        paddingLeft: '16px',
+        paddingRight: '16px',
+        fontSize: '14px',
+        borderRadius: '16px 16px 16px 4px',
+      },
+    };
+
+    const unapprovedCornerBubble: IExtractedElementStyles = {
+      ...speechBubble,
+      styles: {
+        ...speechBubble.styles,
+        borderRadius: '16px 13px 16px 4px',
+      },
+    };
+
+    expect(validateComputedStyleEntry(circularAvatar, scaleWith16px)).toHaveLength(0);
+    expect(validateComputedStyleEntry(speechBubble, scaleWith16px)).toHaveLength(0);
+    expect(validateComputedStyleEntry(unapprovedCornerBubble, scaleWith16px)).toEqual([
+      {
+        selector: 'ag-message-bubble >> shadow-root >> div.bubble',
+        hostComponent: 'ag-message-bubble',
+        property: 'borderRadius',
+        actualValue: '16px 13px 16px 4px',
+        inShadowDom: true,
+      },
+    ]);
+  });
+
 });
 
 describe('::: PHASE 3 TASK 3.1 (CHUNK 3B & 3C): SHADOW-PIERCING BROWSER CRAWLER :::', () => {
